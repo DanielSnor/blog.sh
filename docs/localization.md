@@ -274,6 +274,22 @@ shows as written. A word for a tag no published post carries is shown
 nowhere; `check` says so, and the build goes on -- tags come and go with
 the posts, and the build runs after every save.
 
+**A series is the same: one ID, a name per language.** A post says which
+series it belongs to once, in the site's own language, and the series has
+one address in every language -- `/cs/series/the-new-site/` is the Czech
+page of that series. The name a Czech reader sees over it, in the sentence
+that places each part and in the page's title is the one `series:` gives:
+
+```yaml
+# config/site.cs.yml
+series:
+  "The new site": "Nový web"
+```
+
+Keyed by the name as the posts write it, or by the series' slug -- both
+fold to the same thing. A series with no name here shows as written, and a
+name for a series nobody writes is shown nowhere.
+
 **A list with places in it names the same places.** The menu and the
 footer links are written out in full, the way site.yml has them, but
 every item goes where the same item goes in site.yml, in the same order;

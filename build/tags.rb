@@ -142,7 +142,10 @@ module Tags
         end
       end
       Output.cached_emit(tag_index_dest, tag_index_key) do
-        layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
+        # How many tags there are, as every other listing's heading says how
+        # many it holds -- this was the one that did not. The index is
+        # rewritten whenever a tag comes or goes, so the number costs nothing.
+        layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag, count: tags_map.size) +
                %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
                title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
                description: t('tags.description', site_title: SITE_TITLE),

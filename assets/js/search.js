@@ -106,6 +106,56 @@
     }).map(function (x) { return x.post; });
   }
 
+  // Why a result is in the list, shown on the result: the words that were
+  // asked for are marked where the card shows them. The search folds
+  // everything -- "ctyri" finds "Čtyři" -- so the page cannot look the
+  // query up in the text as written; it folds the text one character at a
+  // time, remembers which character each folded unit came from, finds the
+  // words in the folded run and marks the characters they belong to. "ß"
+  // folds to two units and an accent to none, and both still land on the
+  // letter the reader sees.
+  //
+  // Only what the card shows is marked. The match itself may sit deeper in
+  // the post than the excerpt reaches; then nothing is marked, which is
+  // true -- the word is not in these lines.
+  function foldChar(ch) {
+    return ch.normalize('NFKD').replace(/\p{Mn}/gu, '').toLowerCase()
+      .replace(/[ßæœøđðþłħŧŋıς]/g, function (c) { return FOLD_MAP[c]; })
+      .replace(/[ \t\n\r\f\v]/g, ' ');
+  }
+
+  function markTerms(text, terms) {
+    var chars = Array.from(text || '');
+    if (!terms.length || !chars.length) return escapeHtml(text || '');
+    var folded = '';
+    var owner = [];
+    chars.forEach(function (ch, i) {
+      var units = Array.from(foldChar(ch));
+      units.forEach(function (u) { folded += u; owner.push(i); });
+    });
+    // Counted in code points on both sides, so a pair of surrogates in the
+    // folded run cannot shift every mark after it by one.
+    var run = Array.from(folded);
+    var marked = [];
+    terms.forEach(function (term) {
+      var want = Array.from(term);
+      if (!want.length) return;
+      for (var at = 0; at + want.length <= run.length; at++) {
+        var hit = true;
+        for (var k = 0; k < want.length; k++) { if (run[at + k] !== want[k]) { hit = false; break; } }
+        if (hit) { for (var j = 0; j < want.length; j++) marked[owner[at + j]] = true; }
+      }
+    });
+    var out = '';
+    var open = false;
+    chars.forEach(function (ch, i) {
+      if (marked[i] && !open) { out += '<mark>'; open = true; }
+      if (!marked[i] && open) { out += '</mark>'; open = false; }
+      out += escapeHtml(ch);
+    });
+    return open ? out + '</mark>' : out;
+  }
+
   function resultsUnit(n) {
     if (n === 1) return i18n.results_one;
     if (n < 5) return i18n.results_few;
@@ -139,8 +189,13 @@
     var capNote = hits.length > RESULT_LIMIT
       ? String(i18n.results_capped || '').replace('%{count}', RESULT_LIMIT)
       : '';
-    var html = '<p class="search-status">' + hits.length + ' ' + resultsUnit(hits.length) +
+    // The number and its word are a span each: beside a heading that says
+    // "blog.sh" a skin wants just "10", the way every other listing's
+    // heading carries its count, and one run of text could not be split.
+    var html = '<p class="search-status"><span class="search-count">' + hits.length + '</span> ' +
+               '<span class="search-unit">' + escapeHtml(resultsUnit(hits.length)) + '</span>' +
                capNote + archiveNote + '</p>';
+    var terms = parseQueryTokens(query).filter(function (x) { return !x.neg; }).map(function (x) { return x.t; });
     html += hits.slice(0, RESULT_LIMIT).map(function (p) {
       // Array.from, not slice: slice counts UTF-16 units, so a cut that
       // landed inside an emoji ended the heading with a replacement
@@ -153,8 +208,8 @@
       return (
         '<div class="card post-list-item search-result">' +
           '<p class="meta">' + escapeHtml(p.date) + '</p>' +
-          '<h2><a href="' + escapeHtml(p.url) + '">' + escapeHtml(title) + '</a></h2>' +
-          '<p>' + escapeHtml(p.excerpt) + '</p>' +
+          '<h2><a href="' + escapeHtml(p.url) + '">' + markTerms(title, terms) + '</a></h2>' +
+          '<p>' + markTerms(p.excerpt, terms) + '</p>' +
         '</div>'
       );
     }).join('');

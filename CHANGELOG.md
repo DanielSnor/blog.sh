@@ -18,6 +18,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Added
 
+- **A series has a name per language.** `series:` in `config/site.<lang>.yml` gives a series the
+  name that language shows -- over its listing, in the sentence that places a part, in the page's
+  title -- keyed like `tags:` by the name the posts write or by its slug. The series itself stays
+  one thing: one address, one set of parts. Without it a second language showed the series' name
+  untranslated over translated posts.
 - **On this day.** A sidebar card with posts from this day in earlier years, switched on by
   `on_this_day:` under `widgets:` (or in `./style.sh`). One row per year, five at most: round
   anniversaries always, the rest spread along the years with the oldest claiming first, a titled
@@ -117,12 +122,21 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `.not-found-link--back`, `--archive`, `--year`, `--tags`.
 - **A listing's heading says how many it holds.** A small number after the name, as the index of
   tags writes it: posts under a tag or of a type, parts of a series, posts of an archive year and
-  of the whole archive. On a tag's or a type's listing it stands on the first page only -- that
+  of the whole archive, tags in the index of tags. On a tag's or a type's listing it stands on the first page only -- that
   page is rewritten by a new post anyway, and on all of them it would rewrite every page of a tag
   each time a post takes it. A series says it on every page, which costs nothing: its cards
   already count the parts.
-- **Five things a skin could not select are marked.** Nothing looks different until a stylesheet
+- **The search says why a result is there.** The words that were asked for are marked in a
+  result's title and excerpt -- as written, accents and all: "ctyri" marks "Čtyři". Only what
+  the card shows is marked; a match deeper in the post marks nothing.
+- **Things a skin could not select are marked.** Nothing looks different until a stylesheet
   says so (`docs/skinning.md`, "What the markup marks for you"):
+  a link in a post's text that is a mention or a hashtag -- its whole text "@somebody" or
+  "#something" -- carries `mention` or `mention hashtag`, the classes the same things have in the
+  comments and in the sidebar's toots;
+  a reply written by the account that announced the post is `comment--author`;
+  "page 12" under a listing is `pagination-word` and `pagination-number`;
+  the search's "4 results" is `search-count` and `search-unit`;
   the series sentence is three spans -- the name, what joins it, the part -- so a series' own
   listing can drop the name every card repeats;
   the heading of an archive year says its kind and its year separately, as a tag's does, and the

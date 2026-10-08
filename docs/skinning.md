@@ -176,8 +176,31 @@ row keeps its three places; whether it is worth reading is yours to say:
 The numbers are filled in by a script after the page loads, so this is a
 class you will not find by reading the built HTML.
 
+**A mention and a hashtag in a post's text.** A link whose whole text is
+"@somebody" or "#something" is `a.mention`, a hashtag `a.mention.hashtag`
+as well -- the classes Mastodon's own markup gives them, which is what
+the comments under a post and the toots in the sidebar already carry. One
+rule now reaches all three:
+
+```css
+a.mention { text-decoration: none; }
+```
+
+**The author among the replies.** A reply from the account that announced
+the post is `.comment.comment--author`. The script tells it by the
+address of the announcement, so it works for a live thread, a moderated
+one and a Bluesky one alike.
+
+**The search's count and its matches.** The status over the results is
+`<span class="search-count">4</span> <span class="search-unit">results</span>`,
+so a skin can keep the number and drop the word. In a result's title and
+excerpt the words that were asked for are `<mark>`; `site.css` gives it
+the pills' ground instead of the browser's yellow
+(`.search-result mark`).
+
 **The days a page covers.** Under a listing, the label between the two
-links is `page 12` followed by `.pagination-sep` (the dot) and
+links is `page 12` -- the word in `.pagination-word`, the number in
+`.pagination-number` -- followed by `.pagination-sep` (the dot) and
 `.pagination-dates`; on the page the numbering starts from,
 `.pagination-start` stands where the link to older posts would.
 `site.css` hides the dot and puts the dates on a line of their own under

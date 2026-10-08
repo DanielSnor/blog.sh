@@ -1378,6 +1378,10 @@ main .not-found-search input[type="search"] { width: 100%; }
 .search-tip { color: var(--meta-text); font-size: 0.85rem; margin-bottom: 1.5rem; }
 .search-status { color: var(--meta-text); font-size: 0.9rem; }
 .search-archive-pending { font-style: italic; }
+/* The words that were asked for, where a result shows them. The pills'
+   ground rather than a browser's yellow: it is the one tint every palette
+   already has for "this is the thing in question", in both schemes. */
+.search-result mark { background: var(--pill-bg); color: inherit; padding: 0 0.1em; border-radius: 2px; }
 
 main .post-list-item { margin-bottom: 1.5rem; }
 main .post-list-item:last-child { margin-bottom: 0; }

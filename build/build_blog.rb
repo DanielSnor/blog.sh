@@ -1311,6 +1311,26 @@ def tag_label(tag)
   TAG_LABELS.fetch(tag_slug(tag), tag)
 end
 
+# A series is the same: one ID -- its slug, which is its address in every
+# language -- and a name the posts write once, in the site's own language.
+# On a second language's pages that name stood untranslated over translated
+# posts ("Part 3 of 20 — Nový Sean.cz"), because there was nowhere to say
+# another. `series:` in config/site.<lang>.yml is that place, keyed like
+# `tags:` by the name as the posts write it or by its slug.
+SERIES_LABELS = if SITE_LANG == SITE_OWN_LANG
+                  {}
+                else
+                  LanguageFile.series_labels(SiteConfig.data) { |name| Slug.slugify(name) }
+                end.freeze
+
+# What this language calls the series: its own word where it has one, the
+# name the posts spell out otherwise. Every place a reader sees the name
+# asks here, so the heading, the sentence on a part and the page's title
+# cannot disagree.
+def series_name(slug)
+  SERIES_LABELS.fetch(slug) { SERIES_NAMES[slug].to_s }
+end
+
 def tags_html(post)
   return '' if post['tags'].nil? || post['tags'].empty?
 
@@ -1674,7 +1694,7 @@ def series_part_label(slug, in_series, index)
   lead = before.match(/\A(.*?)([^\p{L}\p{N}]*)\z/m)
   tail = after.match(/\A([^\p{L}\p{N}]*)(.*)\z/m)
   series_note_span('part', lead[1]) + series_note_span('sep', lead[2]) +
-    series_note_span('name', h(SERIES_NAMES[slug].to_s)) +
+    series_note_span('name', h(series_name(slug))) +
     series_note_span('sep', tail[1]) + series_note_span('part', tail[2])
 end
 
@@ -2010,6 +2030,22 @@ end
 # a page whose link failed to draw looks like.
 #
 # `posts:` are the page's own; without them the label is the number alone.
+#
+# "page 663" is a word and a number, and they are a span each: a skin that
+# makes the label a heading wants the number in its accent and the word in
+# ink, the way "Archive 2026" is. Cut from the one translated phrase, like
+# the series sentence -- the space between the two stays where it was.
+def page_label_html(number)
+  before, after = t('pagination.page', number: "\u0000").split("\u0000", 2)
+  return h(before.to_s) if after.nil?
+
+  word = lambda do |text|
+    lead, core, trail = text.match(/\A(\s*)(.*?)(\s*)\z/m).captures
+    core.empty? ? h(text) : %(#{lead}<span class="pagination-word">#{h(core)}</span>#{trail})
+  end
+  %(#{word.call(before)}<span class="pagination-number">#{number}</span>#{word.call(after)})
+end
+
 def pagination_html(number, fixed, base_path = '', oldest_first: false, posts: nil)
   return '' if fixed.zero?
 
@@ -2021,7 +2057,7 @@ def pagination_html(number, fixed, base_path = '', oldest_first: false, posts: n
     last = fixed + 1
     back = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path, oldest_first: true)}">#{h(t('pagination.series_previous'))}</a>) : ''
     on = number < last ? %(<a href="#{page_url(number + 1, fixed, base_path, oldest_first: true)}">#{h(t('pagination.series_next'))}</a>) : ''
-    return %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{back}<span>#{h(t('pagination.page', number: number))}</span>#{on}</nav>)
+    return %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{back}<span>#{page_label_html(number)}</span>#{on}</nav>)
   end
 
   newer = number <= fixed ? %(<a href="#{page_url(number + 1, fixed, base_path)}">#{h(t('pagination.newer'))}</a>) : ''
@@ -2036,7 +2072,7 @@ def pagination_html(number, fixed, base_path = '', oldest_first: false, posts: n
             h(t('pagination.latest'))
           else
             dates = posts && page_dates_label(posts)
-            h(t('pagination.page', number: number)) +
+            page_label_html(number) +
               (dates ? %(<span class="pagination-sep"> · </span><span class="pagination-dates">#{h(dates)}</span>) : '')
           end
   %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{newer}<span>#{label}</span>#{older}</nav>)
@@ -3171,7 +3207,7 @@ def post_page_key(post, source_media_dir)
   # a handful of posts, so the cost of rebuilding all of them when one
   # changes is a handful of pages.
   series_bit = if slug
-                 "#{slug}/#{SERIES_NAMES[slug]}:" +
+                 "#{slug}/#{series_name(slug)}:" +
                    in_series.map { |p| "#{post_path(p)}=#{POST_DIGEST[p['__path']]}" }.join(',')
                elsif draft?(post) && !post['series'].to_s.strip.empty?
                  # A draft is not in SERIES_MAP -- "part 3 of 7" is a fact
@@ -3510,7 +3546,7 @@ Tags.write_index(tags_map)
 # start. Only for a series with more than one post, which SERIES_MAP
 # already guarantees -- a "series" of one is a post.
 SERIES_MAP.each do |slug, in_series|
-  name = SERIES_NAMES[slug].to_s
+  name = series_name(slug)
   # Read from part one, and paged from part one: see anchored_pages.
   #
   # An overlong name is refused the same way a tag's is (Slug.pageable?),

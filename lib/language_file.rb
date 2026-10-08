@@ -47,6 +47,10 @@ module LanguageFile
   # its word here. The tag itself -- its address, its page, the posts that
   # carry it -- is one ID in every language; only the label is translated.
   TAG_LABELS = 'tags'
+  # ...and for a series, the same way: `series:` maps a series to its name
+  # here. Its address and its parts are one in every language.
+  SERIES_LABELS = 'series'
+  LABEL_TABLES = [TAG_LABELS, SERIES_LABELS].freeze
 
   # The lists with places in them. A translation says the same places in
   # the same order with other words: a menu that drifts apart between the
@@ -79,7 +83,7 @@ end
   # names.
   def known
     SETTINGS + TEXTS.flat_map { |section, keys| keys.map { |key| "#{section}.#{key}" } } +
-      %w[nav] + WIDGET_TEXTS.map { |key| "widgets.<name>.#{key}" } + [TAG_LABELS]
+      %w[nav] + WIDGET_TEXTS.map { |key| "widgets.<name>.#{key}" } + LABEL_TABLES
   end
 
   # The chrome of one language laid over the site's own config: sections
@@ -98,7 +102,7 @@ end
       keys.each { |key| merged[section][key] = given[key] if given.key?(key) }
     end
     merged['nav'] = lang_data['nav'] if lang_data.key?('nav')
-    merged[TAG_LABELS] = lang_data[TAG_LABELS] if lang_data[TAG_LABELS].is_a?(Hash)
+    LABEL_TABLES.each { |table| merged[table] = lang_data[table] if lang_data[table].is_a?(Hash) }
     widgets = lang_data['widgets'].is_a?(Hash) ? lang_data['widgets'] : {}
     widgets.each do |name, conf|
       next unless conf.is_a?(Hash) && own_card?(merged, name)
@@ -139,7 +143,7 @@ end
 
           found << [:orphan, name, nil] if dig(own, key, sub).to_s.strip.empty?
         end
-      elsif key == TAG_LABELS
+      elsif LABEL_TABLES.include?(key)
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
         value.each do |tag, label|
@@ -192,14 +196,24 @@ end
   # engine folds every spelling of a tag into, so `Filozofie:` and
   # `filozofie:` name the one page. The slug is the caller's to compute
   # (Slug.slugify), which keeps this file free of it.
-  def tag_labels(data)
-    given = data.is_a?(Hash) ? data[TAG_LABELS] : nil
+  def tag_labels(data, &slug)
+    labels_of(data, TAG_LABELS, &slug)
+  end
+
+  # The names a language gives its series, by the series' slug -- which is
+  # its address, the same in every language.
+  def series_labels(data, &slug)
+    labels_of(data, SERIES_LABELS, &slug)
+  end
+
+  def labels_of(data, table)
+    given = data.is_a?(Hash) ? data[table] : nil
     return {} unless given.is_a?(Hash)
 
-    given.each_with_object({}) do |(tag, label), labels|
+    given.each_with_object({}) do |(name, label), labels|
       next unless label.is_a?(String) && !label.strip.empty?
 
-      labels[yield(tag.to_s)] = label.strip
+      labels[yield(name.to_s)] = label.strip
     end
   end
 
