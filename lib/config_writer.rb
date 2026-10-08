@@ -632,10 +632,18 @@ module ConfigWriter
     # substituted into. Nothing is written to disk here -- the copy lives
     # in memory until save!, so a wizard that gets cancelled leaves no
     # file behind.
+    #
+    # Read as UTF-8 by name, here and for the template below. Without it
+    # the encoding is whatever the shell's locale says, and under a shell
+    # that says nothing a config with one accented letter in it could not
+    # be searched for a key: every `set` died on "invalid byte sequence in
+    # US-ASCII". The wizards never met that, because their entry points
+    # set the default first -- but the shipped example carries a Czech
+    # name since 1.10, so anything that opens the writer on its own did.
     def read_or_seed
       if File.exist?(@path)
         begin
-          return File.read(@path)
+          return File.read(@path, encoding: 'utf-8')
         rescue SystemCallError => e
           raise Unreadable.new(@path, e.message)
         end
@@ -645,7 +653,7 @@ module ConfigWriter
       # has none, and the file the sentence has to name is that one.
       raise TemplateMissing, (@template || @path).to_s unless @template && File.exist?(@template)
 
-      File.read(@template)
+      File.read(@template, encoding: 'utf-8')
     end
 
     # path -> line number, built from ACTIVE lines only. Commented lines
@@ -1141,7 +1149,7 @@ module ConfigWriter
     def read_or_seed
       if File.exist?(@path)
         begin
-          return File.read(@path)
+          return File.read(@path, encoding: 'utf-8')
         rescue SystemCallError => e
           raise Unreadable.new(@path, e.message)
         end
@@ -1151,7 +1159,7 @@ module ConfigWriter
       # has none, and the file the sentence has to name is that one.
       raise TemplateMissing, (@template || @path).to_s unless @template && File.exist?(@template)
 
-      File.read(@template)
+      File.read(@template, encoding: 'utf-8')
     end
 
     # Prefers an active line, falls back to a commented one (which is how

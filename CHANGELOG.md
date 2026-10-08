@@ -231,6 +231,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Fixed
 
+- **The config writer read a config in whatever encoding the shell named.** Under a shell that
+  names none, a `config/site.yml` with one accented letter in it could not be searched for a key,
+  and every setting written to it failed with "invalid byte sequence in US-ASCII". The wizards set
+  the encoding before they open the writer and never met it; anything opening the writer on its own
+  did. It reads UTF-8 by name now.
 - **A second language's build called a post's own page "already taken".** A translation that kept
   the slug of the post it was merged from stands, in its own tree, at an address the post's
   `former_slugs` also names; the build warned once per such post on every run. An old address
