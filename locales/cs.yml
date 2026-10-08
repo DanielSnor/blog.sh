@@ -496,7 +496,7 @@ cli:
   queue_overdue: "(čeká na cron)"
   queue_menu_hint: "↑↓ pohyb · Enter akce s příspěvkem · Esc zpět"
   queue_pick_prompt: "Číslo příspěvku (prázdné = konec): "
-  queue_actions: "'%{slug}': [u] o slot dříve  [d] o slot později  [p] publikovat hned  [s] jiný čas  [n] vyřadit z fronty  [Enter] zpět: "
+  queue_actions: "'%{slug}': [u] o slot dříve  [d] o slot později  [p] publikovat hned  [s] přeplánovat  [n] zrušit plán  [Enter] zpět: "
   queue_unknown: "Nerozumím, zkus u / d / p / s / n."
   queue_already_first: "Příspěvek už je první ve frontě."
   queue_already_last: "Příspěvek už je poslední ve frontě."
@@ -537,7 +537,7 @@ cli:
   bluesky_recovered: "Ten příspěvek už oznámený byl — našel jsem oznámení na účtu a zapsal jeho adresu místo toho, abych poslal druhé: %{url}"
   deleting_bluesky: "Mažu oznámení na Bluesky: %{url}"
   delete_bluesky_failed: "Smazání oznámení na Bluesky selhalo — smaž ho ručně."
-  unlisted_no_toot: "Příspěvek je nezalistovaný, oznámení se neposlalo. Aby odešlo, sundej mu nejdřív příznak."
+  unlisted_no_toot: "Příspěvek je mimo výpisy, oznámení se neposlalo. Aby odešlo, sundej mu nejdřív příznak."
   backdated_no_toot: "Datum příspěvku není aktuální (zpětně datovaný příspěvek), oznámení se neposlalo."
   schedule_only_drafts: "Příspěvek '%{slug}' už je publikovaný — plánovat jde jen koncepty."
   scheduled_label: "Naplánováno: '%{slug}' se publikuje automaticky %{date}."
@@ -561,12 +561,12 @@ cli:
   tooted: "Otootováno: %{url}"
 
   already_draft: "Příspěvek '%{slug}' je už koncept: %{url}"
-  confirm_unpublish: "Opravdu vrátit '%{slug}' zpátky do konceptu? Napiš slug pro potvrzení: "
+  confirm_unpublish: "Opravdu vrátit '%{slug}' do konceptů? Napiš slug pro potvrzení: "
   cancelled: "Zrušeno."
   deleting_toot: "Mažu toot na Mastodonu: %{url}"
   delete_toot_failed: "Smazání selhalo (viz výš) — toot zůstává, jen teď odkazuje na dočasně mrtvou stránku."
   announcement_kept: "Příspěvek si adresu %{url} nechává, aby šlo oznámení smazat později — a aby publikováním nevzniklo druhé."
-  reverted_to_draft: "Vráceno do konceptu: %{path}"
+  reverted_to_draft: "Vráceno do konceptů: %{path}"
   updating_preview: "Aktualizuji náhled"
 
   no_changes: "Žádné změny, nic se neukládá."
@@ -682,10 +682,10 @@ cli:
                                      zeptá se na datum a naplánuje koncept k automatické publikaci v něm; opětovné spuštění plán zruší;
                                      --json s --at zapíše ten čas, --cancel příspěvek z fronty vyřadí (--compact posune zbytek dopředu)
       ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
-                                     fronta naplánovaných příspěvků — pořadí, publikace hned, vyřazení zpět do konceptů;
+                                     fronta naplánovaných příspěvků — pořadí, publikace hned, zrušení plánu;
                                      --json ji vypíše jako data
       ./blog.sh unpublish [<slug>] [--yes] [--json]
-                                     vrátí publikovaný příspěvek zpátky do konceptu, smaže i jeho toot (bez slugu nabídne publikované příspěvky)
+                                     vrátí publikovaný příspěvek do konceptů, smaže i jeho toot (bez slugu nabídne publikované příspěvky)
       ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
                                      smaže příspěvek do koše, bez slugu nabídne posledních %{recent_count} příspěvků ke smazání
       ./blog.sh restore [<slug>] [--rebuild] [--json]
@@ -728,7 +728,7 @@ cli:
   wizard_unknown_choice: "Neznámá volba, zkus znovu."
   wizard_menu_add: "Nový příspěvek"
   wizard_menu_post: "Příspěvek — upravit text, jeho vlastnosti a akce s ním"
-  wizard_menu_queue: "Fronta naplánovaných příspěvků — pořadí, publikovat hned, vyřadit"
+  wizard_menu_queue: "Fronta naplánovaných příspěvků — pořadí, publikovat hned, zrušit plán"
   wizard_menu_restore: "Koš — obnovit smazané příspěvky"
   wizard_menu_browse: "Archiv — filtry, hledání, náhled"
   wizard_menu_rebuild: "Web — znovu sestavit a nasadit po změně nastavení"
@@ -811,7 +811,7 @@ cli:
   props_series_part_moved: "%{label} — na webu %{position}. z %{total}"
   props_series_part_after: "%{label} — po publikaci %{position}. z %{total}"
   props_label_pinned: "připnutí"
-  props_label_unlisted: "nezalistován"
+  props_label_unlisted: "mimo výpisy"
   props_label_announced: "oznámení"
   props_label_addresses: "staré odkazy"
   props_draft_banner: "koncept — není na webu, jen náhled"
@@ -821,13 +821,13 @@ cli:
   props_announces_on_publish: "zatím ne — odejde s publikací"
   props_announces_nowhere: "nikdy — tenhle web neoznamuje nikam (v config/site.yml není mastodon: ani bluesky:)"
   props_announces_no_secret: "zatím nikdy — %{value} v env.sh je prázdný, takže publikace nic neoznámí"
-  props_announces_never_unlisted: "neodejde — nezalistovaný příspěvek se neoznamuje"
+  props_announces_never_unlisted: "neodejde — příspěvek mimo výpisy se neoznamuje"
   props_not_announced: "bez oznámení"
   props_attributes_hint: "Typ, štítky a sérii změníš přes [e]; samotný text přes ./blog.sh edit."
   props_actions_draft: "[p] publikovat  [s] naplánovat  [e] vlastnosti  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
   props_actions_scheduled: "[p] publikovat hned  [s] přeplánovat  [n] zrušit plán  [e] vlastnosti  [r] přejmenovat slug  [x] smazat  [Enter] zpět: "
-  props_actions_published: "[u] stáhnout z webu  [t] oznámit (%{network})  [c] připnout/odepnout  [e] vlastnosti  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
-  props_actions_published_plain: "[u] stáhnout z webu  [c] připnout/odepnout  [e] vlastnosti  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
+  props_actions_published: "[u] vrátit do konceptů  [t] oznámit (%{network})  [c] připnout/odepnout  [e] vlastnosti  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
+  props_actions_published_plain: "[u] vrátit do konceptů  [c] připnout/odepnout  [e] vlastnosti  [r] přejmenovat slug  [a] staré odkazy  [x] smazat  [Enter] zpět: "
   props_action_versions: "[v] starší verze  "
   props_action_qr: "[q] QR pro mobil  "
   props_publish_confirm: "Publikovat „%{slug}“ teď? [a/N] "
@@ -909,7 +909,7 @@ cron:
   sidebar_comments_removed: "comments.json: smazán (comments.approval je vypnuté)"
   sidebar_comments: "comments.json: aktualizovaných vláken: %{threads}, schválených komentářů celkem: %{comments}"
   published_scheduled: "Publikován naplánovaný příspěvek '%{slug}' (datum %{date})."
-  unlisted_not_announced: "Příspěvek '%{slug}' je nezalistovaný, oznámení se neposílalo."
+  unlisted_not_announced: "Příspěvek '%{slug}' je mimo výpisy, oznámení se neposílalo."
   already_announced: "Příspěvek '%{slug}' už jednou oznámený byl, takže se neoznamoval znovu — původní vlákno i s odpověďmi zůstává to, na které příspěvek odkazuje. Druhé oznámení se nepošle, dokud příspěvek nese adresu prvního; kdybys ho opravdu chtěl, smaž nejdřív z JSON příspěvku pole s adresou (mastodon_url, nebo bluesky_url + bluesky_uri)."
   backdated_not_announced: "Příspěvek '%{slug}' je datovaný víc než den od teď, publikoval se tedy bez oznámení — zpětně doplněný příspěvek působí na živé časové ose jako novinka. Když ho přesto chceš oznámit: ./blog.sh toot %{slug} (nebo ./blog.sh bluesky %{slug})."
   publishing_scheduled: "Publikuji naplánované příspěvky (%{count})"

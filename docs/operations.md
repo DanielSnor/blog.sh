@@ -570,12 +570,11 @@ standard error.
 
 **This page and its shortcut are on their way out.** Native apps for iOS
 and Android are in preparation; they reach the engine over the same SSH
-([Over SSH, from an app](#over-ssh-from-an-app)) and need neither. When
-they can be installed, a later release will remove `/write/`, the
-`SendPost` shortcut, the delivery receipts and the `publish.txt` and
-`drafts.txt` requests described below. Until then everything in this
-section works as written, and nothing is being added to it. The receiver
-itself, `scripts/receive.sh`, stays.
+([Over SSH, from an app](#over-ssh-from-an-app)) and need neither. 1.11
+removes `/write/`, the `SendPost` shortcut, the delivery receipts and the
+`publish.txt` and `drafts.txt` requests described below. In 1.10
+everything in this section works as written, and nothing is being added
+to it. The receiver itself, `scripts/receive.sh`, stays.
 
 `write: true` publishes a page at `/write/` to write the post on: a title,
 the text, tags, and photographs each with its description. It keeps what

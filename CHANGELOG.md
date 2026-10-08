@@ -151,12 +151,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **`/write/` and the shortcut.** Native apps for iOS and Android are in preparation. They talk
   to the engine over the SSH the server already has (`scripts/remote.sh`) and do what the page
   does and more -- the queue, a post's properties, a published post's text, a translation -- on
-  Android as well, where the page could hand its files to nothing the engine ships. When the
-  apps can be installed, a later release will take out the page, the `SendPost` shortcut and
-  what exists only for the two: the delivery receipts and the `publish.txt` and `drafts.txt`
-  requests. This is the notice. Until then both work as they do today, and nothing new is added
-  to them. `scripts/receive.sh` stays -- it is what the apps deliver through, and what
-  `./blog.sh add <file>` has always been the other end of.
+  Android as well, where the page could hand its files to nothing the engine ships. **1.11 takes
+  out** the page, the `SendPost` shortcut and what exists only for the two: the delivery receipts
+  and the `publish.txt` and `drafts.txt` requests. This is the notice. In 1.10 both work as they
+  do today, and nothing new is added to them. `scripts/receive.sh` stays -- it is what the apps
+  deliver through, and what `./blog.sh add <file>` has always been the other end of.
 
 ### Fixed
 
