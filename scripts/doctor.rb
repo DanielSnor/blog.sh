@@ -100,7 +100,8 @@ end
 # problems, then what wants a look, then what is fine -- with the three
 # counts beside them, and nothing else on stdout: no header, no heading,
 # no summary sentence, no hint. Every key is always there (`fix` is null
-# where a finding has no advice), so whoever reads it never has to ask
+# where a finding has no advice; `kind` names the check a finding came
+# from, see Doctor::Finding), so whoever reads it never has to ask
 # whether a key is missing or merely empty. The status is the screen's:
 # 1 when there is an error.
 if as_json
@@ -113,7 +114,7 @@ if as_json
     'errors' => errors,
     'warnings' => warnings,
     'oks' => findings.size - errors - warnings,
-    'findings' => findings.map { |f| { 'level' => f.level.to_s, 'text' => f.text, 'fix' => f.fix } }
+    'findings' => findings.map { |f| { 'level' => f.level.to_s, 'kind' => f.kind.to_s, 'text' => f.text, 'fix' => f.fix } }
   )
   exit(errors.zero? ? 0 : 1)
 end

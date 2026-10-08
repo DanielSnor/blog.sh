@@ -1117,7 +1117,7 @@ Three rules follow from "nobody is at the keyboard":
 | `empty trash\|versions [--yes] --json` | `count`, `bytes`, `size`, `emptied` -- without `--yes` only the count, which is the question the terminal asks | `empty_what` |
 | `check --json`, `stats --json`, `on-this-day --json` | the findings, the figures, the day -- see their own sections | -- |
 | `check --languages --json` | the table of languages alone: `languages` (the site's own first) and `rows` (slug, title, `cells`: per language `written`, `title_only` or `missing`); empty on a site that publishes one language | -- |
-| `doctor --json` | the installation's diagnosis: `errors`, `warnings`, `oks` and `findings` (`level`: error, warn or ok; `text`; `fix`, null where there is no advice), problems first; no `ok` key, and the status is 1 when there is an error | refused with `--strip-location` (status 2, in prose) |
+| `doctor --json` | the installation's diagnosis: `errors`, `warnings`, `oks` and `findings` (`level`: error, warn or ok; `kind`: the check it came from, such as `trash`, `scheduler`, `deploy` or `banner`; `text`; `fix`, null where there is no advice), problems first; no `ok` key, and the status is 1 when there is an error | refused with `--strip-location` (status 2, in prose) |
 
 `deploy` in an answer is `done` when the site was rebuilt and deployed,
 `pending` when the rebuild was attempted and the next scheduled run owes

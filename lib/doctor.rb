@@ -67,7 +67,14 @@ module Doctor
   # Endless method definitions would read better here and are wrong here:
   # the engine's floor is Ruby 2.7 (see site_config.rb) and they arrived
   # in 3.0.
-  Finding = Struct.new(:level, :text, :fix, keyword_init: true) do
+  # `kind` says which check a finding came from -- `trash`, `scheduler`,
+  # `banner` -- for a reader that is a program: the sentence is in the
+  # site's language and written for a person, and a program that wants to
+  # lead somebody from "the trash holds 12 posts" to the trash has nothing
+  # in it to go by. Named after the area and not after the single problem:
+  # there are a hundred and forty places a finding is made here, and
+  # nothing yet that would read them apart.
+  Finding = Struct.new(:level, :text, :fix, :kind, keyword_init: true) do
     def error?
       level == :error
     end
@@ -154,38 +161,46 @@ module Doctor
   # network, appearance, deploy.
   def run(online: false, root: ROOT)
     findings = []
-    findings.concat(check_env_sh(root))
+    findings.concat(of(:env_sh, check_env_sh(root)))
 
     data, parse_findings = load_site_yml(root)
-    findings.concat(parse_findings)
+    findings.concat(of(:site_yml, parse_findings))
     return findings unless data
 
-    findings.concat(check_language_yml(root, data))
-    findings.concat(check_identity(data))
-    findings.concat(check_placeholders(data))
-    findings.concat(check_locale(data))
-    findings.concat(check_timezone(data))
-    findings.concat(check_network(data))
-    findings.concat(check_banner(data, root))
-    findings.concat(check_colors(data))
-    findings.concat(check_fonts(data, root))
-    findings.concat(check_extra_css(data, root))
-    findings.concat(check_nav(data, root))
-    findings.concat(check_chrome_shapes(data))
-    findings.concat(check_sidebar(data))
-    findings.concat(check_widgets(data))
-    findings.concat(check_publishing(data))
-    findings.concat(check_scheduler)
-    findings.concat(check_deploy_pending)
-    findings.concat(check_media_location(root))
-    findings.concat(check_tag_icons(data))
-    findings.concat(check_social_icons(data))
-    findings.concat(check_share(data))
-    findings.concat(check_trash(root))
-    findings.concat(check_deploy(root))
-    findings.concat(check_deploy_keep(data))
-    findings.concat(check_online(data, root)) if online
+    findings.concat(of(:language_yml, check_language_yml(root, data)))
+    findings.concat(of(:identity, check_identity(data)))
+    findings.concat(of(:placeholders, check_placeholders(data)))
+    findings.concat(of(:locale, check_locale(data)))
+    findings.concat(of(:timezone, check_timezone(data)))
+    findings.concat(of(:network, check_network(data)))
+    findings.concat(of(:banner, check_banner(data, root)))
+    findings.concat(of(:colors, check_colors(data)))
+    findings.concat(of(:fonts, check_fonts(data, root)))
+    findings.concat(of(:extra_css, check_extra_css(data, root)))
+    findings.concat(of(:nav, check_nav(data, root)))
+    findings.concat(of(:chrome_shapes, check_chrome_shapes(data)))
+    findings.concat(of(:sidebar, check_sidebar(data)))
+    findings.concat(of(:widgets, check_widgets(data)))
+    findings.concat(of(:publishing, check_publishing(data)))
+    findings.concat(of(:scheduler, check_scheduler))
+    findings.concat(of(:deploy_pending, check_deploy_pending))
+    findings.concat(of(:media_location, check_media_location(root)))
+    findings.concat(of(:tag_icons, check_tag_icons(data)))
+    findings.concat(of(:social_icons, check_social_icons(data)))
+    findings.concat(of(:share, check_share(data)))
+    findings.concat(of(:trash, check_trash(root)))
+    findings.concat(of(:deploy, check_deploy(root)))
+    findings.concat(of(:deploy_keep, check_deploy_keep(data)))
+    findings.concat(of(:online, check_online(data, root))) if online
     findings
+  end
+
+  # Every finding of one check carries that check's name. Stamped here,
+  # where the checks are called, rather than at each of the places a
+  # finding is made: a check added to the list above is named by being
+  # added, and none can be forgotten.
+  def of(kind, findings)
+    findings.each { |finding| finding.kind ||= kind }
   end
 
   def dig(data, *keys)
