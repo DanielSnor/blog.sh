@@ -82,7 +82,7 @@ dedup by `source`).
 | `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
 | `former_slugs` | array of strings | every address the post used to have, as `"year/slug"` frozen at rename time; the build emits a redirect stub for each (see `props` → rename). Engine-side history like the announcement URLs: edits and re-imports carry it over untouched |
 | `unpublished_from` | string | drafts only -- the `"year/slug"` address the post vacated when it was unpublished. Publishing consumes it: back under a different slug it becomes a `former_slugs` redirect, back under the same one it just disappears |
-| `series` | string | the series this post belongs to; with two or more published parts the build gives it a listing at `/series/<slug>/` and puts "part 2 of 5" navigation on the post |
+| `series` | string | the series this post belongs to; with two or more published parts the build gives it a listing at `/series/<slug>/`, a line in the index at `/series/`, and puts "part 2 of 5" navigation on the post |
 | `series_part` | integer | position within the series -- without it, parts are ordered by date, which is the usual case; the number is for the rare insert |
 | `pinned` | string/boolean | one post held at the top of the front page. Truth test is strict (`true`/`yes`/`1`), so a hand-edited `false` cannot pin by accident; more than one pinned post warns and the newest wins. Listings past page one, the archives and the feeds ignore it |
 | `toc` | string/boolean | table of contents on the post page. Absent = automatic (from 4 headings up); an explicit false suppresses it, an explicit true forces it below that threshold |
@@ -864,7 +864,9 @@ wrote. Then, in load order:
 - **The tag index** (`tag-index.js`) reorders `/tag/` between alphabetical
   and by-count, and remembers which the reader chose. The page is built
   alphabetically, so a reader without the script gets the order the
-  markup already has rather than a control that does nothing.
+  markup already has rather than a control that does nothing. The row of
+  letters above the list links to the bands between the tags; count order
+  takes the bands out, so the script hides the row with them.
 - **Sharing** (`share.js`) drives the three share controls a link cannot
   be. `mastodon` has no single address to point at -- the destination is
   the reader's own instance -- so it asks once and remembers the answer in

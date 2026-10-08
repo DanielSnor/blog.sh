@@ -107,6 +107,20 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `base:` required so a change made elsewhere in the meantime is refused rather than overwritten.
   The app on a phone is a desk now. `translate <slug> --lang <code> --json` hands a language's text
   out the same way, and a file saying `lang:` beside `edits:` and `base:` brings it back.
+- **`/series/`: the index of series.** A line for every series that has a page -- its name, how
+  many parts, the years they span -- with the one still being written first. A series could be
+  reached only from a post that belongs to it, and `/series/` answered 404 with every address under
+  it alive. The name in a series' own heading now leads back to the index, as a tag's leads to
+  `/tag/`; the sitemap lists the page, `check` knows the address, and a second language gets its
+  own with the names `series:` in `config/site.<lang>.yml` gives them. A site with no series has
+  no such page.
+- **The archive says what its shading means, and a year can be crossed.** The map's last row is a
+  legend: the four steps between "less" and "more", drawn with the map's own cells. A year's page
+  opens with that year's row of the map behind the words "jump to a month" -- a month with posts
+  is a link to its section further down, shaded as on the map.
+- **The tag index has a way to a letter.** Above the list, the letters that have tags under them,
+  each a link to its band, behind the words "jump to a letter". Count order has no bands, so the
+  switch puts the row away while that order is shown.
 - **`banner.show_image: false`.** A header without its picture: the short name and the description
   stand on the page itself, in the page's own text colours, and the whole header is still the link
   home. The markup is the banner's with the `<img>` taken out and nothing else moved -- the wrap
@@ -123,6 +137,17 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Changed
 
+- **The card of a picture post carries the picture, and a video post's the video.** A card is cut
+  by height and keeps its first block whatever that weighs, so a photograph under one line of
+  words was left off the card of a post that is that photograph: on one archive the first page of
+  the pictures showed three pictures in thirteen cards. For a post whose kind is image or video
+  the medium now goes first and the same cut runs over what follows. A post that opened with its
+  medium keeps what it kept; a medium taller than wide is held to 22rem instead of taking a screen,
+  and the budget is charged that height, so the caption under a portrait photograph is on the card.
+  Such a card is `post-list-item--media` (and `--media-tall`). **This changes listings without
+  anything being set**: every site with such posts shows more pictures after the upgrade. An
+  article with a photograph in it is still an article, and the card `layout.lead_card` asks for is
+  left as it was.
 - **A part of a series names the series first.** "Nový Sean.cz — part 3 of 19" where the note used
   to read "Part 3 of 19 of Nový Sean.cz" -- in all three languages -- so a reader meets what they
   are in before where they are in it. The same line now stands on each card of the series' own

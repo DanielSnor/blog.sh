@@ -67,7 +67,8 @@ already carries, so each can be read as well as changed:
 - **`series: Name`** files the post into a series. A series with two or
   more published parts gets a listing of its own at `/series/<slug>/` --
   a series of one is just a post, and the listing appears when the
-  second part does. The listing reads from part one: a long series is
+  second part does -- and with it a line in the index of series at
+  `/series/`. The listing reads from part one: a long series is
   paged in reading order, `/series/<slug>/` holds the first parts and
   `/series/<slug>/page/2/`, `/page/3/`… the ones after, so the "part 1 of
   30" link on every post opens where the series starts. (Up to 1.7 a
@@ -1437,7 +1438,7 @@ Three things are worth knowing before you rely on the result:
 
 ## Reading the archive
 
-Two pages the build writes for you, both from the posts themselves --
+Three pages the build writes for you, all from the posts themselves --
 there is nothing to configure and nothing to keep up to date.
 
 **`/archive/`** is a map of the site in two levels. The first is a row per
@@ -1450,6 +1451,12 @@ Pagination cannot do that -- it is anchored to the oldest post, so
 post's date badge links into the month it belongs to, so a reader who
 finds one post can see what surrounded it.
 
+Under the map a legend says what the shading means -- the four steps
+between "less" and "more", in the map's own colours. A year's page opens
+with that year's row of the map again, behind the words "jump to a month":
+a month with posts is a link to its section further down the page, shaded
+as it is on the map.
+
 A year nobody wrote in gets a row on the map and no page of its own: an
 empty page is an invitation to a dead end. A post is filed under the year
 of its ADDRESS, so `/archive/2025/` and `/posts/2025/` always agree.
@@ -1459,10 +1466,28 @@ of how often each was used. It is built alphabetically -- folded, so an
 accented name sorts where a reader expects rather than after z -- and a
 reader can switch it to by-count, which is remembered for next time. Only
 tags that have a page of their own appear, so the list never points at an
-address the build did not write.
+address the build did not write. Above the list a row of letters -- the
+ones that have tags under them -- jumps to each letter's band; by-count
+order has no bands, so the row is put away while that order is shown.
 
-Neither page needs a menu item to work, but `nav:` in `site.yml` is where
-you would put one; see **Configuration** in the README.
+**`/series/`** is every series the site has, a line each: the name, how
+many parts, and the years they span. The one still being written comes
+first -- the order is by the newest part. A series is listed once it has a
+page of its own, which is once it has two published parts, and the name in
+a series' own heading leads back here, as a tag's leads to `/tag/`. A site
+with no series has no such page.
+
+None of the three needs a menu item to work, but `nav:` in `site.yml` is
+where you would put one; see **Configuration** in the README.
+
+**A picture post's card carries the picture.** A card in a listing is cut
+by height, and it keeps its first block whatever that weighs -- so a
+photograph under one line of words used to be left off the card of a post
+that is that photograph. For a post whose kind is image or video (the icon
+in its date badge says which) the medium now goes first and the cut runs
+over what follows. A medium taller than it is wide is held to a height
+rather than given a screen to itself. An article with a photograph in it is
+still an article, and its card is cut as it always was.
 
 ## Giving a tag its own icon
 

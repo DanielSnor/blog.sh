@@ -768,6 +768,9 @@ module Checker
     # pages or unlisted posts has neither.
     paths << '/archive/' if stream_post
     paths << '/tag/' if stream_tag
+    # ...and the index of series once one series has a page: two posts in
+    # the stream under a name short enough to be a directory.
+    paths << '/series/' if series_sizes.any? { |slug, size| size >= 2 && Slug.pageable?(slug) }
     with_languages(paths, posts, root: root)
   end
 

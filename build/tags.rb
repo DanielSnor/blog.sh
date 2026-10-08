@@ -119,13 +119,12 @@ module Tags
       last_letter = nil
       build_tag_index_items = lambda do
         tag_index_rows.flat_map do |slug, name, count|
-        letter = Slug.fold(name).to_s[0].to_s.upcase
-        letter = '#' unless letter.match?(/[A-Z]/)
+        letter = index_letter(name)
         head = if letter == last_letter
                  []
                else
                  last_letter = letter
-                 [%(<li class="tag-index-letter" aria-hidden="true">#{h(letter)}</li>)]
+                 [%(<li class="tag-index-letter" id="#{letter_anchor(letter)}" aria-hidden="true">#{h(letter)}</li>)]
                end
         # The count travels in an attribute as well as in the text: the switch
         # reorders these in the DOM, and reading a number back out of rendered
@@ -145,12 +144,36 @@ module Tags
         # How many tags there are, as every other listing's heading says how
         # many it holds -- this was the one that did not. The index is
         # rewritten whenever a tag comes or goes, so the number costs nothing.
+        # A way to a letter, for a list that runs to several screens: the
+        # letters that have a band below, each a link to it, behind a word
+        # saying what the row is for. Read off the same rows with the same
+        # function as the bands, so a letter here is a band that exists.
+        # The switch hides the row in count order, where the bands are gone
+        # and the links would lead nowhere (assets/js/tag-index.js).
+        letters = tag_index_rows.map { |_, name, _| index_letter(name) }.uniq
         layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag, count: tags_map.size) +
+               %(\n<p class="tag-index-jump" id="tag-index-jump">) +
+               %(<span class="tag-index-jump__label">#{h(t('tags.jump_label'))}</span>) +
+               letters.map { |letter| %(<a href="##{letter_anchor(letter)}">#{h(letter)}</a>) }.join +
+               %(</p>) +
                %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
                title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
                description: t('tags.description', site_title: SITE_TITLE),
                path: loc('/tag/'))
       end
     end
+  end
+
+  # The letter a tag stands under in the index: the first of its FOLDED
+  # name, so `škola` is under S, and `#` for anything that is not a letter.
+  def index_letter(name)
+    letter = Slug.fold(name).to_s[0].to_s.upcase
+    letter.match?(/[A-Z]/) ? letter : '#'
+  end
+
+  # The address of a letter's band on the index. `#` cannot be written into
+  # an address after a `#`, so the band for the rest has a word.
+  def letter_anchor(letter)
+    "tag-letter-#{letter == '#' ? 'other' : letter.downcase}"
   end
 end

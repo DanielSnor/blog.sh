@@ -1936,6 +1936,29 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 .archive-month:hover { outline: 2px solid var(--text); outline-offset: 1px; }
 .archive-month.is-empty { background: transparent; border: 1px solid var(--border); color: var(--meta-text); }
 
+/* What the shading means: the four steps between two words, as the last
+   row of the map. The cells are the map's own, a little smaller and with
+   nothing in them, so there is no second set of colours to keep in step.
+   Not links, so the hover outline above is taken back off them. */
+.archive-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-top: 0.75rem;
+  color: var(--meta-text);
+  font-size: 0.8rem;
+}
+.archive-legend .archive-month { width: 1.1rem; height: 1.1rem; padding: 0; }
+.archive-legend .archive-month:hover { outline: 0; }
+.archive-legend__word:first-child { margin-right: 0.35rem; }
+.archive-legend__word:last-child { margin-left: 0.35rem; }
+
+/* The year's row of the map again, at the top of the year's own page, with
+   a word saying what it does. It may wrap under its label on a phone; the
+   strip itself still does not. */
+.archive-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; margin: 0 0 1.25rem; }
+.archive-jump__label { color: var(--meta-text); font-size: 0.8rem; }
+
 .archive-section { margin: 0 0 1.75rem; }
 /* The month sticks while its own months' worth of posts scrolls past.
    A year here can be four hundred lines long, and a number left at the top
@@ -1970,6 +1993,33 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   .archive-months { gap: 2px; }
   .archive-month { width: 1.35rem; font-size: 0.72rem; }
 }
+
+/* The card of a picture or video post opens with its medium (build/cards.rb).
+   A landscape one is drawn as it always was, at the width of the card. One
+   that is taller than wide -- or square -- would take a screen at that
+   width, in a list whose point is that the next card is in sight; it is
+   held to a height instead and keeps its shape. Only the medium the card
+   opens with: a second picture further down is whatever it was. The build
+   charges the card's budget this same height (Cards::MEDIA_TALL_HEIGHT), so
+   the two numbers have to move together. */
+.post-list-item--media-tall .content > figure:first-child img,
+.post-list-item--media-tall .content > figure:first-child video,
+.post-list-item--media-tall .content > video:first-child {
+  width: auto;
+  max-height: 22rem;
+}
+
+/* The index of series at /series/. A line each -- name, parts, years --
+   under a rule, the way the archive map rules its years: there are a
+   handful of these on a site where there are hundreds of tags, and each
+   is a thing to open rather than a word to scan for. */
+.series-index { list-style: none; margin: 0; padding: 0; }
+.series-index-item { display: flex; align-items: baseline; gap: 0.4rem; padding: 0.6rem 0; border-top: 1px solid var(--border); }
+.series-index-item:first-child { border-top: 0; }
+.series-index-name { font-size: 1.15rem; font-weight: 600; color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+.series-index-name:hover { text-decoration: underline; }
+.series-index-count { font-size: 0.7rem; color: var(--meta-text); }
+.series-index-years { margin-left: auto; flex: 0 0 auto; color: var(--meta-text); font-size: 0.85rem; }
 
 /* The tag index at /tag/. Pills in long wrapped lines rather than a cloud:
    a cloud sizes words by frequency and then asks the reader to compare type
@@ -2052,6 +2102,24 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   cursor: pointer;
 }
 .tag-index-sort-button[aria-pressed="true"] { background: var(--accent); color: var(--bg); border-color: var(--accent); }
+
+/* The letters that have a band below, each a link to it. Centred like the
+   switch it stands under. `hidden` has to be said again: the attribute
+   means display: none only until a rule gives the element a display of
+   its own, and this one does. */
+.tag-index-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15rem 0.6rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+.tag-index-jump[hidden] { display: none; }
+.tag-index-jump__label { margin-right: 0.3rem; color: var(--meta-text); font-size: 0.8rem; }
+.tag-index-jump a { padding: 0.1rem 0.2rem; color: var(--accent); text-decoration: none; }
+.tag-index-jump a:hover { text-decoration: underline; }
 
 @media (max-width: 700px) {
   .tag-index-sort { gap: 1rem; }

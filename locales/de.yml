@@ -144,6 +144,9 @@ series:
   kind: "Serie"
   title: "%{name} – %{short_name}"
   description: "Die Serie %{name} auf der persönlichen Seite von %{author_name}, in Lesereihenfolge."
+  # Die Übersicht der Serien unter /series/: Überschrift und Beschreibung.
+  index_title: "Serien"
+  index_description: "Alle Serien auf %{site_title}."
 
 type:
   text: "Text"
@@ -169,6 +172,11 @@ archive:
   year_title: "Archiv %{year}"
   year_description: "Beiträge aus %{year} auf %{site_title}."
   back: "← Zurück zur Jahresübersicht"
+  # Die zwei Wörter links und rechts der Legende unter der Karte und die
+  # Beschriftung der Monatszeile oben auf der Seite eines Jahres.
+  legend_less: "weniger"
+  legend_more: "mehr"
+  jump_label: "zum Monat springen"
 tags:
   # Das Schlagwortverzeichnis unter /tag/. Sortiert nach dem gefalteten
   # Namen statt nach Bytes, sonst landen Umlaute hinter dem z.
@@ -176,6 +184,8 @@ tags:
   description: "Alle Schlagwörter auf %{site_title}."
   sort_alpha: "Alphabetisch"
   sort_count: "Nach Häufigkeit"
+  # Die Beschriftung der Buchstabenzeile über dem Register.
+  jump_label: "zum Buchstaben springen"
 search:
   # Dient zugleich als Überschrift der Seite, solange keine Suchanfrage
   # eingegeben wurde.

@@ -56,27 +56,7 @@ module Archive
                      end
 
       month_cells = lambda do |year, by_month|
-        (1..12).map do |m|
-          count = (by_month[m] || []).length
-          label = CGI.escapeHTML(m.to_s)
-          if count.zero?
-            %(<span class="archive-month is-empty">#{label}</span>)
-          else
-            # Four steps of shading, because "has posts / has none" is not the
-            # thing worth seeing: on this archive a month holds anywhere from
-            # one post to eighty-seven, and a map that draws those the same
-            # answers a question nobody asked. The thresholds are read off a
-            # real archive rather than picked round: most months sit under
-            # fifteen, and the handful above forty are the bursts.
-            level = if count < 5 then 1
-                    elsif count < 15 then 2
-                    elsif count < 40 then 3
-                    else 4
-                    end
-            %(<a class="archive-month is-l#{level}" href="#{loc("/archive/#{year}/#m#{format('%02d', m)}")}" ) +
-              %(title="#{count}">#{label}</a>)
-          end
-        end.join
+        month_strip(by_month) { |m| loc("/archive/#{year}/##{month_anchor(m)}") }
       end
 
       rows = archive_span.map do |year|
@@ -110,7 +90,10 @@ module Archive
         # so the key above already holds it.
         layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar,
                                     count: archive_by_year.values.sum(&:length)) +
-               %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
+               # The legend is the map's last row rather than a line after
+               # it: the map is as wide as its strip and centred, and a line
+               # outside it started at the edge of the page, under nothing.
+               %(\n<ul class="archive-map">\n#{rows.join("\n")}\n#{legend_html}\n</ul>),
                title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
                description: t('archive.description', site_title: SITE_TITLE),
                path: archive_path)
@@ -150,7 +133,7 @@ module Archive
               %(#{post_display_time(post).day}.</time> ) +
               %(<a href="#{h(post_href(post))}">#{h(post_title_for(post))}</a></li>)
           end
-          %(<section class="archive-section" id="m#{format('%02d', month)}">) +
+          %(<section class="archive-section" id="#{month_anchor(month)}">) +
             %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
         end
 
@@ -173,6 +156,7 @@ module Archive
         BuildCache.remember_page(year_dest, year_key)
         Output.emit(year_dest,
              layout(year_heading + "\n" +
+                    jump_html(in_year.group_by { |post| post_time(post).month }) + "\n" +
                     sections.join("\n") +
                     # Below the list and on the left, which is where a post's own
                     # "back" link has always sat. A way out belongs at the end of
@@ -188,5 +172,62 @@ module Archive
     # at one (the 404 page does). Read off the same grouping the pages were
     # written from, so a year named here is a page that exists.
     archive_by_year.keys.sort.reverse
+  end
+
+  # Four steps of shading, because "has posts / has none" is not the
+  # thing worth seeing: on this archive a month holds anywhere from
+  # one post to eighty-seven, and a map that draws those the same
+  # answers a question nobody asked. The thresholds are read off a
+  # real archive rather than picked round: most months sit under
+  # fifteen, and the handful above forty are the bursts.
+  def month_level(count)
+    if count < 5 then 1
+    elsif count < 15 then 2
+    elsif count < 40 then 3
+    else 4
+    end
+  end
+
+  # The address of a month on its year's page, said in one place: the map
+  # links to it, the year page carries it and the row above its sections
+  # jumps to it.
+  def month_anchor(month)
+    "m#{format('%02d', month)}"
+  end
+
+  # Twelve months as the map draws them: a link where there is something to
+  # read, an outline where there is not. The block says where a month with
+  # posts leads -- another page from the map, further down this one from
+  # the row at the top of a year.
+  def month_strip(by_month)
+    (1..12).map do |m|
+      count = (by_month[m] || []).length
+      label = CGI.escapeHTML(m.to_s)
+      if count.zero?
+        %(<span class="archive-month is-empty">#{label}</span>)
+      else
+        %(<a class="archive-month is-l#{month_level(count)}" href="#{yield(m)}" title="#{count}">#{label}</a>)
+      end
+    end.join
+  end
+
+  # What the shading means, in the map's own colours: the cells are the
+  # cells the map is made of, so a skin that repaints one has repainted
+  # the other and the two cannot come apart. Hidden from a screen reader --
+  # it explains a colour, and every month already says its number.
+  def legend_html
+    %(<li class="archive-legend" aria-hidden="true"><span class="archive-legend__word">#{h(t('archive.legend_less'))}</span>) +
+      (1..4).map { |level| %(<span class="archive-month is-l#{level}"></span>) }.join +
+      %(<span class="archive-legend__word">#{h(t('archive.legend_more'))}</span></li>)
+  end
+
+  # The year's own row of the map, at the top of the year: a year can be
+  # four hundred lines long, and the map that led here is a page away. Same
+  # cells, same shading, so it reads as the strip the reader just left --
+  # and it says what it is for, because a row of numbers with no word
+  # beside it has to be tried before it is understood.
+  def jump_html(by_month)
+    %(<p class="archive-jump"><span class="archive-jump__label">#{h(t('archive.jump_label'))}</span>) +
+      %(<span class="archive-months">#{month_strip(by_month) { |m| "##{month_anchor(m)}" }}</span></p>)
   end
 end

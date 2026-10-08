@@ -98,8 +98,8 @@ Each part says where it is described in full.
   size. Quoted phrases, `-word` to exclude, and diacritics never decide a match, so *nemecko*
   finds *Německo*. The index is split so the page is not made to wait for it: the recent half
   loads with the page, the archive only when a search reaches past it -- on a 6,600-post site,
-  432 kB against 4.3 MB. Beside it, `/archive/` maps the whole site in two levels and `/tag/`
-  lists every tag with its count. → [architecture.md](docs/architecture.md#the-client-side),
+  432 kB against 4.3 MB. Beside it, `/archive/` maps the whole site in two levels, `/tag/`
+  lists every tag with its count and `/series/` every series with its parts. → [architecture.md](docs/architecture.md#the-client-side),
   [operations.md](docs/operations.md#reading-the-archive)
 - **More than one language.** A post keeps one set of metadata and a text per language; each language gets a root of its own (`/de/`) with its own addresses, feed and listings, the site's own language keeps the root, and a post nobody translated is shown with a link to the one copy it has. The site's own words -- title, about, footer, menu, tags -- are translated in `config/site.<lang>.yml`; the engine's words already are, in English, Czech and German. → [localization.md](docs/localization.md#publishing-in-more-than-one-language)
 - **Build.** Static HTML from JSON through ERB templates: stable pagination, tag, series and type archives, RSS, sitemap, `robots.txt`, a generated favicon, a 404 in the site's own chrome. A page whose inputs have not moved is not rendered again. → [architecture.md](docs/architecture.md#build-pipeline-buildbuild_blogrb)

@@ -141,6 +141,9 @@ series:
   kind: "Series"
   title: "%{name} – %{short_name}"
   description: "The series %{name} on the personal site of %{author_name}, in reading order."
+  # The index of series at /series/: the page's heading and description.
+  index_title: "Series"
+  index_description: "Every series on %{site_title}."
 
 type:
   text: "Text"
@@ -166,6 +169,11 @@ archive:
   year_title: "Archive %{year}"
   year_description: "Posts from %{year} on %{site_title}."
   back: "← Back to the years"
+  # The two words either side of the legend under the map, and the label
+  # of the row of months at the top of a year's page.
+  legend_less: "less"
+  legend_more: "more"
+  jump_label: "jump to a month"
 tags:
   # The tag index at /tag/. Sorted by the folded name rather than by bytes,
   # or every accented tag would land after z.
@@ -173,6 +181,8 @@ tags:
   description: "Every tag on %{site_title}."
   sort_alpha: "A to Z"
   sort_count: "Most used"
+  # The label of the row of letters above the index.
+  jump_label: "jump to a letter"
 search:
   # Doubles as the page's own heading when no query has been typed yet.
   kind: "Search"

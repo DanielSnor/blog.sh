@@ -180,6 +180,14 @@ module Feeds
                           alternates: listing_alternates(languages, "/series/#{slug}/"))
     end
 
+    # The index of series: one entry, when there is a series with a page.
+    series_parts = SERIES_MAP.select { |slug, _| Slug.pageable?(slug) }.values.flatten
+    unless series_parts.empty?
+      latest = series_parts.max_by { |p| post_time(p) }
+      urls << sitemap_url("#{SITE_BASE_URL}#{root}/series/", post_time(latest).iso8601,
+                          alternates: listing_alternates(languages, '/series/'))
+    end
+
     # The tag index: one entry, and only when there is at least one tag with a
     # page of its own -- a site with no tags builds no index and must not be
     # advertising one.

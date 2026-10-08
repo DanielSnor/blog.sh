@@ -3612,6 +3612,37 @@ Tags.write_pages(tags_map, index_template)
 # The index of every tag (build/tags.rb).
 Tags.write_index(tags_map)
 
+# The index of series at /series/, as /tag/ is the index of tags. A series
+# could be reached only from a post that belongs to it: nothing on the site
+# showed them side by side, and /series/ itself answered 404 with every
+# address under it alive.
+#
+# Every series that has a page, and no others -- the same condition the
+# listings below are written under, so a name here is a page that exists.
+# The one being written now comes first: ordered by the newest part, so a
+# series still growing stands above one finished years ago. A line is the
+# name, how many parts, and the years they span; a series is too few and
+# too different in size for anything a tag's pill does.
+SERIES_PAGES = SERIES_MAP.select { |slug, _| Slug.pageable?(slug) }.freeze
+
+unless SERIES_PAGES.empty?
+  series_index_rows = SERIES_PAGES.sort_by { |slug, parts| [-parts.map { |part| post_time(part).to_i }.max, slug] }
+                                  .map do |slug, parts|
+    # The years a reader sees on the parts themselves: the displayed date.
+    years = parts.map { |part| post_display_time(part).year }.minmax.uniq.join("–")
+    %(<li class="series-index-item"><a class="series-index-name" href="#{loc("/series/#{h(slug)}/")}">#{h(series_name(slug))}</a>) +
+      %(<sup class="series-index-count">#{parts.size}</sup><span class="series-index-years">#{h(years)}</span></li>)
+  end
+  # Names, counts and years are the whole page, so the rows are the whole key.
+  Output.cached_emit(File.join(CONTENT_ROOT, 'series', 'index.html'), Digest::SHA256.hexdigest(series_index_rows.join)) do
+    layout(listing_heading_html(t('series.index_title'), variant: 'series-index', icon: :series, count: SERIES_PAGES.size) +
+           %(\n<ul class="series-index">\n#{series_index_rows.join("\n")}\n</ul>),
+           title: "#{t('series.index_title')} – #{SITE_SHORT_NAME}",
+           description: t('series.index_description', site_title: SITE_TITLE),
+           path: loc('/series/'))
+  end
+end
+
 # A series gets a listing of its own, in series order rather than newest
 # first: the whole point of one is that it is meant to be read from the
 # start. Only for a series with more than one post, which SERIES_MAP
@@ -3634,7 +3665,10 @@ SERIES_MAP.each do |slug, in_series|
                 oldest_first: true,
                 base_path: loc("/series/#{slug}"), heading: name,
                 heading_kind: t('series.kind'), heading_variant: 'series',
-                heading_icon: :series,
+                # The name is the way back to the index of series, as a
+                # tag's name is the way back to the index of tags. A series
+                # with a page of its own is in that index by construction.
+                heading_icon: :series, heading_href: loc('/series/'),
                 title: t('series.title', name: name, short_name: SITE_SHORT_NAME),
                 description: t('series.description', name: name, author: SITE_AUTHOR, author_name: SITE_AUTHOR_NAME))
 end

@@ -125,6 +125,22 @@ Without the setting no card carries the class, and a rule scoped to it
 does nothing; `.page-first .post-list-item:first-child` alone cannot do
 this, because the picture is usually not in the card to be styled.
 
+A card of a picture post or a video post opens with its medium on every
+listing, setting or no setting, and says so: `.post-list-item--media`. One
+whose medium is taller than wide, or square, is also
+`.post-list-item--media-tall`, and `site.css` holds that medium to
+`max-height: 22rem` so it does not take a screen to itself:
+
+```css
+.post-list-item--media .content > figure:first-child img { border-radius: 8px; }
+.post-list-item--media-tall .content > figure:first-child img { max-height: 28rem; }
+```
+
+The build charges the card's height budget those same 22rem, so a much
+smaller cap leaves room the card does not use and a much larger one lets
+the card run long; neither breaks anything. The lead card above stays
+`--lead` alone.
+
 The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
 listing names itself.
@@ -220,6 +236,28 @@ across a new year do not fit beside each other.
 a type's listing, on every page of a series, on an archive year and on
 the map of years. It is not on `/page/N/` of a tag, so do not build a
 layout that needs it there.
+
+**The archive's cells, three times.** A month is `.archive-month` with one
+of `.is-l1` to `.is-l4` or `.is-empty`, and it is drawn in three places
+from the same markup: the map on `/archive/`, the legend that is the map's
+last row (`<li class="archive-legend">`, its two words
+`.archive-legend__word`), and the row at the top of a year
+(`<p class="archive-jump">`, its label `.archive-jump__label`). Repaint
+`.archive-month.is-l3` and all three follow; that is the point of sharing
+it. The legend's cells are empty and are not links.
+
+**The row of letters on the tag index.** `<p class="tag-index-jump">`
+holds a label, `.tag-index-jump__label`, and a link per letter. The
+switch hides it with the `hidden` attribute while the list is in count
+order, so if your skin gives the row a `display`, keep
+`.tag-index-jump[hidden] { display: none; }` after it -- `site.css` has to
+say the same thing for the same reason.
+
+**The index of series.** `/series/` is `<ul class="series-index">` with a
+`<li class="series-index-item">` per series: the name
+(`a.series-index-name`), the number of parts (`sup.series-index-count`)
+and the years (`span.series-index-years`). Its heading is
+`.listing-heading--series-index`.
 
 **The ways on from the 404 page.** Under its sentence the page has a
 search field and a row of pills. Both are things you have styled already,
