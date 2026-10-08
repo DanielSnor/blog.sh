@@ -103,6 +103,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
   listing, which until now showed which posts belong and not which comes when; there it is words,
   not a link to the page it stands on. Every post in a series and every page of a series' listing
   is rewritten by the next build.
+- **One thing, one word, in the terminal.** The queue offered "[s] different time" and "[n] remove
+  from queue" for what a post's own screen calls "[s] reschedule" and "[n] cancel the schedule";
+  both say the second now, in all three languages. Czech also called an unlisted post two things
+  and taking a post off the site two things: it is "mimo výpisy" and "vrátit do konceptů"
+  everywhere. The keys are the keys they were.
 - **A page of a listing says the days it covers.** "page 663 · Sep 12–18, 2026" where it said
   "page 663": pages are numbered from the oldest post, so the one right behind the front page
   carries the highest number, and a number without a total says nothing about where it is. There
