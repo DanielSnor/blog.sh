@@ -148,6 +148,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
   anything being set**: every site with such posts shows more pictures after the upgrade. An
   article with a photograph in it is still an article, and the card `layout.lead_card` asks for is
   left as it was.
+- **The cheat sheet shows a picture and a gallery.** Its section on pictures had a source and a
+  sentence and nothing to look at. It now draws both -- a picture with its caption, and a gallery
+  of a landscape beside a portrait, which is the crop the paragraph above it describes -- from two
+  drawings of under a kilobyte each, shipped in `assets/cheat-sheet/`.
 - **A part of a series names the series first.** "Nový Sean.cz — part 3 of 19" where the note used
   to read "Part 3 of 19 of Nový Sean.cz" -- in all three languages -- so a reader meets what they
   are in before where they are in it. The same line now stands on each card of the series' own

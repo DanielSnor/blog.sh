@@ -140,7 +140,11 @@ see it:
 - **`lib/markdown_parser.rb`** (text → blocks) parses the author's
   markdown once, at save time. The `/markdown/` cheat-sheet page is
   generated through this same parser, so the documented syntax can't
-  drift from the implemented one.
+  drift from the implemented one. The two pictures its examples show are
+  drawings in `assets/cheat-sheet/`: to the parser that folder is the
+  sheet's media, so an example names them bare as a post names its
+  pictures, and like everything under `assets/` they are published as
+  they stand (`/assets/cheat-sheet/landscape.svg`, `portrait.svg`).
 - **`lib/markdown_writer.rb`** (blocks → markdown) is the mirror: it
   renders a stored post back into editable markdown for `blog.sh edit`.
   The output is always re-parseable, though ties between overlapping

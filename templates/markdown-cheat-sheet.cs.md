@@ -362,6 +362,12 @@ Vykřičník, popisek v hranatých závorkách, cesta v kulatých. Za cestu se d
 ![Popisek pro čtečky](/cesta/k/fotce.jpg "Titulek pod fotkou")
 ```
 
+::: example
+
+![Krajina s kopci a sluncem](landscape.svg "Titulek pod fotkou")
+
+::: end
+
 Obrázek musí být na vlastním řádku, oddělený prázdnými řádky. Uprostřed odstavce ho zapsat nejde — uložení se v takovém případě zastaví a upozorní.
 
 Dva a víc obrázků hned za sebou, jen s prázdnými řádky mezi nimi, se na webu složí do galerie: po dvou vedle sebe, lichý poslední přes celou šířku. Fotky v jedné řadě dostanou stejnou výšku a co přečnívá, se ořízne — fotka na šířku vedle fotky na výšku přijde o kraje. Kdo chce obrázky pod sebou, dá mezi ně text.
@@ -371,6 +377,14 @@ Dva a víc obrázků hned za sebou, jen s prázdnými řádky mezi nimi, se na w
 
 ![Druhá fotka](druha.jpg)
 ```
+
+::: example
+
+![Fotka na šířku](landscape.svg)
+
+![Fotka na výšku](portrait.svg)
+
+::: end
 
 Cesta může vést kamkoliv na disku, soubor se zkopíruje sám. Holé jméno souboru bez cesty se hledá ve složce `incoming/` — to se hodí při psaní z telefonu, kdy fotku nahrajete přes SFTP a v textu na ni odkážete jen jménem.
 

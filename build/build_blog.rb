@@ -172,6 +172,41 @@ def cheat_sheet_source
 end
 CHEAT_SHEET_SOURCE = cheat_sheet_source
 CHEAT_SHEET_PATH = '/markdown/'
+# The pictures the sheet's own examples show: a section about pictures
+# that draws none leaves the reader to imagine a caption and a gallery.
+# Two drawings of a few hundred bytes each, drawn rather than photographed
+# so the page that explains pictures does not open with a download.
+#
+# They are assets, and live among them: everything under assets/ is
+# copied onto the site as it stands, so nothing here has to publish them,
+# and one copy serves the sheet of every language. To the parser the
+# folder is the sheet's media -- a bare file name in an example is found
+# there and keeps its name, exactly as a post's picture does on a second
+# save.
+CHEAT_SHEET_MEDIA_DIR = File.join(ROOT, 'assets', 'cheat-sheet')
+CHEAT_SHEET_MEDIA_PATH = '/assets/cheat-sheet/'
+
+# The sheet's picture blocks, each with its file's size written in, so the
+# page reserves the room and a gallery can lay its row out. A picture the
+# sheet names and the engine does not ship is left out: a translation in
+# progress, or a sheet somebody edited, then shows no result where it
+# would have shown a broken picture.
+def cheat_sheet_pictures(blocks)
+  blocks.filter_map do |block|
+    next block unless block.is_a?(Hash) && block['type'] == 'image'
+
+    media = (block['media'] || []).first || {}
+    name = media['url'].to_s
+    file = File.join(CHEAT_SHEET_MEDIA_DIR, name)
+    next nil unless !name.empty? && File.basename(name) == name && File.file?(file)
+
+    root = File.read(file, encoding: 'utf-8')[/<svg\b[^>]*>/].to_s
+    width = root[/\swidth="(\d+)"/, 1]
+    height = root[/\sheight="(\d+)"/, 1]
+    size = width && height ? { 'width' => width.to_i, 'height' => height.to_i } : {}
+    block.merge('media' => [media.merge(size)])
+  end
+end
 
 # The sheet shows a source and, under it, what that source becomes. The
 # second half came out as bare paragraphs, lists and quotes, in the same
@@ -3863,9 +3898,10 @@ Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:not_found]),
 
 if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))
-  cheat_blocks, = MarkdownParser.parse_body(cheat_body, nil)
+  cheat_blocks, = MarkdownParser.parse_body(cheat_body, CHEAT_SHEET_MEDIA_DIR)
+  cheat_blocks = cheat_sheet_pictures(cheat_blocks)
   cheat_title = cheat_meta['title'] || t('markdown_page.default_title')
-  content_html = cheat_sheet_examples(Blocks.render_content(cheat_blocks, CHEAT_SHEET_PATH))
+  content_html = cheat_sheet_examples(Blocks.render_content(cheat_blocks, CHEAT_SHEET_MEDIA_PATH))
   cheat_sheet_template = ERB.new(File.read(File.join(ROOT, 'templates', 'markdown_cheat_sheet.html.erb'), encoding: 'utf-8'))
   Output.emit(File.join(CONTENT_ROOT, 'markdown', 'index.html'),
        layout(cheat_sheet_template.result(binding),
