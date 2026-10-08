@@ -236,8 +236,13 @@ module Pairing
     [name, 22]
   end
 
+  # The account this runs in, asked of the system: it is the account whose
+  # authorized_keys is written, so it is the one an app has to log in as.
+  # Not $USER, which is whatever the shell was told -- empty under a
+  # runner, somebody else's after `sudo -u` -- and a code naming the wrong
+  # account is a code that connects nowhere.
   def user
-    ENV['USER'].to_s.empty? ? Etc.getlogin.to_s : ENV['USER'].to_s
+    Etc.getpwuid(Process.euid).name
   end
 
   # The fingerprints of this server's own keys, as `ssh-keygen -l` prints
