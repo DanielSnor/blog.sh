@@ -17,8 +17,8 @@
 #
 # What is NOT here, on purpose: add (a post arrives as a delivery through
 # `receive`; `edit` and `translate` are allowed because with --json they
-# only hand the text out), export, preview, doctor's repairs, check's
-# --repair and --online, browse and the wizard. Each either opens an
+# only hand the text out), export, preview, doctor's --strip-location and
+# --online, check's --repair and --online, browse and the wizard. Each either opens an
 # editor, asks a question, writes outside the archive or reaches the
 # network on somebody else's account; a program with a key is not the
 # author at their desk.
@@ -87,7 +87,11 @@ ALLOWED = {
   'bluesky' => %w[--force],
   'stats' => %w[],
   'on-this-day' => %w[--date=],
-  'check' => %w[--languages]
+  'check' => %w[--languages],
+  # The installation's diagnosis, as it stands on disk. Not --online
+  # (it reaches the network on the author's accounts) and not
+  # --strip-location (it rewrites photographs).
+  'doctor' => %w[]
 }.freeze
 
 WORD = /\A[a-z0-9-]{1,200}\z/

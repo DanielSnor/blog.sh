@@ -275,9 +275,11 @@ says what you are running.
                                # the archive on screen: filters, search, preview, Enter opens the post
 ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                # the same, printed one line per post; --json as data
-./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it;
+./blog.sh doctor [--online] [--json]
+                               # reads the configuration and says what is wrong with it;
                                # --online also asks the feeds, the analytics script, the access
-                               # token and the deploy target -- whether it answers, what is in its root
+                               # token and the deploy target -- whether it answers, what is in its root;
+                               # --json prints the findings as data instead of a screenful
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
 ./blog.sh check [--online] [--json] [--repair] [--languages]

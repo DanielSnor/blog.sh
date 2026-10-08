@@ -675,7 +675,7 @@ cli:
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
   yaml_invalid: "%{path} is not valid YAML (%{message})."
   yaml_invalid_doctor: "Run ./blog.sh doctor for the full picture."
-  doctor_unknown_option: "doctor does not know %{option} -- it takes --online (also checks what needs trying over the network) and --strip-location (removes the location from photos)."
+  doctor_unknown_option: "doctor does not know %{option} -- it takes --online (also checks what needs trying over the network), --json (answers as data) and --strip-location (removes the location from photos)."
   rebuild_unknown_option: "rebuild does not know %{option} -- it takes --full (build every page again), --force (let the deploy through its guards and upload everything) and --json (answer as data)."
   unknown_command: "❌ ./blog.sh has no command \"%{command}\"."
   unknown_command_nearest: "   Did you mean ./blog.sh %{command}?"
@@ -725,7 +725,7 @@ cli:
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      walks the archive on screen: filters, search, preview, Enter opens the post
-      ./blog.sh doctor [--online] [--strip-location]
+      ./blog.sh doctor [--online] [--json] [--strip-location]
                                      reads the configuration and says what is wrong with it
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      walks the archive and says what is broken in it;
@@ -1147,6 +1147,7 @@ import:
 # its own: it is read by someone who does not know which file the setting
 # lives in, let alone which key.
 doctor:
+  json_and_strip: "❌ --json and --strip-location cannot run together: --json is a document about the installation as it stands, --strip-location rewrites photographs. Run them one at a time."
   tag_icons_ok: "Tag icons: %{count}, all of them drawable."
   tag_icon_stripped: "The `icon_svg` of the tag \"%{tag}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from, and whoever wrote it should say whether that source is worth trusting."
   social_icon_unknown: "The link \"%{name}\" in the footer asks for an icon called \"%{icon}\", which the engine does not have -- it draws an empty space where the icon belongs. The ones it does have: %{known}. Your own SVG goes in `icon_svg` instead."
@@ -1424,7 +1425,7 @@ check:
   language_tag_unused: "%{file} gives a word to %{tags}, which no published post carries -- nothing shows it."
   language_tag_unused_fix: "Nothing is wrong on the site. Take the line out, or leave it for a tag you are about to use."
   languages_legend: "A tick is written, a half circle a title with no text yet, a dot where that language has nothing -- the other language still shows the post and links to the one copy of it."
-  languages_alone: "check --languages prints a table and --json and --repair do not; ask for them one at a time."
+  languages_alone: "check --languages answers with the table of languages and --repair changes the archive; ask for them one at a time."
   languages_none: "This site publishes one language, so there is nothing to tabulate. Name the others in `site.locales` in config/site.yml."
   unknown_option: "Unknown option: %{option}. check takes --online, --json, --languages and --repair, nothing else."
   heading: "Checking this archive"

@@ -667,7 +667,7 @@ cli:
   rebuild_prompt: "Seite jetzt neu bauen und deployen? [J/n] "
   yaml_invalid: "%{path} ist kein gültiges YAML (%{message})."
   yaml_invalid_doctor: "Das ganze Bild zeigt ./blog.sh doctor."
-  doctor_unknown_option: "doctor kennt %{option} nicht -- es nimmt --online (prüft auch, was übers Netz versucht werden muss) und --strip-location (entfernt den Standort aus Fotos)."
+  doctor_unknown_option: "doctor kennt %{option} nicht -- es nimmt --online (prüft auch, was übers Netz versucht werden muss), --json (antwortet als Daten) und --strip-location (entfernt den Standort aus Fotos)."
   rebuild_unknown_option: "rebuild kennt %{option} nicht -- es nimmt --full (jede Seite neu bauen), --force (den Deploy an seinen Schutzprüfungen vorbeilassen und alles hochladen) und --json (als Daten antworten)."
   unknown_command: "❌ ./blog.sh hat keinen Befehl „%{command}“."
   unknown_command_nearest: "   Meintest du ./blog.sh %{command}?"
@@ -717,7 +717,7 @@ cli:
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
-      ./blog.sh doctor [--online] [--strip-location]
+      ./blog.sh doctor [--online] [--json] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      geht das Archiv durch und nennt, was darin kaputt ist;
@@ -1130,6 +1130,7 @@ import:
 # welcher Datei die Einstellung steht, geschweige denn unter welchem
 # Schlüssel.
 doctor:
+  json_and_strip: "❌ --json und --strip-location gehen nicht zusammen: --json beschreibt die Installation, wie sie ist, --strip-location schreibt Fotos um. Führe sie einzeln aus."
   tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."
   tag_icon_stripped: "Das `icon_svg` des Schlagworts „%{tag}“ enthält etwas, das die Engine vor dem Rendern entfernt — ein Skript, ein Style, einen Event-Handler oder eine javascript:-Adresse. Die Seiten sind sicher; das Symbol ist aber nicht mehr das, woher es kopiert wurde."
   social_icon_unknown: "Der Link „%{name}“ in der Fußzeile verlangt ein Symbol namens „%{icon}“, das die Engine nicht hat — an seiner Stelle bleibt eine Lücke. Vorhanden sind: %{known}. Ein eigenes SVG gehört in `icon_svg`."
@@ -1408,7 +1409,7 @@ check:
   language_tag_unused: "%{file} gibt %{tags} ein Wort, aber kein veröffentlichter Beitrag trägt diesen Tag -- nichts zeigt es."
   language_tag_unused_fix: "Auf der Seite ist nichts kaputt. Nimm die Zeile heraus oder lass sie für einen Tag stehen, den du bald verwendest."
   languages_legend: "Ein Haken heißt geschrieben, ein Halbkreis ein Titel ohne Text, ein Punkt, dass diese Sprache nichts hat -- die andere Sprache zeigt den Beitrag und verlinkt die eine Fassung."
-  languages_alone: "check --languages druckt eine Tabelle, --json und --repair tun das nicht; verlange sie einzeln."
+  languages_alone: "check --languages antwortet mit der Tabelle der Sprachen, --repair verändert das Archiv; verlange sie einzeln."
   languages_none: "Diese Website veröffentlicht eine Sprache, es gibt nichts zu tabellieren. Nenne die anderen in `site.locales` in config/site.yml."
   unknown_option: "Unbekannte Option: %{option}. check nimmt --online, --json, --languages und --repair, sonst nichts."
   heading: "Archiv wird geprüft"

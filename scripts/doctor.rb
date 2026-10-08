@@ -38,11 +38,15 @@ require_relative '../lib/site_header'
 require_relative '../lib/doctor'
 
 online = ARGV.include?('--online')
+# --json is the same diagnosis as a document: one object, for a program
+# that cannot read a screen -- an app showing what is wrong with the
+# installation it writes to. See the bottom of this file.
+as_json = ARGV.include?('--json')
 
 # Only the switches it has: `doctor --onlien` ran the offline checks and
 # said nothing about the typo, so the online half the person asked for
 # silently never happened (second trial, 25. 9. 2026).
-unknown = ARGV.reject { |arg| %w[--online --strip-location].include?(arg) }
+unknown = ARGV.reject { |arg| %w[--online --strip-location --json].include?(arg) }
 abort I18n.t('cli.doctor_unknown_option', option: unknown.join(' ')) unless unknown.empty?
 
 # The one thing doctor does rather than reports, and it has to be asked for
@@ -50,6 +54,15 @@ abort I18n.t('cli.doctor_unknown_option', option: unknown.join(' ')) unless unkn
 # already on somebody's website, so it never happens as a side effect of
 # running a check. It prints what it changed and what that costs -- every
 # rewritten file has a new checksum, so the next deploy uploads it again.
+# Two modes, one run: --json describes the installation as it stands,
+# --strip-location rewrites photographs in it. Asked for together, one of
+# them would be answered in the other's shape -- the same pair check
+# refuses (--json with --repair), for the same reason.
+if as_json && ARGV.include?('--strip-location')
+  warn I18n.t('doctor.json_and_strip')
+  exit 2
+end
+
 if ARGV.include?('--strip-location')
   require_relative '../lib/exif_location'
 
@@ -81,6 +94,28 @@ def paint_level(level)
   when :warn then Tui.paint('⚠️ ', :yellow)
   else Tui.paint('✅', :green)
   end
+end
+
+# The document. The findings in the order the screen shows them --
+# problems, then what wants a look, then what is fine -- with the three
+# counts beside them, and nothing else on stdout: no header, no heading,
+# no summary sentence, no hint. Every key is always there (`fix` is null
+# where a finding has no advice), so whoever reads it never has to ask
+# whether a key is missing or merely empty. The status is the screen's:
+# 1 when there is an error.
+if as_json
+  require 'json'
+  order = { error: 0, warn: 1, ok: 2 }
+  findings = Doctor.run(online: online).sort_by.with_index { |f, i| [order.fetch(f.level, 3), i] }
+  errors = findings.count(&:error?)
+  warnings = findings.count(&:warn?)
+  puts JSON.pretty_generate(
+    'errors' => errors,
+    'warnings' => warnings,
+    'oks' => findings.size - errors - warnings,
+    'findings' => findings.map { |f| { 'level' => f.level.to_s, 'text' => f.text, 'fix' => f.fix } }
+  )
+  exit(errors.zero? ? 0 : 1)
 end
 
 # The identity block first -- doctor output gets pasted into issues and

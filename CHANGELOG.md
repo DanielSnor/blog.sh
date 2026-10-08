@@ -18,6 +18,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Added
 
+- **`doctor --json`, and the table of languages as data.** `./blog.sh doctor --json` prints the
+  diagnosis as one object -- `errors`, `warnings`, `oks`, and every finding with its level, its
+  sentence and its advice, problems first -- and a program with a key may now ask for it
+  (`scripts/remote.rb`; not `--online`, not `--strip-location`). `check --languages --json`
+  prints which post has a text in which language. That pair used to be refused, which made
+  `--languages` useless to the one caller it was listed for: a program's request always says
+  `--json`.
 - **An old address can belong to a translation.** Two posts that were one piece in two languages
   become one post with a translation -- and the second one's address, which the post's own
   `former_slugs` could only send to the post in the site's own language, now leads to the

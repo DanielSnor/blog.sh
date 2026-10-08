@@ -654,7 +654,7 @@ cli:
   rebuild_prompt: "Znovu sestavit a nasadit web teď? [A/n] "
   yaml_invalid: "%{path} není platné YAML (%{message})."
   yaml_invalid_doctor: "Celý obrázek dá ./blog.sh doctor."
-  doctor_unknown_option: "doctor nezná %{option} — umí --online (ověří i to, co je potřeba zkusit po síti) a --strip-location (odstraní polohu z fotek)."
+  doctor_unknown_option: "doctor nezná %{option} — umí --online (ověří i to, co je potřeba zkusit po síti), --json (vydá nález jako data) a --strip-location (odstraní polohu z fotek)."
   rebuild_unknown_option: "rebuild nezná %{option} — umí --full (sestavit znovu všechny stránky), --force (pustit nasazení přes pojistky a nahrát všechno) a --json (odpovědět jako data)."
   unknown_command: "❌ ./blog.sh nemá příkaz „%{command}“."
   unknown_command_nearest: "   Myslel jsi ./blog.sh %{command}?"
@@ -704,7 +704,7 @@ cli:
                                      vypíše příspěvky po řádcích, od nejnovějšího — prostý text do roury nebo skriptu
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek
-      ./blog.sh doctor [--online] [--strip-location]
+      ./blog.sh doctor [--online] [--json] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      projde archiv a řekne, co je v něm rozbité;
@@ -1117,6 +1117,7 @@ import:
 # čte ho někdo, kdo neví, ve kterém souboru to nastavení bydlí, natož pod
 # kterým klíčem.
 doctor:
+  json_and_strip: "❌ --json a --strip-location naráz nejdou: --json je popis instalace, jak vypadá teď, kdežto --strip-location přepisuje fotky. Pusť je po jednom."
   tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."
   tag_icon_stripped: "`icon_svg` štítku „%{tag}“ nese něco, co engine před vykreslením odstraní — skript, styl, obsluhu události nebo adresu javascript:. Stránky jsou v pořádku; ikona ale není tím, odkud byla zkopírovaná, a jestli tomu zdroji věřit, rozhodne jen ten, kdo ji vkládal."
   social_icon_unknown: "Odkaz „%{name}“ v patičce chce ikonu „%{icon}“, kterou engine nemá — nakreslí se prázdné místo. Umí tyhle: %{known}. Vlastní SVG patří do `icon_svg`."
@@ -1393,7 +1394,7 @@ check:
   language_tag_unused: "%{file} dává slovo štítku %{tags}, který žádný publikovaný příspěvek nenese — nikde se neukáže."
   language_tag_unused_fix: "Na webu nic rozbitého není. Řádek vyndej, nebo ho nech pro štítek, který se chystáš použít."
   languages_legend: "Fajfka je napsáno, půlkolečko titulek bez textu, tečka znamená, že jazyk nemá nic — druhý jazyk příspěvek stejně ukáže a odkáže na tu jednu kopii."
-  languages_alone: "check --languages tiskne tabulku, kdežto --json a --repair ne; chtěj je po jednom."
+  languages_alone: "check --languages vydá tabulku jazyků a --repair archiv mění; chtěj je po jednom."
   languages_none: "Tenhle web publikuje jeden jazyk, není co tabelovat. Ostatní vyjmenuj v `site.locales` v config/site.yml."
   unknown_option: "Neznámý přepínač: %{option}. check bere jen --online, --json, --languages a --repair, nic jiného."
   heading: "Kontrola archivu"

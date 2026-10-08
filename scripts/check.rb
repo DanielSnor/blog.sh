@@ -87,9 +87,23 @@ end
 # printed, so accepting the pair would answer "done" about a table nobody
 # was shown -- which is exactly what the refusal of an unknown switch
 # above exists to prevent.
-if languages && (as_json || repair)
+if languages && repair
   warn(I18n.t('check.languages_alone'))
   exit 2
+end
+
+# The table of languages as a document: which posts have a text in which
+# language, for a program that cannot read the table. `check --languages
+# --json` used to be refused with the pair above, which made the switch
+# useless to exactly the caller that always adds --json -- a program with
+# a key (scripts/remote.rb lists --languages and then appends --json, so
+# the request failed every time). The table alone, not the findings: it
+# is the answer to a different question, and `check --json` is still
+# there for the other one.
+if languages && as_json
+  require 'json'
+  puts JSON.pretty_generate(Checker.language_matrix(Checker.load_posts(ROOT), root: ROOT))
+  exit 0
 end
 
 if as_json
