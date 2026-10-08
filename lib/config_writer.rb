@@ -638,8 +638,10 @@ module ConfigWriter
     # that says nothing a config with one accented letter in it could not
     # be searched for a key: every `set` died on "invalid byte sequence in
     # US-ASCII". The wizards never met that, because their entry points
-    # set the default first -- but the shipped example carries a Czech
-    # name since 1.10, so anything that opens the writer on its own did.
+    # set the default first; anything that opens the writer on its own
+    # did, on any site whose config is written in Czech or German. (The
+    # two shipped templates are kept ASCII as well -- tests/test_gaps.rb --
+    # which is the other half of the same care, not a substitute for it.)
     def read_or_seed
       if File.exist?(@path)
         begin
