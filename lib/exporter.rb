@@ -625,9 +625,17 @@ module Exporter
   # restores from, and a field left out here is a field lost for good.
   def native_keys(post)
     keys = {}
+    # `translations` with the rest, and whole: the post's words in its
+    # other languages, each with the address and the old addresses that
+    # language has. For as long as posts have had them the list above did
+    # not -- so an export, which docs/operations.md names as the way to
+    # move an installation, carried a site of two languages out as a site
+    # of one and said "posts: N" (fleet, 8. 10. 2026). No other engine has
+    # a word for this, so it rides here; the body below stays the post's
+    # own language.
     %w[source former_slugs redirect_from unpublished_from mastodon_url
        bluesky_url bluesky_uri draft_token created_at scheduled
-       state page].each do |key|
+       state page translations].each do |key|
       keys[key] = post[key] unless post[key].nil?
     end
     # Recorded because it CANNOT be, which is the whole point. The outer

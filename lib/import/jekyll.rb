@@ -452,7 +452,7 @@ module Import
     # handed us, and a post is not a place to let arbitrary keys in.
     OWN_NESTED_KEYS = %w[source former_slugs redirect_from unpublished_from
                          mastodon_url bluesky_url bluesky_uri draft_token
-                         created_at scheduled state page].freeze
+                         created_at scheduled state page translations].freeze
     # The ones that sit flat, because a destination engine plausibly
     # understands them too -- Hugo has series, most engines have a pinned.
     OWN_FLAT_KEYS = %w[series series_part pinned hero toc unlisted].freeze
