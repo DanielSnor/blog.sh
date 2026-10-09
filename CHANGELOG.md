@@ -306,6 +306,16 @@ goes in is still being decided; the suffix and the date both come off at the tag
   for the page and for this year's post are two addresses, `/en/projects/` and
   `/en/posts/2026/projects/`; the build called them one, with `translate` having saved both and
   `check` finding nothing wrong.
+- **Six answers to a program that were written for a screen.** A file saying `edits:` for a slug
+  two years have used opened the picker -- a question in prose and a status of 1; it answers
+  `ambiguous_slug`. Every lookup that could not ask said the sentence written for `publish
+  --yes`, so an app opening a post to read it was told to publish it. `drafts --json` carried
+  `omitted` only sometimes, `empty --json` a size of null, and `delete`, `restore` and `schedule
+  --cancel` their own "Deleted: /path" among the warnings. `list --tag cats`, the value as the
+  next word, answered with the whole archive. And `schedule --at` with a moment said in UTC
+  dated the post in UTC and filed it under UTC's year, and read 30 February as 2 March.
+- **`translate` refused an address no page had.** A post never written in a language has no page
+  in its tree, and the address it would have there was counted as taken.
 - **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
   which renders one language per run, and deployed; the second language stayed as the previous
   version built it. The recipe is `./blog.sh rebuild`.

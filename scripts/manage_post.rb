@@ -1638,7 +1638,10 @@ end
 # phone would otherwise quietly undo whatever happened in between.
 def edit_from_file(file, raw, meta, json:, confined:, publish:)
   slug = meta['edits'].to_s.strip
-  path = PathSafety.safe_segment?(slug) ? find_post_path(slug) : nil
+  # ask: false -- a file is handed over where nobody is at a keyboard, and
+  # a slug that two years have used to open the picker here: a question in
+  # prose, "Cancelled." and a status of 1 where an object was promised.
+  path = PathSafety.safe_segment?(slug) ? find_post_path(slug, ask: false) : nil
   refuse('not_found', t('cli.edit_from_not_found', slug: slug)) unless path
   original_raw = File.read(path, encoding: 'utf-8')
   post = JSON.parse(original_raw)
@@ -2271,7 +2274,12 @@ end
 # can't outlive its post.
 RESOLVED_PATHS = {}
 
-def find_post_path(slug, ask: true)
+# sentence: what is said when nobody can be asked. The one about --yes and
+# publishing through `props` was said by every command that looks a post
+# up for a program -- so an app opening a post to read it was told to
+# publish it (fleet, 8. 10. 2026). Publishing keeps that sentence; the
+# rest say what happened.
+def find_post_path(slug, ask: true, sentence: 'cli.slug_ambiguous')
   chosen = RESOLVED_PATHS[slug]
   return chosen if chosen && File.exist?(chosen)
 
@@ -2291,8 +2299,7 @@ def find_post_path(slug, ask: true)
     # the phone throws away, and a status of 1 where the caller was
     # promised an object and a zero. Without --json refuse IS abort.
     refuse('ambiguous_slug',
-           t('cli.publish_yes_ambiguous', slug: slug,
-                                          years: matches.map { |m| File.basename(File.dirname(m)) }.join(', ')))
+           t(sentence, slug: slug, years: matches.map { |m| File.basename(File.dirname(m)) }.join(', ')))
   end
 
   RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
@@ -2507,7 +2514,7 @@ end
 # step forward into its slot -- the question the queue screen asks after
 # [p], answered in advance.
 def publish_as_json(slug, announce: true, allow_partial: false, compact: false)
-  path = find_post_path(slug, ask: false)
+  path = find_post_path(slug, ask: false, sentence: 'cli.publish_yes_ambiguous')
   refuse('not_found', t('cli.post_not_found', slug: slug)) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
@@ -5338,6 +5345,12 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
         nil
       end
       next false unless other.is_a?(Hash) && other['slug'].to_s != post['slug'].to_s
+      # Only a post with WORDS in this language has a page in its tree. One
+      # that was never written in it is listed there and read at its own
+      # address, so the address it would have here is nobody's -- and this
+      # refused it all the same, saying a post "has that address in this
+      # language" about a post with no page in the language at all.
+      next false unless Translations.languages(other).include?(lang.to_s)
 
       localized = Translations.for_lang(other, lang)
       published_address(localized, localized['address_slug']) == wanted
@@ -6354,9 +6367,13 @@ def cmd_drafts(json:, slug: nil)
   end
   if slug
     paths.select! { |f| File.basename(f, '.json') == slug }
-    refuse('not_found', t('cli.edit_from_not_found', slug: slug)) if paths.empty?
+    # A reading, so the sentence is about a draft that is not there --
+    # not "nothing was written", which is what a failed SAVE says.
+    refuse('not_found', t('cli.draft_not_found', slug: slug)) if paths.empty?
   end
-  entries = paths.map { |f| draft_entry(f, with_text: true) }
+  # `omitted` on every entry, false where the text is there: a key that
+  # is only sometimes present is one a reader has to guess the absence of.
+  entries = paths.map { |f| draft_entry(f, with_text: true).merge('omitted' => false) }
                  .sort_by { |e| e['date'] }.reverse
   unless slug
     spent = 0
@@ -6584,6 +6601,7 @@ def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
       freed = post_time!(post)
       done, warnings = quietly(true, keep_stdout: true) { unschedule_post(path, post, slug, raw: raw) }
       refuse('busy', t('cli.queue_busy')) unless done
+      warnings = without_own_report(warnings, 'cli.unscheduled_label')
       moved = 0
       if compact
         moved, more = quietly(true, keep_stdout: true) { compact_queue(freed, rest) }
@@ -6592,8 +6610,15 @@ def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
       acted_answer(find_post_path(slug, ask: false) || path, warnings).merge('position' => nil, 'compacted' => moved)
     else
       refuse('schedule_needs_at', t('cli.schedule_json_needs_at')) if at.nil?
+      # In the SITE's time, whatever zone the moment was said in: an app
+      # sends an instant in UTC, and written down as it came the post was
+      # dated ...Z -- and filed under UTC's year, which around a New
+      # Year's midnight is not the site's. And a day the calendar does not
+      # have is refused: Time.parse reads 30 February as 2 March and says
+      # nothing.
       time = begin
-        Time.parse(at)
+        said = at.to_s[/\A\s*(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/]
+        said.nil? || Date.valid_date?(*said.split('-').map(&:to_i)) ? Time.parse(at).getlocal : nil
       rescue ArgumentError, TypeError
         nil
       end
@@ -6624,11 +6649,22 @@ def unpublish_as_json(slug)
 end
 
 # `delete <slug> --yes --json`: into the trash, the slug typed in advance.
+# What a run SAID is caught whole, and its last line is usually that it
+# worked -- "Deleted (in the trash ...): /abs/path". That is the screen's
+# way of answering; a program has the object for it, and the sentence then
+# stood among the warnings, where an app shows it to a person as one.
+# Told from a warning by how the locale's own sentence begins.
+def without_own_report(lines, *keys)
+  heads = keys.map { |key| I18n.lookup(key).to_s.split('%{').first.to_s.strip }.reject(&:empty?)
+  lines.reject { |line| heads.any? { |head| line.start_with?(head) } }
+end
+
 def delete_as_json(slug, rebuild:)
   answer_json do
     path, _raw, = post_for_json(slug)
     year = File.basename(File.dirname(path))
     trash_dir, warnings = quietly(true, keep_stdout: true) { delete_post(slug, path: path, confirmed: true) }
+    warnings = without_own_report(warnings, 'cli.deleted_label')
     trashed = JSON.parse(File.read(File.join(trash_dir, 'post.json'), encoding: 'utf-8'))
     deployed = rebuild_if_asked(rebuild, warnings)
     { 'ok' => true, 'slug' => slug, 'year' => year, 'trash' => trash_dir,
@@ -6662,6 +6698,7 @@ def restore_as_json(slug, rebuild:)
     end
     refuse('ambiguous_slug', t('cli.ambiguous_slug', slug: slug, count: found.size)) if found.size > 1
     new_path, warnings = quietly(true, keep_stdout: true) { restore_post(slug, found.first) }
+    warnings = without_own_report(warnings, 'cli.restored_label')
     deployed = rebuild_if_asked(rebuild, warnings)
     acted_answer(new_path, warnings, rebuilt: deployed)
   end
@@ -6698,7 +6735,8 @@ def empty_as_json(what, yes:)
     else
       refuse('empty_what', t('cli.empty_what'))
     end
-    { 'ok' => true, 'what' => what, 'count' => count, 'bytes' => size, 'size' => FileSize.human(size),
+    # `size` is always words: FileSize.human has none for nothing at all.
+    { 'ok' => true, 'what' => what, 'count' => count, 'bytes' => size, 'size' => FileSize.human(size) || '0 B',
       'emptied' => yes && count.positive? }
   end
 end
@@ -8544,6 +8582,22 @@ begin
       PreviewServer.serve(File.join(ROOT, 'public.nosync'), port, server: server)
     when 'list', 'browse'
       filters = {}
+      # A filter's value is taken after `=` or as the next word: `--tag
+      # cats` used to be read as a switch with nothing after it and a word
+      # nobody asked about, and answered with the WHOLE archive -- ok: true
+      # to a program that had asked for one tag. And a word this command
+      # has no use for is said, not swallowed.
+      words = ARGV.dup
+      ARGV.clear
+      until words.empty?
+        word = words.shift
+        if %w[--type --tag --search].include?(word)
+          abort t('cli.list_needs_value', option: word) if words.empty? || words.first.start_with?('--')
+          word = "#{word}=#{words.shift}"
+        end
+        abort t('cli.list_unknown_option', option: utf8(word)) unless word.match?(/\A--(type|tag|search)=/m) || %w[--drafts --json].include?(word)
+        ARGV << word
+      end
       ARGV.each do |arg|
         # ⚠️ force_encoding, because ARGV arrives in the encoding the
         # ENVIRONMENT declares -- and with LANG unset that is ASCII-8BIT.
