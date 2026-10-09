@@ -764,13 +764,19 @@ def arm_editor_buffer_notice
   end
 end
 
-def edit_in_editor(initial_content, hint_comment, origin = nil)
+# untouched: what else an untouched editor hands back. A buffer that went
+# in carrying `//` notes never returns the bytes it went in with -- the
+# notes are dropped on the way out -- so `translate`, which opens with the
+# original as notes, got an empty template back, kept THAT as rescued
+# text, said "your text was not lost", and had the next `add` ask about
+# five lines starting with nothing (fleet trial, 8. 10. 2026).
+def edit_in_editor(initial_content, hint_comment, origin = nil, untouched: [])
   text = editor_round_trip(initial_content, hint_comment)
   # An editor closed on an untouched template has nothing worth keeping --
   # and writing it anyway would overwrite a buffer the author had just been
   # told was still there. Opening `add` to look at something, changing your
   # mind and quitting must not be how an interrupted post gets lost.
-  if text != initial_content
+  if text != initial_content && !untouched.include?(text)
     keep_editor_buffer(text, origin)
     arm_editor_buffer_notice
   end
@@ -5198,7 +5204,7 @@ def cmd_translate(slug, lang)
   # were this language's.
   opened_with = restored || (entry.empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
-                       { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" })
+                       { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" }, untouched: [skeleton])
   # 🪤 Against the buffer WITHOUT the notes as well: the editor strips
   # `//` lines on the way back, so a buffer that was carrying the original
   # NEVER returns the bytes it went in with -- and an untouched editor
