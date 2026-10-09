@@ -169,6 +169,34 @@ module Languages
     FALLBACK_CHAIN.find { |lang| written.include?(lang) } || SITE_OWN_LANG
   end
 
+  # What kind of post this is as ANOTHER language shows it: by that
+  # language's own blocks, or the first it falls back on that has any --
+  # and by the post's own where it was never written in any of them, which
+  # in a run of a second language are the ones kept aside when this run's
+  # words were laid over them (`__own_content`, build_blog.rb).
+  def type_in(post, lang)
+    entry = post['translations'].is_a?(Hash) ? post['translations'] : {}
+    chain = lang.to_s == SITE_OWN_LANG ? [] : [lang.to_s] + Array(SiteConfig.language_data(lang.to_s)['fallback']).map { |code| code.to_s.strip }
+    if chain.any? { |code| Translations.written?(entry[code]) }
+      dominant_content_type(Translations.for_lang(post, chain.first, chain: chain.drop(1)))
+    elsif post.key?('__own_content')
+      dominant_content_type(post.merge('content' => post['__own_content']))
+    else
+      dominant_content_type(post)
+    end
+  end
+
+  # Whether a listing has a page in a language. Tags, the archive, series
+  # and the feed are built in every language from the same posts; a
+  # listing by TYPE is the one that is not, because a type is read off the
+  # blocks a language shows a post with (TYPES_BY_LANGUAGE).
+  def listing_there?(bare, lang)
+    type = bare.to_s[%r{\A/type/([^/]+)/}, 1]
+    return true if type.nil? || !defined?(TYPES_BY_LANGUAGE)
+
+    TYPES_BY_LANGUAGE.fetch(lang.to_s, []).include?(type)
+  end
+
   def lang_root_for(lang)
     lang.to_s == SITE_OWN_LANG ? '' : "/#{lang}"
   end
@@ -196,7 +224,7 @@ module Languages
     bare = bare_path(path)
     SITE_LOCALES.map do |lang|
       root = lang_root_for(lang)
-      has = post.nil? || lang == SITE_OWN_LANG || Translations.languages(post).include?(lang)
+      has = post.nil? ? listing_there?(bare, lang) : (lang == SITE_OWN_LANG || Translations.languages(post).include?(lang))
       href = if !has
                "#{root}/"
              elsif post

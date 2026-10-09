@@ -130,7 +130,7 @@ module Feeds
                             post_time(entry).iso8601, alternates: alternates)
       end
 
-      urls.concat(sitemap_listings(root, languages, tags_map, content_types, stream))
+      urls.concat(sitemap_listings(root, languages, tags_map, content_types, stream, language['lang']))
     end
 
     wrap_sitemap(urls)
@@ -143,8 +143,17 @@ module Feeds
     languages.map { |language| [language['lang'], "#{SITE_BASE_URL}#{language['root']}#{path}"] }
   end
 
-  def sitemap_listings(root, languages, tags_map, content_types, stream)
+  def sitemap_listings(root, languages, tags_map, content_types, stream, lang = nil)
     urls = []
+    # Which languages have a listing of each type, and which type a post is
+    # in THIS language: on a site of one language (lang is nil) every type
+    # the caller names and the post's own; otherwise what the build worked
+    # out per language (TYPES_BY_LANGUAGE) -- a type is read off the blocks
+    # a language shows a post with, so the listings are not the same set in
+    # every tree, and one that was never written is not to be listed.
+    by_language = lang && defined?(TYPES_BY_LANGUAGE) ? TYPES_BY_LANGUAGE : nil
+    types_here = by_language ? by_language.fetch(lang.to_s, []) : content_types
+    type_of = by_language ? ->(entry) { Languages.type_in(entry, lang) } : ->(entry) { dominant_content_type(entry) }
 
     # max_by post_time, not max_by the stored STRING. The comment on the post
     # sort spells out why a lexical compare is wrong here: a post written
@@ -158,15 +167,16 @@ module Feeds
                           alternates: listing_alternates(languages, "/tag/#{slug}/"))
     end
 
-    content_types.each do |type|
+    types_here.each do |type|
       # From the stream, not from the combined list: /type/<t>/ shows posts
       # and never pages, so a page could hand the listing a lastmod for
       # something that listing does not contain. The archive block below was
       # given `stream` for exactly this reason, and says so.
-      type_posts = stream.select { |entry| dominant_content_type(entry) == type }
+      type_posts = stream.select { |entry| type_of.call(entry) == type }
       latest = type_posts.max_by { |p| post_time(p) }
+      there = by_language ? languages.select { |other| by_language.fetch(other['lang'].to_s, []).include?(type) } : languages
       urls << sitemap_url("#{SITE_BASE_URL}#{root}/type/#{type}/", latest && post_time(latest).iso8601,
-                          alternates: listing_alternates(languages, "/type/#{type}/"))
+                          alternates: listing_alternates(there, "/type/#{type}/"))
     end
 
     # Every series listing, for the same reason as a tag's: the build writes

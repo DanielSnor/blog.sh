@@ -2724,7 +2724,14 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # Which text this run renders, decided at the same door the shape is
   # settled at, so nothing downstream has to ask: the metadata stay the
   # post's, only the words change with the language (lib/translations.rb).
-  parsed = Translations.for_lang(parsed, SITE_LANG, chain: FALLBACK_CHAIN)
+  #
+  # The blocks the post has in its own words are kept beside the ones this
+  # run reads, when the two differ: what KIND of post it is in another
+  # language is read off that language's blocks, and for a language the
+  # post was never written in those are the post's own (Languages.type_in).
+  in_this_language = Translations.for_lang(parsed, SITE_LANG, chain: FALLBACK_CHAIN)
+  in_this_language = in_this_language.merge('__own_content' => parsed['content']) unless in_this_language.equal?(parsed)
+  parsed = in_this_language
 
   # Which year's DIRECTORY the file sits in -- the same key the checker,
   # the exporter and stats already carry. A post whose date was corrected
@@ -2992,6 +2999,17 @@ TAG_PAGES = posts.each_with_object({}) do |post, acc|
 end.freeze
 
 PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
+# The same question for every OTHER language the site publishes. A post's
+# type is read off the blocks a language shows it with, so a photo post
+# translated in words alone is a text post there -- and a language whose
+# every photo post is like that has no /type/image/ at all. The sitemap,
+# the hreflang of a type listing and the language switcher on it all said
+# it had one, because each assumed that a listing built here is built
+# everywhere (fleet, 8. 10. 2026): three promises of a page nobody wrote.
+# Asked once per run, of the posts this run already holds.
+TYPES_BY_LANGUAGE = SITE_LOCALES.to_h do |lang|
+  [lang, lang == SITE_LANG ? PRESENT_TYPES : CONTENT_TYPES & posts.map { |post| Languages.type_in(post, lang) }.uniq]
+end.freeze
 NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
           'video' => 'video', 'audio' => 'audio', 'link' => 'links',
@@ -3145,9 +3163,14 @@ def timezone_fact
   [zone, rules].join(':')
 end
 TIMEZONE_FACT = timezone_fact
+# ...and which kinds of post the OTHER languages have: a listing by type
+# says in its head and in its switcher whether that language has the same
+# listing, and the post that decides it need not be one this listing
+# shows.
 BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
-                 SITE_BASE_URL, TIMEZONE_FACT)
+                 SITE_BASE_URL, TIMEZONE_FACT,
+                 TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG })
 
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
