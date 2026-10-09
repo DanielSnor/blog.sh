@@ -1517,6 +1517,7 @@ check:
   redirect_from_unusable_fix: "Dotaz, kotva, část . nebo .., anebo část delší, než unese jméno souboru. Čekala se cesta od kořene webu, třeba \"/stary-post/\". Oprav ji, nebo záznam vyhoď."
   former_slug_unusable: "%{slug}: položka former_slugs %{entry} se obsluhovat nebude — z takového tvaru sestavení žádný adresář neudělá."
   former_slug_unusable_fix: "Čeká se rok/slug: dvě části, žádná skrytá, žádná s oddělovačem, žádná delší, než unese jméno souboru. Oprav ji, nebo záznam vyhoď."
+  former_slug_of_language: " Je to stará adresa jeho textu v jazyce %{lang} (seznam translations.%{lang}.former_slugs); zrušit ji jde v ./blog.sh props, pod starými adresami."
   check_failed: "Otázku „%{check}“ se nepodařilo položit (%{reason}). Zbytek kontroly proběhl, ale o téhle části archivu neříká nic."
   check_failed_fix: "Nejspíš je v archivu tvar, se kterým tahle otázka nepočítá — nálezy výš ho často jmenují. Když ne, je to chyba v check samotném a stojí za nahlášení i s tímhle řádkem."
   post_bad_draft_token: "%{file} má draft_token, který není jedním segmentem cesty (%{token})."

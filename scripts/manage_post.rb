@@ -4683,7 +4683,10 @@ def props_addresses(path, slug)
     # row for "the address I am at right now" is not marked as taken by
     # somebody else.
     current = PostAddress.vacated_marker(post, slug: slug)
-    rows = entries.each_with_index.map { |(_, value), i| address_row(value, current, i) }
+    rows = entries.each_with_index.map do |(key, value), i|
+      lang = address_language(key)
+      lang ? "#{address_row(value, current, i)}  [#{lang}]" : address_row(value, current, i)
+    end
     # Into the frame, not above it -- see version_pick.
     index = address_pick(rows, [Tui.paint(t('cli.addresses_heading', count: entries.size), :dim), ''])
     # The blank line after a picker is the caller's to write -- Tui.menu
@@ -4698,10 +4701,7 @@ def props_addresses(path, slug)
     next unless Tui.yes?(Tui.key_choice(''))
 
     abort_if_post_changed(path, raw, slug)
-    updated = post.dup
-    remaining = Array(updated[key]).map(&:to_s) - [former]
-    remaining.empty? ? updated.delete(key) : updated[key] = remaining
-    AtomicWrite.write_json(path, updated)
+    AtomicWrite.write_json(path, without_address(post, key, former))
     puts Tui.paint(t('cli.addresses_dropped', address: former), :green)
     maybe_rebuild
   end
@@ -4720,9 +4720,36 @@ end
 # dialog read only the first, so a renamed page was told it had no old
 # addresses at all -- while the build warned about the one it could not
 # place, on every single run, with nothing anywhere able to clear it.
+#
+# ...and a third: the old addresses of the post's text in ANOTHER language
+# (translations.<lang>.former_slugs), which the build serves and `check`
+# asks about like the other two. They were in neither this list nor any
+# command -- so `check` could say "take the entry out" about an address
+# this screen said the post did not have, and the only way to do it was
+# a text editor in the post's JSON.
 def address_entries(post)
   Array(post['former_slugs']).map { |value| ['former_slugs', value.to_s] } +
-    Array(post['redirect_from']).map { |value| ['redirect_from', value.to_s] }
+    Array(post['redirect_from']).map { |value| ['redirect_from', value.to_s] } +
+    Translations.former_slugs(post).map { |lang, value| ["translations.#{lang}.former_slugs", value.to_s] }
+end
+
+# The language an entry of address_entries belongs to, or nil for the
+# post's own two lists.
+def address_language(key)
+  key[/\Atranslations\.(.+)\.former_slugs\z/, 1]
+end
+
+# The post without one of its old addresses, wherever address_entries
+# found it. A list left empty is taken off, as it always was; the
+# translation it belonged to stays.
+def without_address(post, key, former)
+  updated = JSON.parse(JSON.generate(post))
+  lang = address_language(key)
+  holder = lang ? updated['translations'][lang] : updated
+  list = lang ? Translations::FORMER_KEY : key
+  remaining = Array(holder[list]).map(&:to_s) - [former]
+  remaining.empty? ? holder.delete(list) : holder[list] = remaining
+  updated
 end
 
 # Who is standing at a root address today: a page of that slug, whatever
@@ -6821,10 +6848,7 @@ def props_drop_address_as_json(slug, address, rebuild:)
       entry = address_entries(post).find { |_, value| value == address }
       refuse('address_unknown', t('cli.props_address_unknown', address: address)) unless entry
       key, former = entry
-      updated = post.dup
-      remaining = Array(updated[key]).map(&:to_s) - [former]
-      remaining.empty? ? updated.delete(key) : updated[key] = remaining
-      AtomicWrite.write_json(path, updated)
+      AtomicWrite.write_json(path, without_address(post, key, former))
     end
     warnings = []
     props_after(slug, warnings, rebuild_if_asked(rebuild, warnings))

@@ -1532,6 +1532,7 @@ check:
   redirect_from_unusable_fix: "Eine Query, ein Fragment, ein Segment . oder .., oder ein Segment, das für einen Dateinamen zu lang ist. Erwartet wird ein Pfad ab der Wurzel wie \"/alter-beitrag/\". Korrigiere ihn, oder nimm den Eintrag heraus."
   former_slug_unusable: "%{slug}: der former_slugs-Eintrag %{entry} wird nicht ausgeliefert -- aus dieser Form kann der Build kein Verzeichnis machen."
   former_slug_unusable_fix: "Erwartet wird Jahr/Slug: zwei Segmente, keines versteckt, keines mit einem Trennzeichen, keines länger als ein Dateiname erlaubt. Korrigiere ihn, oder nimm den Eintrag heraus."
+  former_slug_of_language: " Es ist eine alte Adresse seines Textes in %{lang} (die Liste translations.%{lang}.former_slugs); ./blog.sh props nimmt sie heraus, unter den alten Adressen."
   check_failed: "Die Frage \"%{check}\" ließ sich nicht stellen (%{reason}). Der Rest der Prüfung lief, sagt über diesen Teil des Archivs aber nichts."
   check_failed_fix: "Wahrscheinlich enthält das Archiv eine Form, mit der diese Frage nicht rechnet -- die Befunde oben nennen sie oft. Wenn nicht, ist es ein Fehler in check selbst und eine Meldung wert, mit dieser Zeile."
   post_bad_draft_token: "%{file} hat ein draft_token, das kein einzelnes Pfadsegment ist (%{token})."

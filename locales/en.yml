@@ -1548,6 +1548,7 @@ check:
   redirect_from_unusable_fix: "A query, a fragment, a . or .. segment, or a segment too long for a filename. Expected a site-root path like \"/old-post/\". Correct it, or take the entry out."
   former_slug_unusable: "%{slug}: the former_slugs entry %{entry} will not be served -- the build can make no directory of that shape."
   former_slug_unusable_fix: "Expected year/slug: two segments, neither hidden, neither carrying a separator, neither longer than a filename allows. Correct it, or take the entry out."
+  former_slug_of_language: " It is an old address of the post's %{lang} text (the list translations.%{lang}.former_slugs); ./blog.sh props drops it, under the old addresses."
   check_failed: "The question \"%{check}\" could not be asked (%{reason}). The rest of the check ran, but it says nothing about this part of the archive."
   check_failed_fix: "Most likely the archive holds a shape this question does not expect -- the findings above often name it. If they do not, this is a bug in check itself and worth reporting, with this line."
   post_bad_draft_token: "%{file} has a draft_token that is not a single path segment (%{token})."

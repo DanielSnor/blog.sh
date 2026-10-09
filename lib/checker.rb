@@ -1717,14 +1717,14 @@ module Checker
     # somebody would go looking, did not ask at all: an archive carrying
     # a former slug that will never be served was called sound.
     findings += posts.flat_map do |post|
-      former_addresses(post).filter_map do |former|
+      former_addresses_by_language(post).filter_map do |lang, former|
         next if PostAddress.former_slug_refusal(former).nil?
 
-        warn(t('former_slug_unusable', slug: post['slug'].to_s, entry: former.to_s),
+        warn(t('former_slug_unusable', slug: post['slug'].to_s, entry: former.to_s) + of_language(lang),
              t('former_slug_unusable_fix'),
              kind: :former_slug_unusable,
              data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s,
-                     'year' => PostAddress.file_year(post).to_s })
+                     'year' => PostAddress.file_year(post).to_s }.merge(lang ? { 'lang' => lang } : {}))
       end
     end
 
@@ -1748,15 +1748,15 @@ module Checker
       live[fold_name(post_path(post))] ||= post
     end
     posts.each do |post|
-      former_addresses(post).each do |former|
+      former_addresses_by_language(post).each do |lang, former|
         next unless PostAddress.former_slug_refusal(former).nil?
 
         holder = live[fold_name("/posts/#{former.to_s.split('/').reject(&:empty?).join('/')}/")]
         next if holder.nil? || holder.equal?(post)
 
-        findings << warn(t('former_slug_taken', slug: post['slug'].to_s, entry: former.to_s, holder: holder['slug'].to_s),
+        findings << warn(t('former_slug_taken', slug: post['slug'].to_s, entry: former.to_s, holder: holder['slug'].to_s) + of_language(lang),
                          t('former_slug_taken_fix', holder: holder['slug'].to_s), kind: :former_slug_taken,
-                         data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'holder' => holder['slug'].to_s })
+                         data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'holder' => holder['slug'].to_s }.merge(lang ? { 'lang' => lang } : {}))
       end
       Array(post['redirect_from']).each do |origin|
         next unless PostAddress.redirect_refusal(origin).nil?
@@ -1785,6 +1785,18 @@ module Checker
   # claim it.
   def former_addresses(post)
     Array(post['former_slugs']) + Translations.former_slugs(post).map(&:last)
+  end
+
+  # The same, each with the language whose list it is in -- nil for the
+  # post's own. A finding about an address has to say WHICH list: "take
+  # the entry out of former_slugs" about an entry that is in
+  # translations.en.former_slugs sent somebody to a list it was not in.
+  def former_addresses_by_language(post)
+    Array(post['former_slugs']).map { |former| [nil, former] } + Translations.former_slugs(post)
+  end
+
+  def of_language(lang)
+    lang ? t('former_slug_of_language', lang: lang) : ''
   end
 
   def check_redirects(posts, cap = nil)
