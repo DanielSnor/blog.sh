@@ -3360,6 +3360,18 @@ end
 # `to:` and `lang:` are for an address that belonged to one language's text
 # (Translations.former_slugs): the stub then leads to that language's page
 # and says so in that language's title, wherever it stands.
+# The one sentence of a stub, in the language the stub says it is in. A
+# stub for a text of another language carries that language's code and
+# title wherever it stands -- and said "this post has moved" in the
+# language of the tree it was written into: an English page with a Czech
+# sentence on it. The language's own words, or the ones it borrows
+# (ui_language); a language with neither keeps this run's.
+REDIRECT_SENTENCES = Hash.new do |known, lang|
+  code = I18n.locale_file?(lang) ? lang.to_s : SiteConfig.language_data(lang.to_s)['ui_language'].to_s
+  said = I18n.locale_file?(code) ? I18n.load_locale(code).dig('redirect', 'moved').to_s : ''
+  known[lang] = said.empty? ? t('redirect.moved') : said
+end
+
 def redirect_stub_html(post, to: nil, lang: nil)
   # Escaped in every attribute it appears in, not only in the text of the
   # link. The address is built out of the post's slug or its draft token,
@@ -3381,7 +3393,7 @@ def redirect_stub_html(post, to: nil, lang: nil)
     <title>#{h(title)}</title>
     </head>
     <body>
-    <p>#{h(t('redirect.moved'))} <a href="#{url}">#{url}</a></p>
+    <p>#{h(lang && lang.to_s != SITE_LANG.to_s ? REDIRECT_SENTENCES[lang.to_s] : t('redirect.moved'))} <a href="#{url}">#{url}</a></p>
     </body>
     </html>
   HTML
