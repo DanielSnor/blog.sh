@@ -3798,7 +3798,12 @@ Output.emit(File.join(CONTENT_ROOT, 'search', 'index.html'),
      layout(search_template.result(binding),
             title: t('search.page_title', site_title: SITE_TITLE),
             description: t('search.page_description'),
-            path: '/search/'))
+            # loc(), like every listing: the page of a second language is
+            # at /en/search/, and said `/search/` -- so its canonical and
+            # og:url named the OTHER language's page while its hreflang, two
+            # lines below, named itself. The cheat sheet and the 404 did
+            # the same.
+            path: loc('/search/')))
 
 # The page a mistyped or long-dead address lands on. Every supported host
 # serves /404.html for a path it has nothing at -- until now that was the
@@ -3860,6 +3865,12 @@ NOT_FOUND_SIGN =
 def not_found_search_html
   %(        <form class="search-form not-found-search" action="#{loc('/search/')}" method="get" role="search">\n) +
     %(          <input type="search" name="q" id="not-found-q" placeholder="#{h(t('nav.search_placeholder'))}" ) +
+    # The languages this site publishes, for the script that reads the
+    # missing address: `/en/posts/2019/` holds no word to look for, and
+    # without being told that `en` is a language it offered "en" as one.
+    # Only where there is more than one -- a site in one language has no
+    # such folder, and its page stays byte for byte what it was.
+    (SITE_LOCALES.length > 1 ? %(data-langs="#{h(SITE_LOCALES.join(' '))}" ) : '') +
     %(aria-label="#{h(t('nav.search_label'))}" autocomplete="off">\n) +
     %(          <button type="submit" aria-label="#{h(t('nav.search_label'))}">\n) +
     %(            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">) +
@@ -3891,7 +3902,7 @@ Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:not_found]),
             not_found_links_html(ARCHIVE_YEARS, !tags_map.empty?),
             title: t('not_found.page_title', site_title: SITE_TITLE),
             description: t('not_found.page_description'),
-            path: '/404.html',
+            path: loc('/404.html'),
             # The script is this page's alone, so only this page asks for it.
             extra_head: %(\n  <meta name="robots" content="noindex">) +
                         %(\n  <script src="/assets/js/not-found.js" defer></script>)))
@@ -3907,7 +3918,7 @@ if File.exist?(CHEAT_SHEET_SOURCE)
        layout(cheat_sheet_template.result(binding),
               title: "#{cheat_title} – #{SITE_SHORT_NAME}",
               description: t('markdown_page.description'),
-              path: CHEAT_SHEET_PATH))
+              path: loc(CHEAT_SHEET_PATH)))
 else
   warn t('build.cheat_sheet_missing', path: CHEAT_SHEET_SOURCE)
 end

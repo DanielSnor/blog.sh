@@ -41,8 +41,12 @@
       .trim();
   }
 
-  function fromAddress(pathname) {
+  function fromAddress(pathname, langs) {
     var parts = pathname.split('/').filter(function (p) { return p !== ''; });
+    // The folder of a language the site publishes is where the reader
+    // was, not what they were after: /en/posts/2019/ has no word in it,
+    // and "en" in a search box finds nothing anybody meant.
+    if (parts.length && langs.indexOf(parts[0].toLowerCase()) !== -1) parts.shift();
     var words = '';
     for (var i = parts.length - 1; i >= 0 && !words; i--) {
       var candidate = wordsOf(parts[i]);
@@ -59,7 +63,8 @@
     var field = document.getElementById('not-found-q');
     if (!field) return;
 
-    var asked = fromAddress(window.location.pathname);
+    var langs = (field.getAttribute('data-langs') || '').split(' ').filter(function (l) { return l !== ''; });
+    var asked = fromAddress(window.location.pathname, langs);
     // Only into an empty field: a browser that restored what the reader
     // had typed before going back knows better than the address does.
     if (asked.words && !field.value) field.value = asked.words;
