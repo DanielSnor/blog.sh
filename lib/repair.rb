@@ -72,13 +72,18 @@ module Repair
   # year, not across the archive -- sean.cz carries two pairs that repeat
   # across years -- so the index keeps every post of a name and the lookup
   # refuses to choose between them.
-  def index(posts)
+  #
+  # `languages:` are the ones the site publishes beside its own. Their
+  # folders are the site's own first segments, and a dead link into one of
+  # them is repaired another way than one at the root (propose_redirect).
+  def index(posts, languages: [])
     by_slug = posts.group_by { |post| post['slug'].to_s }
     # ...and the same thing folded, for addresses that shout. An old
     # permalink is often /Archiv/Motorola-A1000.html, and percent-encoding
     # arrives with anything a browser ever touched. Two slugs that fold
     # together name neither post, exactly like two that are equal.
-    { 'by_slug' => by_slug, 'folded' => by_slug.keys.group_by { |slug| Checker.fold_name(slug) } }
+    { 'by_slug' => by_slug, 'folded' => by_slug.keys.group_by { |slug| Checker.fold_name(slug) },
+      'languages' => languages.map(&:to_s) }
   end
 
   # The post a slug names, or nil with a reason worth telling: a draft has
@@ -167,6 +172,11 @@ module Repair
     tail = tail_of(data['url'])
     reason = tail.empty? ? nil : resolve(tail, idx).last
     return reason if reason
+    # A post found, in the tree of a language it is not written in: there
+    # is no page of it there to send the link to.
+    lang = finding.kind == :link_dead ? in_language_tree(decode_path(data['url'].to_s.split('#').first.to_s), idx) : nil
+    target = lang && target_for(data['url'], idx)
+    return :language if target && !Translations.languages(target).include?(lang)
 
     # ...and the query shape, which is how most relative links name their
     # target: ./?item=<slug>.
@@ -182,8 +192,8 @@ module Repair
   # Whether an address can be a redirect_from at all. The build refuses a
   # query string, a fragment and the site's own first segments, so a
   # proposal carrying one of those would be a promise the build breaks.
-  def redirectable?(origin)
-    PostAddress.redirect_refusal(origin).nil?
+  def redirectable?(origin, idx = {})
+    PostAddress.redirect_refusal(origin, languages: Array(idx['languages'])).nil?
   end
 
   # The one repair a finding allows, or nil when the answer is a person's
@@ -256,7 +266,17 @@ module Repair
     # by segment rather than whole, because CGI.unescape would also turn a
     # literal "+" into a space.
     origin = decode_path(data['url'].to_s.split('#').first.to_s)
-    return nil unless redirectable?(origin)
+    # A dead link into the tree of a language. A redirect_from there is one
+    # the build refuses -- the folder is the site's own -- so offering it
+    # wrote an entry that serves nothing, called the link repaired, and
+    # left the reader with the same 404. What such a link meant is the
+    # post's page in that language, which stands under the slug the
+    # language gives it: /en/posts/2019/<the Czech slug>/ is the mistake
+    # of somebody who did not know the English one. So the LINK is
+    # rewritten, and only when there is such a page to send it to.
+    lang = in_language_tree(origin, idx)
+    return propose_in_language(data, origin, lang, idx) if lang
+    return nil unless redirectable?(origin, idx)
 
     target = target_for(origin, idx)
     return nil if target.nil?
@@ -264,6 +284,26 @@ module Repair
     Proposal.new(action: :add_redirect,
                  data: { 'slug' => target['slug'], 'year' => PostAddress.file_year(target),
                          'origin' => origin, 'to' => post_path(target) })
+  end
+
+  # The language whose tree an address is in, when what follows the
+  # language is the shape of a post's or a page's address -- not a listing,
+  # a tag or the archive, which belong to the site and name no post.
+  def in_language_tree(path, idx)
+    first, *rest = path.to_s.split('/').reject(&:empty?)
+    return nil unless Array(idx['languages']).include?(first.to_s)
+
+    rest.first == 'posts' || rest.size == 1 ? first : nil
+  end
+
+  def propose_in_language(data, origin, lang, idx)
+    target = target_for(origin, idx)
+    return nil if target.nil? || !Translations.languages(target).include?(lang)
+
+    anchor = data['url'].to_s[/#.*\z/].to_s
+    Proposal.new(action: :rewrite_link,
+                 data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s, 'from' => data['url'].to_s,
+                         'to' => "/#{lang}#{post_path(Translations.for_lang(target, lang))}#{anchor}" })
   end
 
   # A relative link often carries its target in the QUERY rather than in the

@@ -431,6 +431,16 @@ writes this list for you -- it is for the merge, which is done by hand --
 but nothing drops it either: `translate` and an edit from an app carry it
 across.
 
+Such an address is answered in two places and no others -- the site's
+root and that language's tree -- and only while the language is
+published: take the language out of `site.locales` and its old addresses
+answer nothing, which `check` says of each entry. `check` asks each tree
+about its own pages, as the build does. An old address another post's
+page stands at in one of them is reported with where it is taken and
+where it is still served; and one written into the lists of two
+languages leads, at the root, to the text of the language the file names
+first -- `check` names that too.
+
 **A post you have not translated is not hidden.** It stays in the other
 language's listing and the link on it goes to the address the post really
 has, so the same words never stand at two addresses. The language switcher
@@ -1323,7 +1333,13 @@ network can always use; a name works where the phone can look it up
 the code and leaves). Where the blog lives in a container the keys are the host's and
 `pair` cannot reach them; that setup is written by hand, as above.
 `BLOG_SH_AUTHORIZED_KEYS` names the file for an account whose sshd reads
-another one.
+another one. Write it into `env.sh`: `pair` and `doctor` both read it
+there, so the list of devices and the diagnosis are about the file the
+code was written into. Said only in a terminal it is gone with the
+terminal, and the next `pair --list` looks into the account's default
+file and finds nobody. What sshd itself is set to read the engine
+cannot see; that the two agree is yours to check (`sshd -T | grep -i
+authorizedkeysfile`, as root).
 
 For whoever writes an app: the code is a link,
 `blogsh://pair?v=1&h=<host>&p=<port>&u=<user>&k=<key>&f=<prints>&n=<site>`,

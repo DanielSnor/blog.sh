@@ -196,7 +196,7 @@ if repair
     exit 0
   end
 
-  idx = Repair.index(Checker.posts_of_last_run || Checker.load_posts(ROOT))
+  idx = Repair.index(Checker.posts_of_last_run || Checker.load_posts(ROOT), languages: Checker.published_languages(ROOT))
   applied = 0
   skipped = 0
   no_offer = 0

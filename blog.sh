@@ -99,11 +99,21 @@ case "${1:-}" in
     shift
     exec ruby scripts/export.rb "$@"
     ;;
-  # A code for an app to read (lib/pairing.rb). No env.sh: it asks nothing
-  # of the network or of a deploy target, and it has to work on an
-  # installation that has not got that far.
+  # A code for an app to read (lib/pairing.rb). It asks nothing of the
+  # network or of a deploy target and has to work on an installation that
+  # has not got that far, so env.sh is not required -- but it is read when
+  # there is one, the way doctor reads it. BLOG_SH_AUTHORIZED_KEYS lives
+  # there: read by doctor and not by pair, a device let in through the file
+  # it names was "no device" to `pair --list` and "no such device" to
+  # `pair --revoke`, beside its own line in the file sshd reads.
   pair)
     shift
+    if [ -f env.sh ]; then
+      set -a
+      # shellcheck source=/dev/null
+      . ./env.sh
+      set +a
+    fi
     exec ruby scripts/pair.rb "$@"
     ;;
   # Counts the archive on disk, so it needs no env.sh either -- and it is

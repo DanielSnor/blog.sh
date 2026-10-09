@@ -342,6 +342,23 @@ goes in is still being decided; the suffix and the date both come off at the tag
   And `check --languages --json` over a `config/site.yml` that cannot be read answered with the
   empty table of a site in one language and a zero exit; it refuses, with what `check` says about
   that file, and exits 1 -- and the table on the screen no longer says "one language" above it.
+- **`check` and the build agree about a translation's old addresses.** An address in
+  `translations.<lang>.former_slugs` is served in two places: at the root and in that language's
+  tree. `check` called it live under every language the site has, and still live after the
+  language was taken out of `site.locales`; it calls a link there dead, and says of the entry
+  itself that nothing serves it. Each tree is asked about its own pages: an old address another
+  post's page stands at in the language's tree -- which the build skips on every run -- is said
+  once, with where it is taken and where it is served; one taken at the root but served in its
+  language's tree is no longer "not served", and a link to the stub that answers there no longer
+  dead. One address in the lists of two languages of a post is named, with the text the root
+  leads to.
+- **`check --repair` wrote a redirect into a language's folder.** For a dead link such as
+  `/en/posts/2019/<the post's own slug>/` it offered a `redirect_from` the build refuses, wrote
+  it, and called the link repaired. It rewrites the link to the post's page in that language;
+  where the post has none, it offers nothing and says why.
+- **`./blog.sh pair` reads `env.sh`,** as `doctor` does. `BLOG_SH_AUTHORIZED_KEYS` written there
+  names one file for `pair`, `pair --list`, `pair --revoke` and `doctor`; a device let in through
+  it used to be "no device" to `pair --list`. `env.sh.example` carries the line.
 - **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
   which renders one language per run, and deployed; the second language stayed as the previous
   version built it. The recipe is `./blog.sh rebuild`.

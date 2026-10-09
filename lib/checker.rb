@@ -226,7 +226,7 @@ module Checker
     findings.concat(guard(:relative_links) { check_relative_links(posts, cap) })
     findings.concat(guard(:orphan_media) { check_orphan_media(root, posts, cap) })
     findings.concat(guard(:stray_media) { check_stray_media(root, posts, cap) })
-    findings.concat(guard(:redirects) { check_redirects(posts, cap) })
+    findings.concat(guard(:redirects) { check_redirects(posts, cap, root: root) })
     findings.concat(guard(:redirect_entries) { check_redirect_entries(posts, cap, root: root) })
     findings.concat(guard(:series_names) { check_series_names(posts, cap) })
     # cap passed like everywhere else. Its absence meant the default of
@@ -679,6 +679,10 @@ module Checker
   # configuration rather than the posts decides.
   def known_paths(posts, root: nil)
     paths = Set.new(FIXED_PATHS)
+    # Read once: the languages the site publishes decide which old
+    # addresses are served at all, and where.
+    languages = published_languages(root)
+    in_language = []
     # The writing app, which the build publishes at /write/ when the site
     # asks for it (write: true) and not otherwise -- the same condition,
     # read the same way. Left out, a post pointing people at the app, or a
@@ -750,8 +754,18 @@ module Checker
         # screens down, and was counted here all the same -- so a link to
         # it passed as sound in the same run that said the entry is
         # unusable.
-        former_addresses(post).each do |former|
-          paths << "/posts/#{former}/" if PostAddress.former_slug_refusal(former).nil?
+        former_addresses_by_language(post, languages).each do |lang, former|
+          next unless PostAddress.former_slug_refusal(former).nil?
+
+          # The post's own old address is owed in every tree, and is copied
+          # under each language below with everything else. One a
+          # TRANSLATION carries is served in two places and no others: at
+          # the root, where that text stood when it was a post of its own,
+          # and in its language's tree (build_blog.rb says the same).
+          # Counted among the rest it was called live under every language
+          # the site has -- /de/posts/<old English address>/, where the
+          # build writes nothing.
+          lang ? in_language << [lang, former] : paths << "/posts/#{former}/"
         end
         # The same question of a redirect_from, which the build refuses
         # when its first segment belongs to the site itself or when its
@@ -760,7 +774,7 @@ module Checker
         # site answers at passed every link to them as sound -- under a
         # closing sentence that names redirects by name.
         Array(post['redirect_from']).each do |origin|
-          paths << origin.to_s if PostAddress.redirect_refusal(origin, languages: published_languages(root)).nil?
+          paths << origin.to_s if PostAddress.redirect_refusal(origin, languages: languages).nil?
         end
       end
     end
@@ -772,7 +786,9 @@ module Checker
     # ...and the index of series once one series has a page: two posts in
     # the stream under a name short enough to be a directory.
     paths << '/series/' if series_sizes.any? { |slug, size| size >= 2 && Slug.pageable?(slug) }
-    with_languages(paths, posts, root: root)
+    known = with_languages(paths, posts, root: root)
+    in_language.each { |lang, former| known << "/posts/#{former}/" << "/#{lang}/posts/#{former}/" }
+    known
   end
 
   # The same addresses again under every language the archive has text in.
@@ -1726,7 +1742,7 @@ module Checker
     # somebody would go looking, did not ask at all: an archive carrying
     # a former slug that will never be served was called sound.
     findings += posts.flat_map do |post|
-      former_addresses_by_language(post).filter_map do |lang, former|
+      former_addresses_by_language(post, languages).filter_map do |lang, former|
         next if PostAddress.former_slug_refusal(former).nil?
 
         warn(t('former_slug_unusable', slug: post['slug'].to_s, entry: former.to_s) + of_language(lang),
@@ -1750,22 +1766,76 @@ module Checker
     # folded the way the build folds what it has written, and never
     # against the post itself: a post that still holds its own current
     # address among its former ones is served, by itself.
-    live = {}
+    #
+    # ...and asked of every TREE the address is owed in, each against the
+    # pages of that tree. A language's tree has pages of its own -- the
+    # posts written in it, under the slugs that language gives them --
+    # and the build asks each tree separately. Asked of the root alone,
+    # an old address a language's page stands at was skipped by the build
+    # on every run of that language with check silent; and one taken at
+    # the root but served in its language's tree was called unserved, and
+    # a link to the stub that IS there called dead.
+    own = site_own_language(root)
+    live = Hash.new { |trees, tree| trees[tree] = {} }
     posts.each do |post|
       next if draft?(post)
 
-      live[fold_name(post_path(post))] ||= post
+      live[''][fold_name(post_path(post))] ||= post
+      (Translations.languages(post) & languages).each do |lang|
+        live[lang][fold_name(post_path(Translations.for_lang(post, lang)))] ||= post
+      end
     end
     posts.each do |post|
-      former_addresses_by_language(post).each do |lang, former|
+      former_addresses_by_language(post, languages).each do |lang, former|
         next unless PostAddress.former_slug_refusal(former).nil?
 
-        holder = live[fold_name("/posts/#{former.to_s.split('/').reject(&:empty?).join('/')}/")]
-        next if holder.nil? || holder.equal?(post)
+        address = fold_name("/posts/#{former.to_s.split('/').reject(&:empty?).join('/')}/")
+        trees = former_trees(lang, languages)
+        taken = trees.to_h { |tree| [tree, live[tree][address]] }.reject { |_, holder| holder.nil? || holder.equal?(post) }
+        next if taken.empty?
 
-        findings << warn(t('former_slug_taken', slug: post['slug'].to_s, entry: former.to_s, holder: holder['slug'].to_s) + of_language(lang),
-                         t('former_slug_taken_fix', holder: holder['slug'].to_s), kind: :former_slug_taken,
-                         data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'holder' => holder['slug'].to_s }.merge(lang ? { 'lang' => lang } : {}))
+        holder = taken.values.first['slug'].to_s
+        served = trees - taken.keys
+        said = { slug: post['slug'].to_s, entry: former.to_s, holder: holder }
+        text, fix = if served.empty?
+                      [t('former_slug_taken', **said), t('former_slug_taken_fix', holder: holder)]
+                    else
+                      [t('former_slug_taken_partly', **said, served: served.map { |tree| tree_name(tree) }.join(', '),
+                                                             taken: taken.keys.map { |tree| tree_name(tree) }.join(', ')),
+                       t('former_slug_taken_partly_fix', holder: holder)]
+                    end
+        folders = ->(list) { list.map { |tree| tree.empty? ? '/' : "/#{tree}/" } }
+        findings << warn(text + of_language(lang), fix, kind: :former_slug_taken,
+                         data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'holder' => holder,
+                                 'taken_in' => folders.call(taken.keys), 'served_in' => folders.call(served) }.merge(lang ? { 'lang' => lang } : {}))
+      end
+      # One address in the lists of two languages of the same post. Each
+      # language's tree serves its own, but at the root the address can
+      # lead to one text only -- the build gives it to the language the
+      # file names first and says "skipped" about the other on every run.
+      former_addresses_by_language(post, languages).select { |lang, former| lang && PostAddress.former_slug_refusal(former).nil? }
+                                                   .group_by { |_, former| fold_name(former.to_s.split('/').reject(&:empty?).join('/')) }
+                                                   .each_value do |claims|
+        langs = claims.map(&:first).uniq
+        next if langs.size < 2
+
+        findings << warn(t('former_slug_two_languages', slug: post['slug'].to_s, entry: claims.first.last.to_s,
+                                                        langs: langs.join(', '), first: langs.first),
+                         t('former_slug_two_languages_fix'), kind: :former_slug_two_languages,
+                         data: { 'slug' => post['slug'].to_s, 'entry' => claims.first.last.to_s, 'langs' => langs,
+                                 'year' => PostAddress.file_year(post).to_s })
+      end
+      # An old address of a text in a language the site does not publish:
+      # there is no page for it to lead to, so the build stands nothing
+      # there. Written down and served nowhere -- which is what the day
+      # after taking a language out of site.locales looks like.
+      unless draft?(post)
+        former_addresses_unpublished(post, languages + [own]).each do |lang, former|
+          findings << warn(t('former_slug_unpublished', slug: post['slug'].to_s, entry: former.to_s, lang: lang),
+                           t('former_slug_unpublished_fix', lang: lang), kind: :former_slug_unpublished,
+                           data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'lang' => lang,
+                                   'year' => PostAddress.file_year(post).to_s })
+        end
       end
       Array(post['redirect_from']).each do |origin|
         next unless PostAddress.redirect_refusal(origin, languages: languages).nil?
@@ -1773,7 +1843,9 @@ module Checker
         parts = origin.to_s.split('/').reject(&:empty?)
         next if parts.empty? || parts.last.match?(/\.html?\z/i)
 
-        holder = live[fold_name("/#{parts.join('/')}/")]
+        # A redirect_from is an address at the root and nowhere else (one
+        # into a language's folder is refused above).
+        holder = live[''][fold_name("/#{parts.join('/')}/")]
         next if holder.nil? || holder.equal?(post)
 
         findings << warn(t('redirect_from_taken', slug: post['slug'].to_s, entry: origin.to_s, holder: holder['slug'].to_s),
@@ -1792,27 +1864,53 @@ module Checker
   # every question asked of one is asked of both: whether its shape can be
   # served, whether something else now stands there, whether two posts
   # claim it.
-  def former_addresses(post)
-    Array(post['former_slugs']) + Translations.former_slugs(post).map(&:last)
+  #
+  # Of the languages the site PUBLISHES, like the build (`only:` there):
+  # a text in a language the site does not publish has no page, so its
+  # old address has nothing to lead to and no stub is written. Asked
+  # without the list, every question below was answered about addresses
+  # nothing serves -- a link to one passed as sound on the day the
+  # language was taken out of site.locales.
+  def former_addresses(post, languages = [])
+    former_addresses_by_language(post, languages).map(&:last)
   end
 
   # The same, each with the language whose list it is in -- nil for the
   # post's own. A finding about an address has to say WHICH list: "take
   # the entry out of former_slugs" about an entry that is in
   # translations.en.former_slugs sent somebody to a list it was not in.
-  def former_addresses_by_language(post)
-    Array(post['former_slugs']).map { |former| [nil, former] } + Translations.former_slugs(post)
+  def former_addresses_by_language(post, languages = [])
+    Array(post['former_slugs']).map { |former| [nil, former] } + Translations.former_slugs(post, only: languages)
+  end
+
+  # The old addresses of texts in languages the site does not publish:
+  # written down, and served nowhere. `published` is every language the
+  # site has, its own among them -- a text filed under the site's own
+  # language is another mistake, and not this one.
+  def former_addresses_unpublished(post, published = [])
+    Translations.former_slugs(post).reject { |lang, _| published.include?(lang) }
+  end
+
+  # Where an old address is owed: the trees the build stands a stub in.
+  # '' is the root; a language is its folder.
+  def former_trees(lang, languages)
+    lang ? ['', lang] : ['', *languages]
+  end
+
+  def tree_name(tree)
+    tree.empty? ? t('tree_root') : t('tree_language', lang: tree)
   end
 
   def of_language(lang)
     lang ? t('former_slug_of_language', lang: lang) : ''
   end
 
-  def check_redirects(posts, cap = nil)
+  def check_redirects(posts, cap = nil, root: nil)
+    languages = published_languages(root)
     claims = Hash.new { |h, k| h[k] = [] }
     posts.each do |post|
       Array(post['redirect_from']).each { |origin| claims[origin.to_s] << post['slug'] }
-      former_addresses(post).each { |former| claims["/posts/#{former}/"] << post['slug'] }
+      former_addresses(post, languages).each { |former| claims["/posts/#{former}/"] << post['slug'] }
     end
     capped(claims.filter_map do |origin, slugs|
       next if slugs.uniq.size < 2
