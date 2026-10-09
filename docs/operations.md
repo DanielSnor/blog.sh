@@ -1212,7 +1212,12 @@ receiver gives; a request that is not JSON, holds a word the whitelist
 refuses or is over 64 kB is refused as one (`bad_json`, `bad_args`,
 `unknown_command`, `too_large`), and the engine answering in prose --
 no `env.sh`, a configuration that will not parse -- is wrapped as
-`engine_failed` with its words. Unlike the shortcut's key this one may
+`engine_failed` with its words: the end of what it said, or, where it
+died of an exception, the line that names the error. Two clocks answer
+`timeout`: the request's one line has `BLOGSH_LINE_SECONDS` (30) to end
+once it has begun, and an engine still running after
+`BLOGSH_RUN_SECONDS` (1800) is stopped with whatever it had started.
+Unlike the shortcut's key this one may
 be ed25519; the forced command runs in the same environment
 `receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.
 

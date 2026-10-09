@@ -108,7 +108,7 @@ answer_from_engine() {
   case "$OUT" in
     \{*) printf '%s\n' "$OUT" ;;
     *)
-      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | tail -c 600)
+      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | LC_ALL=C awk '!c && /\.rb:[0-9]+:in .*\([A-Z][A-Za-z0-9_:]*\)$/ { c = $0 } { a = a $0 "\n" } END { if (c != "") print substr(c, 1, 600); else printf "%s", substr(a, length(a) - 599) }')
       printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | tr '\n' ' ')")"
       ;;
   esac

@@ -47,8 +47,16 @@ $stdout.set_encoding(Encoding::UTF_8)
 ROOT = File.expand_path('..', __dir__)
 LIMIT = 65_536
 FIRST_SECONDS = 30
-# Long enough for a full rebuild of a large archive and its upload.
-RUN_SECONDS = 1800
+# How long the REST of the request's one line may take once its first
+# byte is here. FIRST_SECONDS watched only for that first byte, so a
+# sender that wrote half a line and went quiet held a process for as long
+# as it cared to hold the connection.
+LINE_SECONDS = ENV.fetch('BLOGSH_LINE_SECONDS', '30').to_i
+# Long enough for a full rebuild of a large archive and its upload -- and
+# a ceiling that is kept: an engine still running after this is stopped,
+# with everything it started, and the caller is told. (For as long as
+# this file has existed the number was written here and read nowhere.)
+RUN_SECONDS = ENV.fetch('BLOGSH_RUN_SECONDS', '1800').to_i
 # A delivery's ceiling, the receiver's own plus room for the names and the
 # line breaks; the receiver measures the exact one. How long the lines may
 # take to keep coming is the receiver's BLOGSH_BODY_SECONDS too.
@@ -116,6 +124,54 @@ def slug?(word)
   word.bytesize <= SLUG_BYTES && word.match?(SLUG)
 end
 
+# The request's line, read against a clock: whatever has arrived by the
+# first newline, by the end of the stream or by the limit -- and a refusal
+# when none of the three has come in time.
+def line_within(seconds)
+  raw = +''
+  deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + seconds
+  until raw.include?("\n") || raw.bytesize > LIMIT
+    left = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    refuse('timeout', "The request stalled for #{seconds} seconds before its line ended, and was dropped.") if left <= 0 || IO.select([$stdin], nil, nil, left).nil?
+
+    chunk = $stdin.read_nonblock(LIMIT + 1, exception: false)
+    break if chunk.nil?
+
+    raw << chunk.force_encoding(Encoding::UTF_8) unless chunk == :wait_readable
+  end
+  raw.include?("\n") ? raw[0..raw.index("\n")] : raw
+end
+
+# What went wrong, in the room an answer has for it. An engine that died
+# of an exception says so on the FIRST line of what it prints -- where,
+# what, and which error -- and forty lines of "from ..." after it; the
+# last 600 characters of that are the bottom of the stack and nothing
+# else. So a crash is answered with the line that names it, and prose --
+# which ends with what matters -- with its end, as before.
+def failure_words(text)
+  crashed = text.lines.map(&:rstrip).find { |line| line.match?(/\.rb:\d+:in .+\([A-Z][\w:]*\)\z/) }
+  crashed ? crashed[0, 600] : (text[-600..] || text)
+end
+
+# The engine, run against a clock. In a process group of its own, so that
+# stopping it stops the build and the upload it started as well.
+def run_engine(env, command, args)
+  Open3.popen3(env, command, *args, chdir: ROOT, pgroup: true) do |stdin, stdout, stderr, runner|
+    stdin.close
+    said = [Thread.new { stdout.read }, Thread.new { stderr.read }]
+    if runner.join(RUN_SECONDS).nil?
+      %w[TERM KILL].each do |signal|
+        Process.kill(signal, -runner.pid)
+        break if runner.join(5)
+      rescue SystemCallError
+        break
+      end
+      refuse('timeout', "The engine was still running after #{RUN_SECONDS} seconds and was stopped.")
+    end
+    [said[0].value.to_s, said[1].value.to_s, runner.value]
+  end
+end
+
 def read_request
   ready = IO.select([$stdin], nil, nil, FIRST_SECONDS)
   refuse('empty_input', "Nothing arrived on standard input for #{FIRST_SECONDS} seconds.") if ready.nil?
@@ -123,7 +179,7 @@ def read_request
   # One line, ended by its newline rather than by the end of the stream:
   # an SSH library without a half-close (the app's) could never signal
   # EOF, and JSON.generate never breaks a line, so the newline is enough.
-  raw = $stdin.gets(LIMIT + 1).to_s
+  raw = line_within(LINE_SECONDS)
   refuse('empty_input', 'Nothing arrived on standard input.') if raw.strip.empty?
   refuse('too_large', "The request is over #{LIMIT} bytes.") if raw.bytesize > LIMIT
 
@@ -227,7 +283,7 @@ def deliver
     exit 0
   end
   reason = "#{out}\n#{err}".scrub('').gsub(/[\u0000-\u0008\u000b-\u001f\u007f]/, '').strip.tr("\n", ' ')
-  refuse('engine_failed', reason[-600..] || reason)
+  refuse('engine_failed', failure_words(reason))
 end
 
 deliver if ARGV.first == '--deliver'
@@ -239,15 +295,16 @@ engine = File.join(ROOT, 'blog.sh')
 # BLOG_SH_SPEAK is named or UNSET, never inherited: what the forced
 # command's own environment says is not what this caller asked for.
 out, err, status = begin
-  Open3.capture3({ 'BLOG_SH_REMOTE' => '1', 'BLOG_SH_SPEAK' => speak }, [engine, 'blog.sh'], *args, chdir: ROOT, stdin_data: '')
+  run_engine({ 'BLOG_SH_REMOTE' => '1', 'BLOG_SH_SPEAK' => speak }, [engine, 'blog.sh'], args)
 rescue SystemCallError => e
   refuse('engine_failed', "Could not run the engine: #{e.message}")
 end
+out = out.force_encoding(Encoding::UTF_8)
+err = err.force_encoding(Encoding::UTF_8)
 
 if out.lstrip.start_with?('{')
   print out
   exit 0
 end
-reason = "#{out}\n#{err}".scrub('').gsub(/[\u0000-\u0008\u000b-\u001f\u007f]/, '').strip[-600..] ||
-         "#{out}\n#{err}".scrub('').strip
+reason = failure_words("#{out}\n#{err}".scrub('').gsub(/[\u0000-\u0008\u000b-\u001f\u007f]/, '').strip)
 refuse('engine_failed', "#{reason.tr("\n", ' ')} (status #{status.exitstatus})")
