@@ -286,6 +286,26 @@ goes in is still being decided; the suffix and the date both come off at the tag
   port is taken, and which one to try.
 - **`translate` closed without a change left an empty template behind as rescued text,** said the
   text was not lost, and had the next `add` ask about it.
+- **Saving a post rewrote the blocks nobody had touched.** An edit rebuilds a post from its
+  text, and the text has no word for what an import brought along: a paragraph Tumblr marked as
+  indented or as a list item, a video's provider and first address, a player handed over as HTML.
+  Fixing a typo in one paragraph saved every other block without them -- at the desk and from an
+  app alike; on one real archive 101 posts changed by being saved unchanged. A block the new text
+  did not change is now saved as it was stored, whole; so is anything a translation's entry holds
+  beside its words.
+- **Two deliveries arriving together could swap pictures.** `incoming/` knows a picture by the
+  name it was sent under, and every phone calls its first one the same: of two posts sent at the
+  same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
+  receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
+  told `busy` and stores nothing.
+- **A listing by type was promised in a language that has none.** A photo post translated in
+  words alone is a text post in that language; where every photo post is, `/en/type/image/` is
+  never written -- and the sitemap, the hreflang of `/type/image/` and its language switcher all
+  named it. Each says only what that language's build wrote.
+- **A page and a post of one year translated to the same slug stopped every language.** "Projects"
+  for the page and for this year's post are two addresses, `/en/projects/` and
+  `/en/posts/2026/projects/`; the build called them one, with `translate` having saved both and
+  `check` finding nothing wrong.
 - **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
   which renders one language per run, and deployed; the second language stayed as the previous
   version built it. The recipe is `./blog.sh rebuild`.

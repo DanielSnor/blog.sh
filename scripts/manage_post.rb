@@ -5309,6 +5309,10 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
     # across untouched (Translations.former_slugs).
     kept = Array(entry[Translations::FORMER_KEY]).map(&:to_s).reject { |former| former.strip.empty? }
     one[Translations::FORMER_KEY] = kept unless kept.empty?
+    # ...and so is anything else the entry holds that this save does not
+    # write: a key somebody put there by hand, or one a later version
+    # will. The words are the editor's to replace; the rest is not.
+    entry.each { |key, value| one[key] = value unless one.key?(key) || Translations::TEXT_KEYS.include?(key) || key == Translations::FORMER_KEY }
     # A PAGE lives in the root of its language, which is where the engine
     # keeps its own names: a page addressed `assets` in German would be
     # written over /de/assets/ and take the stylesheet down with it. The
@@ -5595,6 +5599,7 @@ def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined:
   # a service answering.
   restore_embed_lookups(blocks, post['content'])
   resolve_embed_lookups(blocks)
+  blocks = keep_untouched_blocks(blocks, post['content'], media_files, media_dir)
 
   lost = edit_content_loss(post, blocks, new_card)
   # From a file the question is a different one. At a keyboard anything
@@ -7615,6 +7620,83 @@ def restore_embed_lookups(blocks, original_blocks)
     src = stored[block['url'].to_s]
     block['embed_src'] = src if src
   end
+end
+
+# A block the new text did not change is saved as it was stored -- the
+# very block, with everything on it.
+#
+# The three restores above each bring back one thing markdown cannot say
+# (a poster, a player's address, where a file came from). There are more
+# such things than anybody has listed, and an import is where they come
+# from: a paragraph Tumblr marked as indented, as a list item or as a line
+# of a chat; a video's provider and the address it was first seen at; the
+# player a service handed over as HTML. None of them has a word in
+# markdown, so the text an editor shows does not carry them, and a save
+# rebuilt every block from that text: fixing one typo in a post rewrote
+# every other block of it without them. Measured through the app's road
+# on a real archive, 101 posts changed by being saved unchanged (fleet,
+# 8. 10. 2026).
+#
+# So the question is asked the other way round: not "what did this block
+# lose", one field at a time, but "did the author change it". A stored
+# block is written out as the text an editor shows and read back, on its
+# own: that is what it looks like when nobody has touched it -- one block
+# or several, since a paragraph stored with a blank line inside it comes
+# back as two, and one stored with a space at its end comes back without.
+# Where the new text holds exactly that, the stored block is what is
+# saved. What the text changed is the author's, as parsed.
+#
+# Two kinds are left alone. A link card travels in the header, not in the
+# text, and has its own road back. And a block naming a file that ARRIVED
+# with this save: what was measured from the bytes a moment ago is what
+# is true now, and the stored block describes the file that was.
+def keep_untouched_blocks(blocks, original_blocks, media_files, media_dir)
+  here = File.expand_path(media_dir.to_s)
+  arriving = media_files.reject { |source, _| File.dirname(File.expand_path(source.to_s)) == here }.values.map(&:to_s)
+  written_as = lambda do |run|
+    MarkdownWriter.blocks_to_markdown(run, nil)
+  rescue StandardError
+    nil
+  end
+  # Each stored block by how many blocks it reads back as and what those
+  # are written as; first come, first kept, so two alike keep their order.
+  stored = Hash.new { |known, shape| known[shape] = [] }
+  Array(original_blocks).each_with_index do |block, at|
+    next unless block.is_a?(Hash) && block['type'] != 'link'
+
+    back = begin
+      MarkdownParser.parse_body(written_as.call([block]).to_s, media_dir, incoming_dir: nil, confined: true).first
+    rescue StandardError, SystemExit
+      nil
+    end
+    text = back && !back.empty? ? written_as.call(back) : nil
+    stored[[back.size, text]] << [at, block] if text
+  end
+  spans = stored.keys.map(&:first).uniq.sort
+
+  kept = []
+  at = 0
+  while at < blocks.size
+    found = spans.filter_map do |span|
+      run = blocks[at, span]
+      next if run.size < span || run.any? { |block| !block.is_a?(Hash) || block['type'] == 'link' }
+
+      names = []
+      each_media_entry(run) { |entry| names << entry['url'].to_s }
+      next if (names & arriving).any?
+
+      waiting = stored[[span, written_as.call(run)]]
+      waiting.empty? ? nil : [waiting.first.first, span, waiting]
+    end.min_by(&:first)
+    if found
+      kept << found.last.shift.last
+      at += found[1]
+    else
+      kept << blocks[at]
+      at += 1
+    end
+  end
+  kept
 end
 
 # The address a media file was downloaded from, carried over from the

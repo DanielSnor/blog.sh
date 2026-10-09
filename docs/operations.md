@@ -122,7 +122,10 @@ already carries, so each can be read as well as changed:
   (`base_required`), and saving one rebuilds and deploys. What the new
   text leaves out is taken out: a paragraph, a picture or a rule its
   author removed is the edit, and a picture the text stops naming is
-  deleted from the post's media. The one thing refused as a loss
+  deleted from the post's media. What the text leaves as it was is saved
+  as it was stored -- the very block, with whatever an import put on it
+  that markdown cannot say (a paragraph's kind, a video's provider) -- so
+  an edit changes what was edited and nothing else. The one thing refused as a loss
   (`content_lost`) is what the author never saw going -- something the
   post holds that markdown has no words for, a link card or a mention
   from an import; such a post is marked `editable: false` when its text
