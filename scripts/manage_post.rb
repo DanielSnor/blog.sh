@@ -5479,6 +5479,24 @@ def edit_content_loss(post, blocks, new_card)
   before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
 end
 
+# What the post holds that its own text cannot say: what would be gone
+# after saving that text back untouched. This is the loss nobody chose,
+# and the whole of what a save from a file is refused for -- the same
+# question `drafts --json` and `edit --json` answer before the text is
+# handed out (draft_problem). nil when the post's text cannot be read
+# back at all: then nothing was handed out either, and the caller keeps
+# the stricter count.
+def unwritable_content(post, media_dir)
+  # Pictures by bare name, as the text is handed out (draft_entry).
+  meta, body = MarkdownParser.parse_frontmatter(edit_markdown_for(post, nil))
+  blocks, = MarkdownParser.parse_body(body, media_dir, incoming_dir: nil, confined: true)
+  card = link_card_from_frontmatter(meta)
+  blocks.unshift(card) if card
+  edit_content_loss(post, blocks, card)
+rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
+  nil
+end
+
 # The losses named as the author knows them, in the site's language: the
 # summary used to be built as "1x small span", the schema's words, on a
 # Czech screen. A type the locale has no name for -- something a future
@@ -5546,6 +5564,14 @@ def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined:
   resolve_embed_lookups(blocks)
 
   lost = edit_content_loss(post, blocks, new_card)
+  # From a file the question is a different one. At a keyboard anything
+  # that goes is asked about, and a yes is cheap. A file has nobody to
+  # ask -- and what it must not do is lose what its author never saw
+  # going: a card or a span markdown has no words for. A paragraph, a
+  # picture or a rule the author took out of the text they were shown is
+  # not that; it is the edit. Counting it as a loss meant a post could
+  # not be made SHORTER from the app at all (fleet, 8. 10. 2026).
+  lost = unwritable_content(post, media_dir) || lost unless interactive
   if lost.any?
     summary = content_loss_summary(lost)
     # Without a keyboard there is nobody to say "yes, lose it": refused,
