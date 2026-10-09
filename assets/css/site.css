@@ -1994,6 +1994,29 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   .archive-month { width: 1.35rem; font-size: 0.72rem; }
 }
 
+@media (max-width: 420px) {
+  /* ...and below that the cells stop holding a width at all. Twelve of
+     them at 1.35rem, the year and the count come to about 372px before
+     the page's own margins, so on a phone 320 to 375px wide the row ran
+     off the right edge and the whole page scrolled sideways (measured in
+     a browser on a real archive: 388px of page at every one of those
+     widths). Here the map takes the line, the strip takes what the year
+     and the count leave of it, and the twelve cells share that in equal
+     parts -- still one strip, still one shape, down to 320px.
+
+     A filled cell gets the 1px border an empty one draws, transparent:
+     sharing a width is done before borders are added, and without it
+     the outlined months came out 2px wider than the filled ones -- and
+     January stopped sitting above January.
+
+     Only the map's rows: the legend's cells and the strip at the top of
+     a year's page keep their size (that one wraps under its label). */
+  .archive-map { width: 100%; }
+  .archive-year .archive-months { flex: 1 1 auto; min-width: 0; }
+  .archive-year .archive-month { flex: 1 1 0; width: auto; min-width: 0; font-size: 0.68rem; }
+  .archive-year .archive-month:not(.is-empty) { border: 1px solid transparent; }
+}
+
 /* The card of a picture or video post opens with its medium (build/cards.rb).
    A landscape one is drawn as it always was, at the width of the card. One
    that is taller than wide -- or square -- would take a screen at that
