@@ -50,6 +50,7 @@ from both.
    | `setup`, `style`, `wizard` | authors -- the questions in `./setup.sh` and `./style.sh`, plus the plumbing both share |
    | `cron`, `import` | authors -- scheduled publishing and `./import.sh` |
    | `lock` | authors -- what a command says when another run holds the site |
+   | `pair`, `on_this_day` | authors -- `./blog.sh pair` (the code an app connects with, the devices let in) and `./blog.sh on-this-day` (what the day holds from earlier years); the card's own words for a reader are under `chrome` and `js` |
    | `language_file` | authors -- the build's and `check`'s sentences about a `config/site.<lang>.yml` whose menu or footer links go elsewhere |
 
 2. **`templates/markdown-cheat-sheet.<lang>.md`** -- the source of the
@@ -249,7 +250,8 @@ The keys it takes, and nothing else: `site.title`, `site.short_name`,
 `site.description`; `banner.claim`, `banner.alt`; `about.heading`,
 `about.html`; `footer.links_heading`, `footer.links`,
 `footer.note_heading`, `footer.note_html`, `footer.copyright`,
-`footer.social_heading`; `nav`; `heading` under a widget; and `tags`.
+`footer.social_heading`; `nav`; `heading` under a widget; `tags`; and
+`series`.
 Everything else in site.yml -- the picture in the banner, the author, the
 address, the colours, the widgets' accounts -- is a fact about the site,
 the same in every language, and a translation of it would be a second site.
@@ -535,8 +537,8 @@ the words under it and nothing else.
 
 - **Pictures in a translation.** Media belong to the post and its
   languages share them; add them with `edit`.
-- **Series names are not translated.** A series is named the way its
-  posts name it, in every language. Tags are translated -- see
+- **A post's tags and series are written once.** Both are translated by
+  the language's file, not on the post -- see
   [What a language says about itself](#what-a-language-says-about-itself);
   do not give a post a second tag in the other language, which makes two
   tag pages for one subject.

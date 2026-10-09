@@ -113,14 +113,23 @@ already carries, so each can be read as well as changed:
   it; the wizard never publishes directly. Absent, or anything but
   yes/true/1, is a draft.
 - **`edits: <slug>`** makes the file not a new post but a new text for
-  that DRAFT -- the save `edit` does, with every question it would ask
+  that post -- the save `edit` does, with every question it would ask
   turned into a refusal, because nobody is there to answer it. `base:`
-  beside it is the digest `./blog.sh drafts --json` handed out with the
-  text; when the draft has changed since, the file is refused instead of
-  undoing whatever happened in between. A published post is refused:
-  editing one is for the desk. This is how the phone saves a draft it
-  opened (see [Writing from a phone](#editing-a-draft-from-the-phone)),
-  and a way for a script to edit without the `$EDITOR` trick.
+  beside it is the digest `./blog.sh drafts --json` or `edit <slug>
+  --json` handed out with the text; when the post has changed since, the
+  file is refused (`changed`) instead of undoing whatever happened in
+  between. A draft may come without `base:`; a published post may not
+  (`base_required`), and saving one rebuilds and deploys. What the new
+  text leaves out is taken out: a paragraph, a picture or a rule its
+  author removed is the edit, and a picture the text stops naming is
+  deleted from the post's media. The one thing refused as a loss
+  (`content_lost`) is what the author never saw going -- something the
+  post holds that markdown has no words for, a link card or a mention
+  from an import; such a post is marked `editable: false` when its text
+  is handed out, and editing it is for the desk, where `edit` asks. This
+  is how an app saves a post it opened (see
+  [Writing from a phone](#editing-a-draft-from-the-phone)), and a way for
+  a script to edit without the `$EDITOR` trick.
 - **`toc: true` / `toc: false`** overrides the table of contents. A post
   with four headings or more gets one on its own -- that is the length at
   which a reader starts scrolling to look for something rather than
@@ -564,7 +573,7 @@ nothing else, so a caller can read it without parsing prose:
 ```json
 {
   "slug": "psano-v-posteli",
-  "path": "content.nosync/posts/2026/psano-v-posteli.json",
+  "path": "/home/me/blog/content.nosync/posts/2026/psano-v-posteli.json",
   "state": "draft",
   "url": "https://example.com/draft/89260b63fb498e75/psano-v-posteli/",
   "deploy": "done",
@@ -1150,7 +1159,7 @@ before, because a command that may rebuild the site must not be handed
 another one. A language the engine does not have is not an error: the
 answer is then in the blog's own.
 
-`scripts/remote.sh` allows two words as the SSH command and nothing
+`scripts/remote.sh` allows three words as the SSH command and nothing
 else. **`run`** runs one engine command: its argv arrives on standard
 input as one line of JSON, `{"args": ["props", "venku", "--set",
 "tags=louka, les"]}` and a newline -- the line ends the request, so a
@@ -1158,16 +1167,24 @@ sender that cannot close its side of the stream is answered all the
 same -- word by word, so nothing is ever parsed as shell and a value
 with spaces or diacritics is one word on both ends. Before the engine sees it,
 `scripts/remote.rb` checks every word: the command has to be one a
-program may run (`version`, `list`, `drafts`, `props`, `queue`,
-`schedule`, `publish`, `unpublish`, `delete`, `restore`, `rebuild`,
-`empty`, `toot`, `bluesky`, `stats`, `on-this-day`, `check`), each flag
-one that command has in its `--json` form, every positional word a slug,
-and no word may hold a control character. `--json` is added when it is
-missing, so the answer is always an object. What is not on the list is
-what opens an editor, asks a question, writes outside the archive or
-reaches a network on somebody else's account: `edit`, `translate`, `add`
-(a post arrives through `receive`), `export`, `preview`, `browse`,
-`check --repair`, the wizard. **`receive`** is the delivery
+program may run (`version`, `list`, `drafts`, `edit`, `translate`,
+`props`, `queue`, `schedule`, `publish`, `unpublish`, `delete`,
+`restore`, `rebuild`, `empty`, `toot`, `bluesky`, `stats`,
+`on-this-day`, `check`, `doctor`), each flag one that command has in its
+`--json` form, every positional word a slug, and no word may hold a
+control character. A slug here is a name as a file may have it and a
+reader would read it -- letters and digits of any alphabet, `_`, `.` and
+`-`, not starting with `.` or `-` -- which is wider than what the engine
+itself makes (lowercase, digits, hyphens) because an import keeps the
+names the old system gave: a post `list` hands out can be asked for by
+that name. `--json` is added when it is missing, so the answer is always
+an object -- and with it `edit` and `translate` open no editor: they
+hand the text out, and the changed text comes back as a file through
+`deliver`. What is not on the list is what asks a question, writes
+outside the archive or reaches a network on somebody else's account:
+`add` (a post arrives through `receive`), `export`, `preview`, `browse`,
+`check --repair`, `doctor --online` and `--strip-location`, `pair`, the
+wizard. **`receive`** is the delivery
 `scripts/receive.sh` takes -- pictures and a markdown, or a `publish.txt`
 or `drafts.txt` request -- for the same key. **`deliver`** is the same
 delivery for a sender that cannot close its side of the stream: it ends
@@ -1239,15 +1256,26 @@ been used.
 What `pair` does to `authorized_keys`, since that is the file that
 decides who may log in:
 
-- It writes only lines that begin `restrict,command=` and name a script
-  of this installation. What an app hands in is taken only if it is
-  exactly one ed25519 public key.
+- It writes only lines that begin `restrict,` and whose `command=` names
+  a script of this installation: `restrict,expiry-time="...",command=`
+  for a code that waits, `restrict,command=` for a device. What an app
+  hands in is taken only if it is exactly one ed25519 public key.
+- Where `authorized_keys` is a link -- kept with your dotfiles, say --
+  the link stays a link and the file it points at is the one rewritten.
+  The file keeps who may read it (one you made read-only stays so) and
+  is never left writable by anybody else.
 - It touches only lines it wrote itself, known by the comment that ends
   them (`blog.sh:<device>`, and `blog.sh-pair:<id>` while a code waits)
   together with this installation's path. Every other line -- a key of
   your own, another blog's devices -- is written back as it was.
 - The file as it was before each change is kept beside it as
   `authorized_keys.blog-sh.bak`.
+- A line names this installation by its folder. Move the folder and its
+  devices' lines still name the old one: sshd finds no script there, the
+  apps are refused, and neither `pair --list` nor `doctor` sees the lines
+  any more, because they are no longer this installation's. Take them
+  out of `authorized_keys` by hand (they end `blog.sh:<device>`) and pair
+  the devices again from the new place.
 
 The ten minutes are kept by the engine: the code's key can do nothing
 but ask it, and it refuses a key that arrives late. The code's line also
@@ -1280,7 +1308,10 @@ key, refuse a server whose key is not among the fingerprints, ask for
 the command `enroll` and write one line of JSON, `{"key": "ssh-ed25519
 AAAA...", "name": "the device's name"}`. The answer is one object:
 `{"ok": true, "device": "..."}`, or `ok: false` with `error` one of
-`expired`, `used`, `unknown_code`, `bad_key`, `bad_request`. From then
+`expired`, `used`, `unknown_code`, `bad_key`, `bad_request` -- and, when
+it is the machine rather than the code that is at fault,
+`engine_failed` (with the engine's words in `message`), `no_ruby`,
+`no_cd` or `unknown_command`. From then
 on the app's own key works as any app's does.
 
 ## Pinning a post to the front page
@@ -1504,7 +1535,13 @@ Three things are worth knowing before you rely on the result:
   ever had goes on answering.
 - **An export can be imported back, into an EMPTY archive.** `./import.sh`
   → *Markdown tree* reads the `blogsh:` block the export writes, so posts
-  keep their series, their redirects and their announcement URLs. That is
+  keep their series, their redirects, their announcement URLs and their
+  other languages -- a post's translations ride under `blogsh:` whole,
+  with the address and the old addresses each language has, since no
+  other engine has a word for them (the body of the file is the post's
+  own language; what the site says about itself in the other ones is
+  `config/site.<lang>.yml`, which is configuration and travels with the
+  backup, not with the export). That is
   the supported way to move an installation to another machine or another
   host, and -- run against a scratch copy -- the way to check that an
   export really did come out whole.
@@ -2335,6 +2372,7 @@ everything generated is rebuildable:
 | `content.nosync/versions/` | what each edited post said before its last ten saves, which is what `[v]` restores from ([Properties and actions](#properties-and-actions)). It sits beside the content and dies with it, so a backup of the posts alone keeps the archive and loses the undo |
 | `media.nosync/` | their images and videos. A published picture has been a hardlink to this file since 1.6, so a backup still stores it once per name -- this is the copy that matters ([A published picture is the archive's own file](#a-published-picture-is-the-archives-own-file)) |
 | `config/site.yml` | site identity and integrations |
+| `config/site.<lang>.yml` | what the site says about itself in each further language: its title, menu, the words for its tags and series, and where a language without a locale borrows its interface. Gitignored like `site.yml`, so a fresh clone has none -- and a site that names `ui_language` in one does not build without it |
 | `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
 | `env.sh` | tokens (or re-create them; mind the file's 600 mode in backups too) |
 | `trash/` | optional -- deleted-but-recoverable posts |

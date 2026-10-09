@@ -69,7 +69,10 @@ a site you can see at `http://localhost:8000/` -- and from there,
 
 `./setup.sh` is the config step: it asks for the settings a site needs,
 checks the answers as it goes, and writes `config/site.yml` and `env.sh`
-for you. Every question can be skipped with Enter, and nothing is
+for you. Most questions can be skipped with Enter, which keeps what is
+there -- the ones that cannot are the site's title, short name,
+description, author and address for as long as they still hold the
+template's examples -- and nothing is
 written until you have seen the diff and confirmed it -- so it is also
 the way to change any of this later. If you would rather edit the files
 yourself, the numbered sections below are the full reference and
@@ -119,7 +122,10 @@ and runs `./blog.sh`. It is nothing more than that -- no window of its
 own, nothing blog.sh does not do -- and the answer to Enter is no, since a
 yes puts something outside this folder. `./setup.sh --launcher` makes it
 at any later time, and makes it again for a site whose folder moved: the
-folder is written into the launcher, so one site has one launcher.
+folder is written into the launcher, so one site has one launcher --
+under one name. The launcher is called what the site is called: after a
+change of `site.short_name` the next `--launcher` makes one under the new
+name, and the old one stays where it was until it is dragged to the Trash.
 
 Three things to know about it, all of them macOS's:
 
@@ -546,7 +552,7 @@ not ask about it.
 
 ```bash
 ./blog.sh add                  # write your first post (opens $EDITOR)
-ruby build/build_blog.rb       # build into public.nosync/
+ruby build/build_blog.rb       # build into public.nosync/ (one language; ./blog.sh rebuild builds all and deploys)
 ./blog.sh preview               # preview at http://localhost:8000 (Ctrl-C stops it)
 ```
 
@@ -888,8 +894,14 @@ Worth knowing before switching it on:
 
 ```bash
 git pull
-ruby build/build_blog.rb && ./scripts/deploy-web.sh
+./blog.sh rebuild
 ```
+
+`rebuild`, not `ruby build/build_blog.rb`: the build script renders one
+language per run, and `rebuild` runs it for every language the site
+publishes and then deploys. On a site in two languages the bare script
+followed by a deploy leaves the second language's pages as the previous
+version built them -- and uploads them that way.
 
 `main` is the release branch: a clone on it gets each release by `git
 pull`. A clone that was put on a release tag (`git checkout v1.8`) is on
@@ -907,8 +919,19 @@ is per-machine, gitignored and always safe to delete. Deploy the assets
 with it: a page that cannot fetch `assets/js/share.js` logs a 404 on
 every load.
 
+**Going back a version** is `git checkout <tag>` and a rebuild, and what
+the newer version was given to work with has to go first, because the
+older one refuses what it does not know rather than ignore it. From 1.10
+back to 1.9: take `on_this_day` out of `widgets:` and `series:` out of
+every `config/site.<lang>.yml`, or the build stops on them. Old addresses
+a translation was given (`translations.<lang>.former_slugs`) stop being
+answered -- 1.9 does not read them. What 1.10 left in the installation
+folder for itself (`.on-this-day.*.json`, `.search_index.json`,
+`.last-sidebar-run`) is safe to delete. The posts, the media and the rest
+of the configuration are untouched in both directions.
+
 Per-deployment files (`content.nosync/`, `media.nosync/`,
-`config/site.yml`, `env.sh`, `incoming/`, `trash/`, `drafts/`,
+`config/site.yml`, `config/site.<lang>.yml`, `env.sh`, `incoming/`, `trash/`, `drafts/`,
 manifests) are gitignored and survive any pull untouched. The one thing
 to watch: if you've **edited engine files in place** (templates, CSS),
 a pull can conflict -- keep such customizations as commits on your own

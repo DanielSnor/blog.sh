@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # scripts/remote.sh -- the forced command for a program's key: an app on a
-# phone, a script on another machine. Two words are allowed as the SSH
+# phone, a script on another machine. Three words are allowed as the SSH
 # command, and nothing else:
 #
 #   run      one engine command; its argv arrives on standard input as one

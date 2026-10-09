@@ -244,19 +244,21 @@ says what you are running.
                                # --json prints it all as data, with the actions that apply, and takes
                                # the screen's keys as flags: --set k=v, --drop-address, --rename --yes,
                                # --versions, --restore-version --yes, --rebuild
-./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
+./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
                                # shows the draft's preview, asks what's next;
                                # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky;
-                               # --json (with --yes) answers as one object, for a script or a phone
-./blog.sh schedule [<slug>] [--at <time>] [--cancel] [--compact] [--json]
+                               # --json (with --yes) answers as one object, for a script or a phone;
+                               # --allow-partial lets it out without the words of every language the site publishes
+./blog.sh schedule [<slug>] [--allow-partial] [--at <time>] [--cancel] [--compact] [--json]
                                # asks for a date, then auto-publishes the draft when it arrives;
                                # --json with --at writes that date, --cancel takes the post out of the queue
 ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
                                # what is scheduled, when each one goes, and the slots it uses
 ./blog.sh unpublish [<slug>] [--yes] [--json]
-                               # moves a published post back to draft (also deletes its announcement)
+                               # moves a published post back to draft (also deletes its announcement);
+                               # --yes belongs to --json: at the keyboard it asks
 ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
-                               # deletes a post to trash/
+                               # deletes a post to trash/ (--yes belongs to --json here too)
 ./blog.sh restore [<slug>] [--rebuild] [--json]
                                # restores a post from trash; --json without a slug lists the trash
 ./blog.sh empty trash [--yes] [--json]
@@ -281,9 +283,10 @@ says what you are running.
                                # --online also asks the feeds, the analytics script, the access
                                # token and the deploy target -- whether it answers, what is in its root;
                                # --json prints the findings as data instead of a screenful
-./blog.sh pair [--list] [--revoke <device>]
+./blog.sh pair [--list] [--revoke [<device>]] [--host <address>] [--port <n>] [--no-wait]
                                # shows a code an app reads to connect, with no key or address typed;
                                # --list names the devices let in this way, --revoke takes one out
+                               # (by its number, name or fingerprint, or asked which)
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
 ./blog.sh check [--online] [--json] [--repair] [--languages]

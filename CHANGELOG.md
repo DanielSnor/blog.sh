@@ -73,9 +73,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **`./blog.sh drafts [--json] [<slug>]`.** The drafts, and with --json what the phone needs to
   edit each one.
 - **`edits: <slug>` in a file for `add`.** Saves it over that draft, as `edit` would, with every
-  question a refusal; `base:` refuses a draft that changed after its text was handed out.
+  question a refusal; `base:` refuses a draft that changed after its text was handed out. What
+  the new text leaves out is taken out -- a post can be made shorter this way; refused as a loss
+  is only what markdown has no words for, which the text never showed.
 - **The sidebar cron turns the day over.** A site with the card wants `refresh-sidebar.sh` in
-  cron even with no other widget; it rewrites the card's file once a day, per language.
+  cron even with no other widget; it rewrites the card's file once a day, per language. The
+  script leaves the moment it ran, and `doctor` says when the card is switched on and nothing
+  runs it -- without it the card shows the day of the last build and is gone the day after.
 - **`list --json`, `props <slug> --json`, `queue --json`.** The three screens somebody reads before
   acting, as data: the archive with its filters, one post with its properties and the actions that
   apply to it by name, the queue in publish order. One object each, every key always present, a
@@ -263,6 +267,28 @@ goes in is still being decided; the suffix and the date both come off at the tag
   that is the post's own page is the post answering, and is passed over without a word.
 - **The cheat sheet's contents list had lost two sections.** The teaser (1.5) and the link card
   (1.7) were added to the sheet and never to the list at its top, in all three languages.
+- **An export left a post's other languages behind.** `translations` was not among the keys an
+  export writes, so the documented way to move an installation carried a site of two languages
+  out as a site of one, and said "posts: N". They ride under `blogsh:` now, and an import of the
+  tree brings them home -- words, address and old addresses of each language.
+- **Three pages of a second language named the first language's as their own.** `/en/search/`,
+  `/en/markdown/` and `/en/404.html` carried the canonical address and `og:url` of the pages
+  without `/en/`, beside an hreflang that said otherwise. Each says its own address.
+- **`doctor` said "0 problems" about a language configuration no language builds on.** A language
+  in `site.locales` with no locale file, a key a language's file may not have, a translation of a
+  widget the site lacks, an empty tag label: `check` named them and `doctor` did not. It does;
+  and `check` names the one neither did -- `site.fallback` or `site.ui_language` kept in
+  `config/site.yml`, where 1.9 stopped reading them.
+- **The advice about a language with no locale file did not work.** Build and `check` said to
+  write `site.ui_language` into `config/site.yml`, which is where it is refused. They say
+  `ui_language: <code>` at the top of `config/site.<code>.yml`.
+- **`preview` on a port already in use printed "Serving at ..." and a stack trace.** It says the
+  port is taken, and which one to try.
+- **`translate` closed without a change left an empty template behind as rescued text,** said the
+  text was not lost, and had the next `add` ask about it.
+- **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
+  which renders one language per run, and deployed; the second language stayed as the previous
+  version built it. The recipe is `./blog.sh rebuild`.
 
 
 ## 1.9 -- 2026-09-28

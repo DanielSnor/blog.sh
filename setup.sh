@@ -32,7 +32,7 @@ case "${1:-}" in
     # help still prints.
     ruby -r./lib/site_header -e "puts SiteHeader.render(tool: './setup.sh')" 2>/dev/null && echo || true
     cat <<'USAGE'
-usage: ./setup.sh
+usage: ./setup.sh [--launcher]
 
 Asks for the settings a site needs to work, checks the answers as it
 goes, and writes them into config/site.yml and env.sh -- leaving every
@@ -60,6 +60,11 @@ Every question can be skipped with Enter, which keeps the current value.
 Nothing is written until you have seen the diff and confirmed it; the
 result is verified by reading it back, and restored from a backup if it
 does not read back the way it was asked for.
+
+On a Mac the last question offers a launcher: an icon in Applications,
+named after the site, that opens Terminal here and runs ./blog.sh.
+./setup.sh --launcher asks nothing and makes just that -- at any later
+time, or again after the site's folder moved.
 
 Related:
   ./style.sh          appearance: palette, header image, fonts, widgets, footer

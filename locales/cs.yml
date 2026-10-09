@@ -677,9 +677,11 @@ cli:
   header_mode: "Režim: %{mode}"
   usage: |
     použití:
-      ./blog.sh add [<soubor>]       založí koncept, ukáže náhled a zeptá se, co dál;
+      ./blog.sh add [<soubor>] [--json] [--untrusted]
+                                     založí koncept, ukáže náhled a zeptá se, co dál;
                                      se souborem s markdownem se nezeptá na nic a jen zapíše koncept,
-                                     což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data)
+                                     což je cesta pro telefon, skript nebo zkratku (--json to ohlásí jako data,
+                                     --untrusted bere obrázky jen holým jménem souboru)
       ./blog.sh edit [<slug>] [--json]
                                      edituje příspěvek, bez slugu nabídne posledních %{recent_count} příspěvků k editaci;
                                      --json vydá text jako data místo otevření editoru
@@ -689,19 +691,22 @@ cli:
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <jméno> --yes] [--rebuild]
                                      stav příspěvku, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním;
                                      --json je vypíše jako data, včetně akcí, které na něj platí
-      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
                                      ukáže náhled konceptu a zeptá se, co dál (bez slugu nabídne rozepsané koncepty);
-                                     --yes publikuje rovnou bez ptaní, --no-announce nechá příspěvek mimo Mastodon a Bluesky
-      ./blog.sh schedule [<slug>] [--at <čas>] [--cancel] [--compact] [--json]
+                                     --yes publikuje rovnou bez ptaní, --no-announce nechá příspěvek mimo Mastodon a Bluesky,
+                                     --allow-partial ho pustí ven i bez textu ve všech jazycích, které web vydává
+      ./blog.sh schedule [<slug>] [--allow-partial] [--at <čas>] [--cancel] [--compact] [--json]
                                      zeptá se na datum a naplánuje koncept k automatické publikaci v něm; opětovné spuštění plán zruší;
                                      --json s --at zapíše ten čas, --cancel příspěvek z fronty vyřadí (--compact posune zbytek dopředu)
       ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
                                      fronta naplánovaných příspěvků — pořadí, publikace hned, zrušení plánu;
                                      --json ji vypíše jako data
       ./blog.sh unpublish [<slug>] [--yes] [--json]
-                                     vrátí publikovaný příspěvek do konceptů, smaže i jeho toot (bez slugu nabídne publikované příspěvky)
+                                     vrátí publikovaný příspěvek do konceptů, smaže i jeho toot (bez slugu nabídne publikované příspěvky);
+                                     --yes patří k --json: u klávesnice se ptá
       ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
                                      smaže příspěvek do koše, bez slugu nabídne posledních %{recent_count} příspěvků ke smazání
+                                     (--yes i tady patří k --json)
       ./blog.sh restore [<slug>] [--rebuild] [--json]
                                      obnoví příspěvek z koše, bez slugu nabídne obsah koše (--json ho vypíše)
       ./blog.sh empty trash [--yes] [--json]
@@ -720,8 +725,9 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
-      ./blog.sh pair [--list] [--revoke <zařízení>]
-                                     ukáže kód, kterým se připojí aplikace v telefonu
+      ./blog.sh pair [--list] [--revoke [<zařízení>]] [--host <adresa>] [--port <n>] [--no-wait]
+                                     ukáže kód, kterým se připojí aplikace v telefonu; --list vypíše připojená zařízení,
+                                     --revoke jedno odebere podle čísla, jména nebo otisku
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      projde archiv a řekne, co je v něm rozbité;
                                      --json vypíše všechny nálezy jako data, bez stropu;
@@ -1163,7 +1169,7 @@ pair:
   needs_value: "%{option} chce hodnotu."
 
 doctor:
-  pairing_leftover: "V %{path} zůstal řádek po párovacím kódu, který vypršel (počet: %{count}). Nic neotevírá, SSH ten klíč už odmítá."
+  pairing_leftover: "V %{path} zůstal řádek po párovacím kódu, který vypršel (počet: %{count}). Nic neotevírá: engine ten klíč po vypršení kódu odmítá, i kdyby ho SSH ještě pustilo dál."
   pairing_leftover_fix: "./blog.sh pair --list ho uklidí."
   json_and_strip: "❌ --json a --strip-location naráz nejdou: --json je popis instalace, jak vypadá teď, kdežto --strip-location přepisuje fotky. Pusť je po jednom."
   tag_icons_ok: "Štítkových ikon: %{count}, všechny jdou vykreslit."

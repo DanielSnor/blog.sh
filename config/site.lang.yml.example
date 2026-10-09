@@ -39,6 +39,7 @@
 #   nav
 #   widgets     <name>: heading
 #   tags        <tag>: the word for it
+#   series      <series>: the name for it
 #
 # Everything else in site.yml -- the banner's picture, the author, the
 # address, the colours, a widget's account -- is a fact about the site,
@@ -129,3 +130,13 @@ footer:
 #   photography: "Fotografie"
 #   travel: "Reisen"
 # --- end of tags ---
+
+# What a reader of this language sees for a series. Like a tag, a series
+# is written once on its posts and keeps its address in every language
+# (/de/series/the-new-site/); the name over its page, in the sentence that
+# places each part and in the list of series is the one given here. Keyed
+# by the name as the posts write it, or by the series' slug. A series with
+# no name here shows as written.
+# series:
+#   "The new site": "Die neue Website"
+# --- end of series ---

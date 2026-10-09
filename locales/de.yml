@@ -690,9 +690,11 @@ cli:
   header_mode: "Modus: %{mode}"
   usage: |
     Verwendung:
-      ./blog.sh add [<Datei>]        legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht;
+      ./blog.sh add [<Datei>] [--json] [--untrusted]
+                                     legt einen Entwurf an, zeigt eine Vorschau und fragt, wie es weitergeht;
                                      mit einer Markdown-Datei fragt es gar nichts und schreibt nur den Entwurf --
-                                     der Weg für Handy, Skript oder Kurzbefehl (--json meldet das Ergebnis als Daten)
+                                     der Weg für Handy, Skript oder Kurzbefehl (--json meldet das Ergebnis als Daten,
+                                     --untrusted nimmt Bilder nur mit bloßem Dateinamen)
       ./blog.sh edit [<slug>] [--json]
                                      bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten;
                                      --json gibt den Text als Daten aus, statt einen Editor zu öffnen
@@ -702,19 +704,22 @@ cli:
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <Name> --yes] [--rebuild]
                                      Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen;
                                      --json gibt sie als Daten aus, mit den Aktionen, die auf ihn zutreffen
-      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
                                      zeigt die Vorschau eines Entwurfs und fragt, wie es weitergeht (ohne Slug: Entwürfe in Arbeit);
-                                     --yes veröffentlicht sofort ohne Rückfrage, --no-announce hält ihn von Mastodon und Bluesky fern
-      ./blog.sh schedule [<slug>] [--at <Zeit>] [--cancel] [--compact] [--json]
+                                     --yes veröffentlicht sofort ohne Rückfrage, --no-announce hält ihn von Mastodon und Bluesky fern,
+                                     --allow-partial lässt ihn auch ohne Text in jeder Sprache der Website hinaus
+      ./blog.sh schedule [<slug>] [--allow-partial] [--at <Zeit>] [--cancel] [--compact] [--json]
                                      fragt nach einem Datum und plant die automatische Veröffentlichung; nochmal ausführen bricht ab;
                                      --json mit --at schreibt diese Zeit, --cancel nimmt den Beitrag aus der Warteschlange (--compact rückt den Rest vor)
       ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
                                      die Warteschlange geplanter Posts -- Reihenfolge, sofort veröffentlichen, zurück zu den Entwürfen;
                                      --json gibt sie als Daten aus
       ./blog.sh unpublish [<slug>] [--yes] [--json]
-                                     setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge)
+                                     setzt einen veröffentlichten Beitrag auf Entwurf zurück, löscht auch seinen Toot (ohne Slug: veröffentlichte Beiträge);
+                                     --yes gehört zu --json: an der Tastatur wird gefragt
       ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
                                      löscht einen Beitrag in den Papierkorb; ohne Slug werden die letzten %{recent_count} Beiträge angeboten
+                                     (--yes gehört auch hier zu --json)
       ./blog.sh restore [<slug>] [--rebuild] [--json]
                                      holt einen Beitrag aus dem Papierkorb zurück; ohne Slug: was im Papierkorb liegt (--json listet es)
       ./blog.sh empty trash [--yes] [--json]
@@ -733,8 +738,9 @@ cli:
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
-      ./blog.sh pair [--list] [--revoke <Gerät>]
-                                     zeigt einen Code, mit dem sich eine App auf dem Telefon verbindet
+      ./blog.sh pair [--list] [--revoke [<Gerät>]] [--host <Adresse>] [--port <n>] [--no-wait]
+                                     zeigt einen Code, mit dem sich eine App auf dem Telefon verbindet; --list nennt die zugelassenen Geräte,
+                                     --revoke nimmt eines heraus, nach Nummer, Name oder Fingerabdruck
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      geht das Archiv durch und nennt, was darin kaputt ist;
                                      --json gibt jeden Fund als Daten aus, ungekürzt;
@@ -1176,7 +1182,7 @@ pair:
   needs_value: "%{option} braucht einen Wert."
 
 doctor:
-  pairing_leftover: "In %{path} steht noch eine Zeile von einem abgelaufenen Kopplungscode (%{count}). Sie öffnet nichts: SSH weist diesen Schlüssel seitdem ab."
+  pairing_leftover: "In %{path} steht noch eine Zeile von einem abgelaufenen Kopplungscode (%{count}). Sie öffnet nichts: die Engine weist diesen Schlüssel ab, sobald sein Code abgelaufen ist, auch wo SSH ihn noch durchließe."
   pairing_leftover_fix: "./blog.sh pair --list räumt sie weg."
   json_and_strip: "❌ --json und --strip-location gehen nicht zusammen: --json beschreibt die Installation, wie sie ist, --strip-location schreibt Fotos um. Führe sie einzeln aus."
   tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."

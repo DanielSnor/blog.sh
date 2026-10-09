@@ -42,7 +42,7 @@
 #               pill_bg, (banner_title), (banner_claim)
 #   fonts       (faces), (banner_title), (banner_title_size),
 #               (banner_claim), (banner_claim_size)
-#   layout      (sidebar), (hero)
+#   layout      (sidebar), (hero), (lead_card)
 #   nav         (the menu bar: label with tag or url -- or [] for none)
 #   about       (heading), html
 #   widgets     (toots, pixelfed, commits, bluesky, rss, on_this_day)

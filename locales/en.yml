@@ -698,9 +698,11 @@ cli:
   header_mode: "Mode: %{mode}"
   usage: |
     usage:
-      ./blog.sh add [<file>]         creates a draft, shows a preview and asks what's next;
+      ./blog.sh add [<file>] [--json] [--untrusted]
+                                     creates a draft, shows a preview and asks what's next;
                                      with a markdown file it asks nothing at all and just writes the draft,
-                                     which is the route for a phone, a script or a shortcut (--json reports it as data)
+                                     which is the route for a phone, a script or a shortcut (--json reports it as data,
+                                     --untrusted takes pictures by bare file name only)
       ./blog.sh edit [<slug>] [--json]
                                      edits a post; without a slug, offers the last %{recent_count} posts to edit;
                                      --json hands the text out as data instead of opening an editor
@@ -710,19 +712,22 @@ cli:
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <name> --yes] [--rebuild]
                                      a post's state, its properties (series, tags, type, flags) and its actions;
                                      --json prints them as data, with the actions that apply to it
-      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
-                                     --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
-      ./blog.sh schedule [<slug>] [--at <time>] [--cancel] [--compact] [--json]
+                                     --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky,
+                                     --allow-partial lets it out without the words of every language the site publishes
+      ./blog.sh schedule [<slug>] [--allow-partial] [--at <time>] [--cancel] [--compact] [--json]
                                      asks for a date and schedules the draft for automatic publishing then; run again to cancel;
                                      --json with --at writes that date, --cancel takes the post out of the queue (--compact shifts the rest forward)
       ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
                                      the scheduled-post queue -- reorder, publish now, return a post to the drafts;
                                      --json prints it as data
       ./blog.sh unpublish [<slug>] [--yes] [--json]
-                                     moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
+                                     moves a published post back to draft, deletes its toot too (without a slug, offers published posts);
+                                     --yes belongs to --json: at the keyboard it asks
       ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
                                      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
+                                     (--yes belongs to --json here too)
       ./blog.sh restore [<slug>] [--rebuild] [--json]
                                      restores a post from trash; without a slug, offers what's in trash (--json lists it)
       ./blog.sh empty trash [--yes] [--json]
@@ -741,8 +746,9 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      reads the configuration and says what is wrong with it
-      ./blog.sh pair [--list] [--revoke <device>]
-                                     shows a code an app on a phone connects with
+      ./blog.sh pair [--list] [--revoke [<device>]] [--host <address>] [--port <n>] [--no-wait]
+                                     shows a code an app on a phone connects with; --list names the devices let in,
+                                     --revoke takes one out by its number, name or fingerprint
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      walks the archive and says what is broken in it;
                                      --json prints every finding as data, uncapped;
@@ -1193,7 +1199,7 @@ pair:
   needs_value: "%{option} wants a value."
 
 doctor:
-  pairing_leftover: "%{path} still holds a line from a pairing code that ran out (%{count}). It opens nothing: SSH has refused that key since."
+  pairing_leftover: "%{path} still holds a line from a pairing code that ran out (%{count}). It opens nothing: the engine refuses that key once its code has run out, even where SSH would still let it through."
   pairing_leftover_fix: "./blog.sh pair --list tidies it away."
   json_and_strip: "❌ --json and --strip-location cannot run together: --json is a document about the installation as it stands, --strip-location rewrites photographs. Run them one at a time."
   tag_icons_ok: "Tag icons: %{count}, all of them drawable."
