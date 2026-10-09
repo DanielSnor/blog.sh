@@ -132,8 +132,16 @@ module Pairing
   end
 
   # A piece of text as it stands inside the double quotes of an option.
+  #
+  # ⚠️ The quote is escaped and NOTHING else is. sshd takes `\"` for a
+  # quote and leaves every other backslash exactly where it stands, so a
+  # backslash doubled here reached the shell doubled -- and the shell's
+  # own way of writing an apostrophe is `'\''`. A blog in a folder called
+  # "Daniel's blog" got a line sshd could not run (the app was answered
+  # "unmatched '" by a shell), while pair showed its code and waited
+  # (fleet, 8. 10. 2026; measured on OpenSSH 10.3).
   def in_option(text)
-    text.gsub('\\') { '\\\\' }.gsub('"') { '\\"' }
+    text.gsub('"') { '\\"' }
   end
 
   # One of this installation's scripts exactly as a line names it: quoted
@@ -157,8 +165,23 @@ module Pairing
   # An hour of a dead line is the cheaper of the two: what this clock is
   # for is the line nobody ever came for and nobody tidied away.
   def waiting_line(root, id, public_key, expires)
-    %(restrict,expiry-time="#{expires.localtime.strftime('%Y%m%d%H%M')}",) +
+    %(restrict,expiry-time="#{sshd_clock(expires)}",) +
       %(command="#{forced_command(root, 'enroll.sh', id)}" #{public_key} #{WAITING}#{id})
+  end
+
+  # A moment as sshd will read it: on the MACHINE's clock, which is not
+  # necessarily this terminal's. Somebody whose shell says TZ=UTC on a
+  # server in Prague had the stamp written two hours behind what sshd
+  # reads it as, and the code's key was refused the moment it was made --
+  # "Permission denied" to the app, a code on the screen still waiting
+  # (fleet, 8. 10. 2026). sshd is started by the system and knows nothing
+  # of anybody's TZ, so the stamp is written with TZ put aside.
+  def sshd_clock(time)
+    said = ENV['TZ']
+    ENV.delete('TZ')
+    Time.at(time.to_i).localtime.strftime('%Y%m%d%H%M')
+  ensure
+    said.nil? ? ENV.delete('TZ') : ENV['TZ'] = said
   end
 
   def device_line(root, public_key, name)
@@ -207,14 +230,37 @@ module Pairing
     end
   end
 
-  # The file as it was goes beside it first, then the new one replaces it
-  # whole. 0600 both: sshd refuses an authorized_keys others can write, and
-  # a copy of it deserves no less.
-  def write_lines(lines)
-    if File.file?(keys_file)
-      AtomicWrite.write("#{keys_file}.blog-sh.bak", File.read(keys_file, encoding: 'utf-8'), permissions: 0o600)
+  # Where the file's bytes really are. An authorized_keys kept with
+  # somebody's dotfiles is a LINK in ~/.ssh, and replacing a file whole
+  # replaces the name: the link became a file of its own, the one in the
+  # dotfiles stayed as it was, and from then on the two said different
+  # things without anybody having been told (fleet, 8. 10. 2026). What
+  # is replaced is what the link points at; the link stays a link. One
+  # that points at nothing yet gets the file it was pointing at.
+  def keys_target
+    file = keys_file
+    return file unless File.symlink?(file)
+
+    begin
+      File.realpath(file)
+    rescue SystemCallError
+      File.expand_path(File.readlink(file), File.dirname(file))
     end
-    AtomicWrite.write(keys_file, lines.empty? ? '' : "#{lines.join("\n")}\n", permissions: 0o600)
+  end
+
+  # The file as it was goes beside it first, then the new one replaces it
+  # whole. The copy is 0600 always. The file itself keeps who may read it
+  # -- somebody who made theirs read-only (0400) gets it back read-only --
+  # and is never left writable by anybody but its owner: sshd refuses an
+  # authorized_keys others can write. A new one is 0600.
+  def write_lines(lines)
+    target = keys_target
+    mode = File.file?(target) ? File.stat(target).mode & 0o644 : 0o600
+    mode = 0o600 if (mode & 0o400).zero?
+    if File.file?(target)
+      AtomicWrite.write("#{keys_file}.blog-sh.bak", File.read(target, encoding: 'utf-8'), permissions: 0o600)
+    end
+    AtomicWrite.write(target, lines.empty? ? '' : "#{lines.join("\n")}\n", permissions: mode)
   end
 
   # --- this machine, as an app has to find it -----------------------------

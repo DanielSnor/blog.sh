@@ -42,6 +42,15 @@ def t(key, **vars)
   I18n.t("pair.#{key}", **vars)
 end
 
+# What was typed is UTF-8 whatever the shell said its language was. With
+# no LANG -- cron, `docker exec`, a bare ssh command -- Ruby labels every
+# argument as raw bytes, and a device called "Danielův iPhone" then could
+# not even be compared with the name in the file: --revoke died on it with
+# an encoding error and the device stayed (fleet, 8. 10. 2026). Labelled,
+# not converted: an argument that really is not UTF-8 matches no name.
+ARGV.map! { |arg| arg.dup.force_encoding(Encoding::UTF_8) }
+ARGV.map! { |arg| arg.valid_encoding? ? arg : arg.scrub('?') }
+
 def value_of(flag)
   at = ARGV.index(flag)
   at && ARGV[at + 1]
