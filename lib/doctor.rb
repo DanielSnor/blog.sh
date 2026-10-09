@@ -181,6 +181,7 @@ module Doctor
     findings.concat(of(:chrome_shapes, check_chrome_shapes(data)))
     findings.concat(of(:sidebar, check_sidebar(data)))
     findings.concat(of(:widgets, check_widgets(data)))
+    findings.concat(of(:on_this_day, check_on_this_day(data)))
     findings.concat(of(:publishing, check_publishing(data)))
     findings.concat(of(:scheduler, check_scheduler))
     findings.concat(of(:deploy_pending, check_deploy_pending))
@@ -295,7 +296,24 @@ module Doctor
     # A stray file is not read at all, so what text it holds shows nowhere:
     # "nothing reads it" beside "its pages show it" said both (fleet, 26. 9.).
     published = parsed.reject { |path, _| stray.any? { |finding| finding.text.include?("config/#{File.basename(path)}") } }
-    findings + stray + template_language_texts(root, published)
+    findings + stray + template_language_texts(root, published) + build_stoppers(root)
+  end
+
+  # What the build of EVERY language stops on, in the words `check` has
+  # for it. Doctor is where the build's message sends somebody and where
+  # the installer sends them after an edit by hand ("reports every problem
+  # in it at once"), and it answered "0 problems" to a language with no
+  # locale file, a key the engine does not read, a translation of a widget
+  # the site does not have, a menu that goes elsewhere, an empty tag label
+  # and the table site.yml kept before 1.9 -- with the site unable to
+  # build in any language (fleet, 8. 10. 2026). A stray file and a file
+  # that does not parse are named above already, in doctor's own words.
+  def build_stoppers(root)
+    found = Checker.check_unknown_locales(root) + Checker.check_language_key_moved(root) + Checker.check_language_files(root)
+    found.select(&:error?).reject { |finding| %i[language_file_stray language_file_syntax].include?(finding.kind) }
+         .map { |finding| error(finding.text, finding.fix) }
+  rescue StandardError
+    []
   end
 
   # The build's own rule: a file for every published language but the
@@ -622,7 +640,8 @@ module Doctor
   # its approved comments and the warning is earned.
   def sidebar_ran_recently?
     stamps = [File.join(ROOT, 'public.nosync', 'comments.json'),
-              File.join(ROOT, '.stats_full_refresh_at')].filter_map do |path|
+              File.join(ROOT, '.stats_full_refresh_at'),
+              SIDEBAR_HEARTBEAT].filter_map do |path|
       File.mtime(path) if File.exist?(path)
     rescue SystemCallError
       nil
@@ -630,6 +649,44 @@ module Doctor
     return false if stamps.empty?
 
     (Time.now - stamps.max) <= SIDEBAR_STALE_AFTER
+  end
+
+  # What scripts/refresh-sidebar.sh leaves on every run since 1.10: the
+  # moment it ran. Before that the only evidence was a side effect of
+  # moderated comments (above), which a site without them does not have.
+  SIDEBAR_HEARTBEAT = File.join(ROOT, '.last-sidebar-run')
+
+  def sidebar_last_run
+    return nil unless File.exist?(SIDEBAR_HEARTBEAT)
+
+    Time.parse(File.read(SIDEBAR_HEARTBEAT).strip)
+  rescue StandardError
+    begin
+      File.mtime(SIDEBAR_HEARTBEAT)
+    rescue StandardError
+      nil
+    end
+  end
+
+  # The card of this day is the one widget that needs the cron to be
+  # TRUE rather than fresh: its file is for one date, and only
+  # refresh-sidebar turns the day over. Switched on without it, the card
+  # is there on the day of a build and gone -- heading and all -- the day
+  # after, while this report counted it among the cards and said nothing
+  # (fleet trial, 8. 10. 2026). Asked like check_scheduler asks: is there
+  # evidence the thing runs.
+  def check_on_this_day(data)
+    return [] unless SiteConfig::Chrome.map(data, 'layout').fetch('sidebar', true)
+    return [] unless SiteConfig::Chrome.widgets(data).key?('on_this_day')
+
+    last = sidebar_last_run
+    return [] if last && (Time.now - last) <= SIDEBAR_STALE_AFTER
+    # An installation whose cron ran before it left a heartbeat: the next
+    # run leaves one, and until then the older evidence stands.
+    return [] if last.nil? && sidebar_ran_recently?
+
+    note = last ? t('on_this_day_stale', ago: humanize_age(Time.now - last)) : t('on_this_day_never')
+    [warn(note, t('on_this_day_fix'))]
   end
 
   # --- appearance ----------------------------------------------------

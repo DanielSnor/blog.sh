@@ -367,6 +367,9 @@ about:
 #   # no account, nothing to fetch. The name alone switches it on; a day
 #   # with nothing from an earlier year hides the card. See
 #   # `./blog.sh on-this-day` for what it shows today, and why.
+#   # It needs scripts/refresh-sidebar.sh in cron: that is what turns the
+#   # day over. Without it the card shows the day of the last build and is
+#   # gone the day after (`./blog.sh doctor` says when nothing runs it).
 #   on_this_day:
 #     # heading: "On this day"
 # --- end of widgets ---

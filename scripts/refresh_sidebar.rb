@@ -38,6 +38,16 @@ require_relative '../lib/run_lock'
 require_relative '../lib/i18n'
 RunLock.acquire!(ROOT, label: 'sidebar', busy_exit: 3, quiet_when_busy: true)
 
+# The heartbeat: that this ran, and when. `doctor` reads it to say whether
+# anything turns the day over for the card of this day -- which, without
+# this run, shows the day of the last build and then nothing. Never worth
+# stopping for: a moment that cannot be written down is still a run.
+begin
+  File.write(File.join(ROOT, '.last-sidebar-run'), Time.now.strftime('%Y-%m-%dT%H:%M:%S%z'))
+rescue StandardError
+  nil
+end
+
 # Not an abort: this runs every half hour under cron, where a non-zero
 # exit with a line on stderr is a mail, and "you have not built the site
 # yet" is not news worth mailing forty-eight times a day. Saying it and

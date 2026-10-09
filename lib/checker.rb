@@ -238,6 +238,7 @@ module Checker
     findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
     findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
     findings.concat(guard(:unknown_locales) { check_unknown_locales(root) })
+    findings.concat(guard(:language_key_moved) { check_language_key_moved(root) })
     findings.concat(guard(:language_files) { check_language_files(root, posts) })
     findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
     local_clean = findings.none? { |f| f.error? || f.warn? }
@@ -1303,6 +1304,22 @@ module Checker
 
     [error(t('unknown_locale', langs: missing.join(', ')), t('unknown_locale_fix'),
            kind: :unknown_locale, data: { 'langs' => missing })]
+  end
+
+  # `site.fallback` and `site.ui_language` in config/site.yml: where a
+  # language's own settings were kept before 1.9 gave each language a file.
+  # The build refuses the old place by name -- for every language -- and
+  # this said the archive was sound.
+  def check_language_key_moved(root)
+    return [] unless root
+
+    site = own_config(root)['site']
+    return [] unless site.is_a?(Hash)
+
+    %w[fallback ui_language].select { |key| site.key?(key) }.map do |key|
+      error(t('language_key_moved', key: key), t('language_key_moved_fix', key: key),
+            kind: :language_key_moved, data: { 'key' => key })
+    end
   end
 
   def check_language_addresses(posts, root, cap = CAP)

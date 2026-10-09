@@ -22,6 +22,7 @@ env.sh
 .deploy-pending
 # The scheduler's heartbeat -- one line, rewritten every fifteen minutes.
 .last-scheduled-run
+.last-sidebar-run
 .blog-sh.lock
 .blog-sh-receipt.lock
 .last-edit.md
