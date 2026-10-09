@@ -6773,17 +6773,37 @@ def props_after(slug, warnings, deployed)
   props_as_json(slug).merge('deploy' => deploy_word(deployed), 'warnings' => warnings)
 end
 
+# One writer of a post's fields at a time, and the post read INSIDE the
+# turn. Two `props --set` sent together each read the post, each wrote it
+# whole, and the second took the first one's change away with it while
+# both answered ok (fleet, 8. 10. 2026). Under the lock every other writer
+# of the archive takes -- the scheduler, a build, the queue -- the one that
+# comes second is told the blog is busy, in the words `schedule` uses for
+# the same thing, and writes nothing. The rebuild that may follow is not
+# part of the turn: it takes the lock for itself.
+def with_post_for_write(slug)
+  held, = quietly(true, keep_stdout: true) do
+    RunLock.hold(ROOT, label: 'props') do
+      path, _raw, post = post_for_json(slug)
+      yield path, post
+      :written
+    end
+  end
+  refuse('busy', t('cli.queue_busy')) if held == RunLock::BUSY
+end
+
 def props_set_as_json(slug, sets:, rebuild:)
   answer_json do
-    path, _raw, post = post_for_json(slug)
-    updated = apply_property_sets(post, sets)
     warnings = []
-    if truthy_frontmatter?(updated['pinned']) && !truthy_frontmatter?(post['pinned'])
-      # The note toggle_pin prints: only one pin ever shows.
-      other = load_posts_summary.find { |p| p[:pinned] && p[:slug] != slug }
-      warnings << t('cli.pin_other', slug: other[:slug]) if other
+    with_post_for_write(slug) do |path, post|
+      updated = apply_property_sets(post, sets)
+      if truthy_frontmatter?(updated['pinned']) && !truthy_frontmatter?(post['pinned'])
+        # The note toggle_pin prints: only one pin ever shows.
+        other = load_posts_summary.find { |p| p[:pinned] && p[:slug] != slug }
+        warnings << t('cli.pin_other', slug: other[:slug]) if other
+      end
+      AtomicWrite.write_json(path, updated)
     end
-    AtomicWrite.write_json(path, updated)
     props_after(slug, warnings, rebuild_if_asked(rebuild, warnings))
   end
 end
@@ -6791,14 +6811,15 @@ end
 # `props <slug> --drop-address <address> --json`: the [a] screen's one action.
 def props_drop_address_as_json(slug, address, rebuild:)
   answer_json do
-    path, _raw, post = post_for_json(slug)
-    entry = address_entries(post).find { |_, value| value == address }
-    refuse('address_unknown', t('cli.props_address_unknown', address: address)) unless entry
-    key, former = entry
-    updated = post.dup
-    remaining = Array(updated[key]).map(&:to_s) - [former]
-    remaining.empty? ? updated.delete(key) : updated[key] = remaining
-    AtomicWrite.write_json(path, updated)
+    with_post_for_write(slug) do |path, post|
+      entry = address_entries(post).find { |_, value| value == address }
+      refuse('address_unknown', t('cli.props_address_unknown', address: address)) unless entry
+      key, former = entry
+      updated = post.dup
+      remaining = Array(updated[key]).map(&:to_s) - [former]
+      remaining.empty? ? updated.delete(key) : updated[key] = remaining
+      AtomicWrite.write_json(path, updated)
+    end
     warnings = []
     props_after(slug, warnings, rebuild_if_asked(rebuild, warnings))
   end
