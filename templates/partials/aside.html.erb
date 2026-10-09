@@ -3,15 +3,21 @@
     on every page of the site. The tags hug the markup rather than sitting
     on lines of their own because partials compile without a trim mode --
     a guard on its own line would add a blank line to every page that does
-    have an about text. Same reason as in nav.html.erb. %><aside><% unless ABOUT['html'].to_s.strip.empty? %>
+    have an about text. Same reason as in nav.html.erb.
+
+    The card of this day hugs for the same reason, and for one more: it
+    came in 1.10, and standing on lines of its own its guard put one blank
+    line into the sidebar of every page of every site that does NOT show
+    the card -- so the first build after the upgrade rewrote, and the
+    first deploy uploaded, every post page of the archive for a line
+    nobody could see (measured on a real one: 3 929 pages). Switched off
+    it has to write nothing at all. %><aside><% unless ABOUT['html'].to_s.strip.empty? %>
         <div class="card">
 <%= chrome_heading_line(site_heading(ABOUT, 'heading', 'about_heading'), indent: 10) %>          <div class="chrome-text"><%= config_html(ABOUT['html']) %></div>
-        </div><% end %>
-<% if ON_THIS_DAY %>
+        </div><% end %><% if ON_THIS_DAY %>
         <div class="card">
 <%= chrome_heading_line(widget_heading('on_this_day'), indent: 10) %>          <div id="on-this-day" data-src="<%= h(loc('/' + OnThisDay::FILE)) %>"></div>
-        </div>
-<% end %>
+        </div><% end %>
 <% if WIDGETS['toots'] %>
         <div class="card">
 <%= chrome_heading_line(widget_heading('toots'), indent: 10) %>          <div id="last-toots"></div>

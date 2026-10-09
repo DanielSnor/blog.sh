@@ -100,8 +100,14 @@ module Tags
   # not find it there. `browse` in the CLI already folds for this reason.
   def write_index(tags_map)
     unless tags_map.empty?
+      # ...and everything that stands under no letter comes FIRST, together.
+      # By the folded name alone a tag that starts with a digit sorts before
+      # A and one that folds to no Latin letter at all (an emoji, a Greek
+      # letter, an opening quote) after Z, and each end got a band called
+      # `#` -- two bands with one address, and a `#` in the row of letters
+      # that could only ever reach the first of them.
       tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
-                               .sort_by { |_, name, _| [Slug.fold(name), name] }
+                               .sort_by { |_, name, _| [index_letter(name) == '#' ? 0 : 1, Slug.fold(name), name] }
       # Names and counts are the whole page, so that is the whole key.
       tag_index_dest = File.join(CONTENT_ROOT, 'tag', 'index.html')
       tag_index_key = Digest::SHA256.hexdigest(tag_index_rows.map { |row| row.join(':') }.join(','))
@@ -109,7 +115,8 @@ module Tags
       # dictionary rather than as a wall. Taken from the FOLDED name, because
       # that is the order the list is in: `škola` belongs under S, where the
       # reader looking between `sirky` and `sport` will be. Anything that is
-      # not a letter -- a tag that starts with a digit -- goes under `#`.
+      # not a letter -- a tag that starts with a digit -- goes under `#`,
+      # which the order above keeps in one run at the top.
       #
       # Emitted as list items rather than as headings between lists: the list
       # is one <ul> and breaking it into twenty-seven of them would break the
