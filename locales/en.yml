@@ -1597,6 +1597,7 @@ stats:
 on_this_day:
   unknown_option: "Unknown option: %{option}. on-this-day takes --date and --json, nothing else."
   bad_date: "%{value} is not a date -- write it as MM-DD or YYYY-MM-DD."
+  no_leap_day: "This year has no 29 February -- its posts are remembered on the 28th, which is the day shown here."
   no_posts: "There is nothing in the archive yet."
   heading: "On this day: %{date}"
   summary: "%{posts} post(s) from %{years} earlier year(s)"

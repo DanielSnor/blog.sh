@@ -1566,6 +1566,7 @@ stats:
 on_this_day:
   unknown_option: "Neznámá volba: %{option}. on-this-day bere --date a --json, nic jiného."
   bad_date: "%{value} není datum — napiš ho jako MM-DD nebo RRRR-MM-DD."
+  no_leap_day: "Letos 29. únor není — jeho příspěvky se připomínají 28. února, a ten tu vidíš."
   no_posts: "V archivu zatím nic není."
   heading: "V tento den: %{date}"
   summary: "příspěvků: %{posts}, z dřívějších let: %{years}"

@@ -62,16 +62,32 @@ until args.empty?
 end
 
 today = Date.today
+# A day without a year is a day of the calendar, not of this year. 29
+# February is one, and three years in four it was "not a date" here --
+# the one day whose posts the reader had no way to ask for by its own
+# name. In a year that has none it is answered the way the site answers
+# it: with the 28th, which is the day those posts are remembered on
+# (OnThisDay.days_for).
+no_leap_day = false
 date = if wanted.nil?
          today
        else
          begin
            case wanted
            when /\A(\d{4})-(\d{2})-(\d{2})\z/ then Date.new(Regexp.last_match(1).to_i, Regexp.last_match(2).to_i, Regexp.last_match(3).to_i)
-           when /\A(\d{1,2})-(\d{1,2})\z/ then Date.new(today.year, Regexp.last_match(1).to_i, Regexp.last_match(2).to_i)
+           when /\A(\d{1,2})-(\d{1,2})\z/
+             month, day = Regexp.last_match(1).to_i, Regexp.last_match(2).to_i
+             no_leap_day = month == 2 && day == 29 && !Date.leap?(today.year)
+             Date.new(today.year, month, no_leap_day ? 28 : day)
            else raise ArgumentError
            end
          rescue ArgumentError, Date::Error
+           # A program is answered with an object, as every other refusal
+           # of a value is (`schedule --at` says bad_date the same way).
+           if ARGV.include?('--json')
+             puts JSON.pretty_generate('ok' => false, 'error' => 'bad_date', 'message' => t('bad_date', value: wanted.inspect))
+             exit 0
+           end
            warn(t('bad_date', value: wanted.inspect))
            exit 2
          end
@@ -108,6 +124,7 @@ if posts.empty?
 end
 
 puts Tui.paint(t('heading', date: date.strftime(I18n.t('date_format'))), :bold)
+puts "  #{t('no_leap_day')}" if no_leap_day
 years = plan['all'].map { |e| e['year'] }.uniq.size
 if plan['all'].empty?
   puts "  #{t('nothing')}"
