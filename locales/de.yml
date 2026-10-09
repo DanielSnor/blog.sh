@@ -38,6 +38,7 @@ build:
   language_key_unknown: "❌ %{file} nennt %{keys}, was die Engine nicht liest. Sie kennt: %{known}."
   language_key_orphan: "❌ %{file} übersetzt %{keys}, das es in config/site.yml nicht gibt -- es gibt nichts zu ersetzen. Richte es zuerst in site.yml ein oder nimm es aus %{file} heraus."
   language_label_empty: "❌ %{file} gibt %{keys} ein leeres Wort, sodass auf dem Schlagwort nichts stünde. Schreib das Wort, oder nimm das Schlagwort aus tags: heraus -- dann erscheint es so, wie es geschrieben ist."
+  language_series_empty: "❌ %{file} gibt %{keys} einen leeren Namen, sodass die Serie ohne Namen bliebe. Schreib den Namen, oder nimm die Serie aus series: heraus -- dann heißt sie so, wie die Beiträge sie nennen."
   language_list_mismatch: "❌ %{file}: %{key} muss auf dieselben Ziele in derselben Reihenfolge führen wie in config/site.yml -- nur die Worte ändern sich. %{detail}"
   # Jede Zahl bekommt ihre eigene Beschriftung -- „Beiträge: 1“ statt
   # „1 Beiträge“ --, denn das I18n der Engine kennt keine Pluralformen und
@@ -1468,6 +1469,8 @@ check:
   language_key_orphan_fix: "Es gibt nichts zu ersetzen. Richte es zuerst in site.yml ein oder nimm es aus der Datei -- so bewirkt es nichts."
   language_label_empty: "%{file} gibt %{keys} ein leeres Wort, sodass auf dem Schlagwort nichts stünde."
   language_label_empty_fix: "Schreib das Wort, oder nimm das Schlagwort aus tags: heraus -- dann erscheint es so, wie es geschrieben ist."
+  language_series_empty: "%{file} gibt %{keys} einen leeren Namen, sodass die Serie ohne Namen bliebe."
+  language_series_empty_fix: "Schreib den Namen, oder nimm die Serie aus series: heraus -- dann heißt sie so, wie die Beiträge sie nennen."
   language_list_mismatch: "%{file}: %{key} führt woandershin als in config/site.yml. %{detail}"
   language_list_mismatch_fix: "Ein übersetztes Menü oder eine übersetzte Fußzeile nennt dieselben Ziele in derselben Reihenfolge; nur die Worte ändern sich. Bis sie übereinstimmen, verweigert der Build die Datei."
   language_tag_unused: "%{file} gibt %{tags} ein Wort, aber kein veröffentlichter Beitrag trägt diesen Tag -- nichts zeigt es."

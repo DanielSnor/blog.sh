@@ -335,6 +335,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
   dated the post in UTC and filed it under UTC's year, and read 30 February as 2 March.
 - **`translate` refused an address no page had.** A post never written in a language has no page
   in its tree, and the address it would have there was counted as taken.
+- **Three answers of `check` about a second language.** `check --repair` offered to rewrite a
+  relative link standing in a translation and then could not: the rewrite opened only the post's
+  own text. It rewrites every text the post has. An empty name in a language file's `series:` was
+  answered with the sentence about a tag -- the pill, "take it out of tags:" -- and has its own.
+  And `check --languages --json` over a `config/site.yml` that cannot be read answered with the
+  empty table of a site in one language and a zero exit; it refuses, with what `check` says about
+  that file, and exits 1 -- and the table on the screen no longer says "one language" above it.
 - **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
   which renders one language per run, and deployed; the second language stayed as the previous
   version built it. The recipe is `./blog.sh rebuild`.

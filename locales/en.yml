@@ -38,6 +38,7 @@ build:
   language_key_unknown: "❌ %{file} says %{keys}, which the engine does not read. It knows: %{known}."
   language_key_orphan: "❌ %{file} translates %{keys}, which config/site.yml does not have -- there is nothing for it to replace. Set it up in site.yml first, or take it out of %{file}."
   language_label_empty: "❌ %{file} gives %{keys} an empty word, which would leave the pill with nothing on it. Write the word, or take the tag out of tags: -- it then shows as written."
+  language_series_empty: "❌ %{file} gives %{keys} an empty name, which would leave the series with no name to show. Write the name, or take the series out of series: -- it is then called what the posts call it."
   language_list_mismatch: "❌ %{file}: %{key} has to go to the same places as in config/site.yml, in the same order -- only the words change. %{detail}"
   # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
   # because the engine's I18n has no plural forms and is not getting any.
@@ -1484,6 +1485,8 @@ check:
   language_key_orphan_fix: "There is nothing for it to replace. Set it up in site.yml first, or take it out of the file -- as it stands it does nothing."
   language_label_empty: "%{file} gives %{keys} an empty word, which would leave the pill with nothing on it."
   language_label_empty_fix: "Write the word, or take the tag out of tags: -- it then shows as written."
+  language_series_empty: "%{file} gives %{keys} an empty name, which would leave the series with no name to show."
+  language_series_empty_fix: "Write the name, or take the series out of series: -- it is then called what the posts call it."
   language_list_mismatch: "%{file}: %{key} goes to other places than in config/site.yml. %{detail}"
   language_list_mismatch_fix: "A translated menu or footer names the same places in the same order; only the words change. The build refuses the file until they match."
   language_tag_unused: "%{file} gives a word to %{tags}, which no published post carries -- nothing shows it."

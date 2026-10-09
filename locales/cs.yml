@@ -37,6 +37,7 @@ build:
   language_key_unknown: "❌ %{file} říká %{keys}, což engine nečte. Zná: %{known}."
   language_key_orphan: "❌ %{file} překládá %{keys}, ale config/site.yml nic takového nemá — není co nahradit. Nejdřív to nastav v site.yml, nebo to z %{file} vyndej."
   language_label_empty: "❌ %{file} dává %{keys} prázdné slovo, takže by na štítku nic nebylo. Napiš to slovo, nebo ten štítek z tags: vyndej — pak se ukáže tak, jak je napsaný."
+  language_series_empty: "❌ %{file} dává %{keys} prázdné jméno, takže by se série nejmenovala nijak. Doplň ho, nebo tu sérii ze series: vyndej — pak se jmenuje tak, jak ji nesou příspěvky."
   language_list_mismatch: "❌ %{file}: %{key} musí vést na stejná místa ve stejném pořadí jako v config/site.yml — mění se jen slova. %{detail}"
   # Každý počet má svůj popisek — „postů: 1“, ne „1 postů“ — protože I18n
   # v enginu nezná množná čísla a nikdy je znát nebude. Věta, která musí
@@ -1453,6 +1454,8 @@ check:
   language_key_orphan_fix: "Není co nahradit. Nejdřív to nastav v site.yml, nebo to ze souboru vyndej — takhle to nedělá nic."
   language_label_empty: "%{file} dává %{keys} prázdné slovo, takže by na štítku nic nebylo."
   language_label_empty_fix: "Napiš to slovo, nebo ten štítek z tags: vyndej — pak se ukáže tak, jak je napsaný."
+  language_series_empty: "%{file} dává %{keys} prázdné jméno, takže by se série nejmenovala nijak."
+  language_series_empty_fix: "Doplň ho, nebo tu sérii ze series: vyndej — pak se jmenuje tak, jak ji nesou příspěvky."
   language_list_mismatch: "%{file}: %{key} vede jinam než v config/site.yml. %{detail}"
   language_list_mismatch_fix: "Přeložené menu nebo patička jmenuje stejná místa ve stejném pořadí; mění se jen slova. Dokud se neshodují, sestavení soubor odmítá."
   language_tag_unused: "%{file} dává slovo štítku %{tags}, který žádný publikovaný příspěvek nenese — nikde se neukáže."

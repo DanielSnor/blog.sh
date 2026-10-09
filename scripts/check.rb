@@ -107,8 +107,21 @@ end
 # the request failed every time). The table alone, not the findings: it
 # is the answer to a different question, and `check --json` is still
 # there for the other one.
+#
+# ...and a refusal when config/site.yml cannot be read. The languages are
+# named there, so a file that is missing, empty or not YAML names none --
+# which this answered as the empty table of a site that publishes one
+# language, with a zero exit: a program showed "one language" over a site
+# with three. The refusal has the shape every other answer for a program
+# refuses in, and carries what `check` itself says about that file.
 if languages && as_json
   require 'json'
+  unread = Checker.check_config(ROOT).first
+  if unread
+    puts JSON.pretty_generate('ok' => false, 'error' => unread.kind.to_s,
+                              'message' => [unread.text, unread.fix].compact.join(' '))
+    exit 1
+  end
   puts JSON.pretty_generate(Checker.language_matrix(Checker.load_posts(ROOT), root: ROOT))
   exit 0
 end
@@ -265,8 +278,13 @@ SLUG_COLUMN_MAX = 48
 if languages
   matrix = Checker.language_matrix(Checker.posts_of_last_run || Checker.load_posts(ROOT), root: ROOT)
   if matrix['languages'].empty?
-    puts I18n.t('check.languages_none')
-    puts
+    # Not said over a config that could not be read: no language was named
+    # because nothing was read, and the finding below says which of the two
+    # it is.
+    if Checker.check_config(ROOT).empty?
+      puts I18n.t('check.languages_none')
+      puts
+    end
   else
     marks = { 'written' => '✅', 'title_only' => '◐', 'missing' => '·' }
     # The slug column is as wide as the slugs, up to a limit: one imported

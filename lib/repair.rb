@@ -522,7 +522,7 @@ module Repair
 
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
     touched = false
-    Array(post['content']).each do |block|
+    bodies(post).flatten(1).each do |block|
       next unless block.is_a?(Hash)
 
       if block['url'].to_s == data['from']
@@ -588,9 +588,20 @@ module Repair
 
   # Every link address a post carries -- the same two places the checker
   # reads them from.
+  # Every body the post has, the same ones the checker reads its links
+  # from. The finding names an address, not the text it stands in, and for
+  # as long as the rewrite opened only `content` a relative link in a
+  # translation was offered, taken, and answered with "could not be
+  # applied" -- on every run, because nothing had changed.
+  def bodies(post)
+    translations = post['translations']
+    others = translations.is_a?(Hash) ? translations.values.map { |one| one.is_a?(Hash) ? one['content'] : nil } : []
+    [post['content'], *others].map { |body| body.is_a?(Array) ? body : [] }
+  end
+
   def link_urls(post)
     urls = []
-    Array(post['content']).each do |block|
+    bodies(post).flatten(1).each do |block|
       next unless block.is_a?(Hash)
 
       urls << block['url'].to_s if block['type'] == 'link'

@@ -1440,8 +1440,14 @@ module Checker
         [error(t('language_key_orphan', file: name, keys: keys.join(', ')), t('language_key_orphan_fix'),
                kind: :language_key_orphan, data: { 'file' => name, 'keys' => keys })]
       when :empty
-        [error(t('language_label_empty', file: name, keys: keys.join(', ')), t('language_label_empty_fix'),
-               kind: :language_label_empty, data: { 'file' => name, 'keys' => keys })]
+        # One kind for a caller that reads it, and a sentence per table: the
+        # one about a tag speaks of a pill and of `tags:`, and a series is
+        # neither.
+        keys.group_by { |key| LanguageFile.series_key?(key) }.map do |series, of_table|
+          word = series ? 'language_series_empty' : 'language_label_empty'
+          error(t(word, file: name, keys: of_table.join(', ')), t("#{word}_fix"),
+                kind: :language_label_empty, data: { 'file' => name, 'keys' => of_table })
+        end
       else
         found.map do |_, key, detail|
           sentence = LanguageFile.describe(detail, name) { |k, **v| I18n.t(k, **v) }

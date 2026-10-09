@@ -106,7 +106,11 @@ module Languages
         when :orphan
           [I18n.t('build.language_key_orphan', file: file, keys: found.map { |f| f[1] }.join(', '))]
         when :empty
-          [I18n.t('build.language_label_empty', file: file, keys: found.map { |f| f[1] }.join(', '))]
+          # A sentence per table: the one about a tag speaks of a pill and
+          # of `tags:`, and a series is neither.
+          found.map { |f| f[1] }.group_by { |key| LanguageFile.series_key?(key) }.map do |series, keys|
+            I18n.t(series ? 'build.language_series_empty' : 'build.language_label_empty', file: file, keys: keys.join(', '))
+          end
         else
           found.map do |_, key, detail|
             I18n.t('build.language_list_mismatch', file: file, key: key,

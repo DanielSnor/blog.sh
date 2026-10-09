@@ -86,6 +86,12 @@ end
       %w[nav] + WIDGET_TEXTS.map { |key| "widgets.<name>.#{key}" } + LABEL_TABLES
   end
 
+  # Whether a key `problems` names -- "series.Nový Sean.cz" -- is a row of
+  # the table of series, for a caller that has a sentence for each table.
+  def series_key?(key)
+    key.to_s.start_with?("#{SERIES_LABELS}.")
+  end
+
   # The chrome of one language laid over the site's own config: sections
   # merged key by key, lists replaced whole. Only what the file may say is
   # taken -- a key it may not say is refused by `problems`, and a build
