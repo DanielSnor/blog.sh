@@ -5158,11 +5158,11 @@ def translation_from_file(file, raw, meta, path, original_raw, post, json:, conf
   _said, warnings = quietly(json, keep_stdout: true) do
     apply_translation(slug, lang, path, original_raw, post, raw, confined: confined)
   end
-  begin
-    File.delete(file)
-  rescue SystemCallError
-    nil
-  end
+  # Consumed the way every other file handed over is: out of incoming/,
+  # and from nowhere else. This deleted the file wherever it lay -- the
+  # one path of four that did, and on a Mac a text written beside the
+  # blog is quite possibly the only copy (fleet trial, 8. 10. 2026).
+  cleanup_incoming({}, [file])
   deployed, more = quietly(json) { rebuild_and_deploy(t('cli.updating_preview')) }
   if json
     puts JSON.pretty_generate(acted_answer(path, warnings + more, rebuilt: deployed).merge('lang' => lang))
