@@ -1016,6 +1016,15 @@ parse -- the receiver answers for it with `engine_failed` and the words
 the engine printed, and every delivery ends with status 0 once an answer
 has been given -- a ceiling that is not a number (`bad_limit`) included.
 
+Deliveries are taken in one at a time. From the first file of a delivery
+landing in `incoming/` to the engine having taken them out again, a
+second delivery waits: `incoming/` is one folder, a picture is known
+there by the name it was sent under, and two phones -- or one app
+sending two posts -- both call their first picture `01.jpg`. The one
+that waits does so for up to `BLOGSH_TURN_SECONDS` (300, set where the
+other two are) and is then told `busy`, with nothing of it stored; send
+it again. A delivery that died mid-way does not hold the next one up.
+
 A delivery that goes wrong halfway can simply be repeated. Pictures wait
 in `incoming/` until a text names them, so a refused post leaves them
 where they are and sending it again finds them -- nothing has to be
@@ -2441,6 +2450,7 @@ whole), but restoring from the archive itself is exact.
 | `HEIC displays only in Safari` when attaching a photo | The iPhone default format. Convert it with the command the message prints, set `media.convert_heic: true` to have the engine do it, or set the phone to Settings → Camera → Formats → Most Compatible. |
 | A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
 | `name_taken` from the receiver | Something in `incoming/` under that name is not a plain file -- a directory, or a symlink. Nothing was replaced; clear the name on the server. |
+| `busy` from the receiver | Another delivery was still being taken in when this one had waited as long as it waits (`BLOGSH_TURN_SECONDS`, 300). Nothing of this one was stored; send it again. |
 | `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the shortcut's command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. Every one of them answers with its code and leaves with a zero status, the same as any other refusal: the phone discards the output of a command that failed, and these are the answers a first delivery to a new install most needs to read. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |

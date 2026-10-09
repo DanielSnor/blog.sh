@@ -31,6 +31,9 @@ MAX_MB="${BLOGSH_MAX_MB:-24}"
 # thirty; the rest had none, and ten bytes bought a process held open
 # for as long as the sender cared to hold it.
 BODY_SECONDS="${BLOGSH_BODY_SECONDS:-600}"
+# How long a delivery waits for the one ahead of it, which may be
+# rebuilding a site, before it gives up and says so.
+TURN_SECONDS="${BLOGSH_TURN_SECONDS:-300}"
 
 # ⚠️ A refusal leaves with 0. The answer is the OBJECT -- it says
 # "ok":false and names the reason -- so the status is free to answer what
@@ -154,9 +157,11 @@ WORK=$(mktemp -d) || unavailable "no_tmp" "Cannot create a temporary directory."
 # receiver on the internet is dialled by whatever is scanning that day.
 # TMP is emptied first: the trap reads it, under set -u.
 TMP=
+TURN=
 cleanup() {
   rm -rf "$WORK"
   [ -n "$TMP" ] && rm -f "$TMP"
+  [ -n "$TURN" ] && rm -rf "$TURN"
 }
 trap cleanup EXIT
 # Read with a deadline. Neither dd nor head has one of its own, so the
@@ -345,6 +350,37 @@ if [ "$(wc -l < "$WORK/names")" -eq 1 ]; then
       ;;
   esac
 fi
+
+# One delivery at a time, from its first file landing in incoming/ to the
+# engine having taken them out again. incoming/ is one folder, a picture is
+# known there by the name it was sent under, and every phone calls its
+# first picture the same thing: of two deliveries arriving together the
+# post made first was made with the other one's 01.jpg, and both were
+# answered ok. A folder, because making one either happens or does not on
+# every system this runs on (a Mac has no flock(1)); it holds the number
+# of the process whose turn it is. A turn whose process is gone is over,
+# and so is one that never got as far as writing its number down.
+case "$TURN_SECONDS" in
+  ''|*[!0-9]*) unavailable "bad_limit" "BLOGSH_TURN_SECONDS is not a whole number of seconds: $TURN_SECONDS" ;;
+esac
+HELD="$INSTALL/incoming/.receiving"
+WAITED=0
+until mkdir "$HELD" 2>/dev/null; do
+  [ -w "$INSTALL/incoming" ] || fail "write_failed" "Could not write into $INSTALL/incoming/."
+  WHO=$(cat "$HELD/pid" 2>/dev/null || true)
+  if [ -n "$WHO" ]; then
+    kill -0 "$WHO" 2>/dev/null || { rm -rf "$HELD"; continue; }
+  elif [ -n "$(find "$HELD" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
+    rm -rf "$HELD"
+    continue
+  fi
+  [ "$WAITED" -lt "$TURN_SECONDS" ] \
+    || fail "busy" "Another delivery is still being taken in, so nothing of this one was stored. Send it again."
+  sleep 1
+  WAITED=$((WAITED + 1))
+done
+printf '%s\n' "$$" > "$HELD/pid"
+TURN="$HELD"
 
 INDEX=0
 while IFS= read -r NAME; do
