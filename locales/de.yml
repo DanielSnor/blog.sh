@@ -547,6 +547,8 @@ cli:
   announcing: "Kündige an"
   preview_serving: "public.nosync läuft auf %{url} -- Ctrl-C beendet."
   preview_bad_port: "❌ \"%{value}\" ist keine Portnummer. Schreibe etwa `./blog.sh preview 8000` oder lass den Port weg."
+  preview_port_taken: "❌ Auf Port %{port} läuft schon etwas -- vielleicht eine Vorschau in einem anderen Fenster. Versuch einen anderen Port: ./blog.sh preview %{other}"
+  preview_port_denied: "❌ Dieses Konto darf Port %{port} nicht öffnen (Ports unter 1024 gehören dem System). Versuch ./blog.sh preview 8000."
   preview_missing_public: "public.nosync existiert noch nicht -- erst bauen (ruby build/build_blog.rb)."
   schedule_date_invalid: "Das ist kein lesbares Datum -- erwartet z. B. 2026-08-15 09:00."
   schedule_date_not_future: "Das Veröffentlichungsdatum muss in der Zukunft liegen."

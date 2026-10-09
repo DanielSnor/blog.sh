@@ -555,6 +555,8 @@ cli:
   announcing: "Announcing"
   preview_serving: "Serving public.nosync at %{url} -- Ctrl-C stops it."
   preview_bad_port: "❌ \"%{value}\" is not a port number. Write something like `./blog.sh preview 8000`, or leave the port out."
+  preview_port_taken: "❌ Something is already listening on port %{port} -- a preview left running in another window, perhaps. Try another port: ./blog.sh preview %{other}"
+  preview_port_denied: "❌ This account may not open port %{port} (ports under 1024 belong to the system). Try ./blog.sh preview 8000."
   preview_missing_public: "public.nosync does not exist yet -- run a build first (ruby build/build_blog.rb)."
   schedule_date_invalid: "That's not a date I can read -- expected e.g. 2026-08-15 09:00."
   schedule_date_not_future: "The publish date has to be in the future."

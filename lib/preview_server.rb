@@ -60,14 +60,23 @@ module PreviewServer
   # message localized (see manage_post.rb's `preview` command), so this
   # only logs things it alone knows about: per-request errors, and a
   # blank line on shutdown.
-  def serve(root, port, logger: method(:puts))
+  # The port, taken. Separate from serving so the caller can find out
+  # that it CANNOT be taken before it has said "serving at ...": a second
+  # preview, or anything else already on the port, used to be met after
+  # that line, with a stack trace under it.
+  #
+  # Loopback only. TCPServer.new(port) binds every interface, so the
+  # whole build -- which after an import is a personal archive that has
+  # never been public -- was served to the LAN while the CLI printed
+  # "http://localhost:<port>/". A default that cannot be walked back
+  # once someone has shipped on it.
+  def listen(port)
+    TCPServer.new('127.0.0.1', port)
+  end
+
+  def serve(root, port, logger: method(:puts), server: nil)
     root = File.expand_path(root)
-    # Loopback only. TCPServer.new(port) binds every interface, so the
-    # whole build -- which after an import is a personal archive that has
-    # never been public -- was served to the LAN while the CLI printed
-    # "http://localhost:<port>/". A default that cannot be walked back
-    # once someone has shipped on it.
-    server = TCPServer.new('127.0.0.1', port)
+    server ||= listen(port)
 
     loop do
       client = server.accept

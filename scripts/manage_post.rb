@@ -8432,11 +8432,22 @@ begin
       abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
 
       port = asked.to_i
+      # Taken BEFORE the line that says where it is served: a port that
+      # something already holds is the commonest way this fails (a preview
+      # left running in another window), and it used to be answered with
+      # "Serving ... at http://localhost:8000/" and a stack trace.
+      server = begin
+        PreviewServer.listen(port)
+      rescue Errno::EADDRINUSE
+        abort t('cli.preview_port_taken', port: port, other: port < 65_535 ? port + 1 : 8000)
+      rescue Errno::EACCES, Errno::EPERM
+        abort t('cli.preview_port_denied', port: port)
+      end
       puts t('cli.preview_serving', url: "http://localhost:#{port}/")
       # The serve loop below blocks forever -- with stdout piped (not a TTY)
       # the URL line would sit in the buffer the whole time, so push it out.
       $stdout.flush
-      PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
+      PreviewServer.serve(File.join(ROOT, 'public.nosync'), port, server: server)
     when 'list', 'browse'
       filters = {}
       ARGV.each do |arg|

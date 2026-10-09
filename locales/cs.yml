@@ -534,6 +534,8 @@ cli:
   announcing: "Oznamuji"
   preview_serving: "Servíruji public.nosync na %{url} — Ctrl-C ukončí."
   preview_bad_port: "❌ „%{value}“ není číslo portu. Napiš třeba `./blog.sh preview 8000`, nebo port vynech."
+  preview_port_taken: "❌ Na portu %{port} už něco běží — třeba náhled puštěný v jiném okně. Zkus jiný port: ./blog.sh preview %{other}"
+  preview_port_denied: "❌ Port %{port} tenhle účet otevřít nesmí (porty pod 1024 patří systému). Zkus třeba ./blog.sh preview 8000."
   preview_missing_public: "public.nosync ještě neexistuje — nejdřív ho sestav (ruby build/build_blog.rb)."
   schedule_date_invalid: "Tohle datum neumím přečíst — čekám např. 2026-08-15 09:00."
   schedule_date_not_future: "Datum publikace musí být v budoucnosti."
