@@ -1225,10 +1225,12 @@ The forced command runs in the account's non-interactive shell, which
 reads none of the files a terminal session reads -- so a Ruby that lives
 under rbenv or Homebrew is not on its `PATH`, and the engine refuses the
 system's old one. Put the path in the key's line, the way `BLOGSH_MAX_MB`
-goes there: `command="PATH=/home/me/.rbenv/shims:/usr/bin:/bin
-/path/to/blog/scripts/remote.sh"`. A path with a space in it is
-single-quoted inside the double quotes; the app writes the line that way
-itself.
+goes there: `command="env PATH=/home/me/.rbenv/shims:/usr/bin:/bin
+/path/to/blog/scripts/remote.sh"`. (`env` in front makes it a line every
+login shell runs: `PATH=... script` alone is sh's way of saying it, and
+an account whose shell is csh or tcsh takes it for a command's name.) A
+path with a space in it is single-quoted inside the double quotes; the
+app writes the line that way itself.
 
 Where the blog lives in a container, the forced command is the one that
 enters it, and the word SSH was asked for -- which the script reads from
@@ -1258,7 +1260,11 @@ or its fingerprint. With nothing after it, somebody at a terminal is
 asked which one, and nothing goes without a yes.
 
 `pair` draws a QR code in the terminal (and prints the same thing as a
-line of text, for an app with no camera to point). The app reads it and
+line of text, for an app with no camera to point). The code wants a
+window of some sixty columns by thirty-five rows, which is more than a
+terminal opens with, so a window too small is asked to grow first; one
+that does not is told how large the code is, and the line of text is
+there either way. The app reads it and
 is connected; nobody types an address, a user name or a key. What the
 code holds is where to connect -- the address, the port, the account --
 the fingerprints of this server's own SSH keys, so the app knows it
@@ -1287,6 +1293,11 @@ decides who may log in:
   your own, another blog's devices -- is written back as it was.
 - The file as it was before each change is kept beside it as
   `authorized_keys.blog-sh.bak`.
+- With a code closed again, or a device come and gone, the file is byte
+  for byte what it was: carriage returns on lines that are not `pair`'s
+  stay, and so does a last line with no line feed after it.
+- `pair --list` only reads: it makes no folder and takes no lock unless
+  there is a run-out code's line to take out.
 - A line names this installation by its folder. Move the folder and its
   devices' lines still name the old one: sshd finds no script there, the
   apps are refused, and neither `pair --list` nor `doctor` sees the lines
@@ -1328,7 +1339,10 @@ AAAA...", "name": "the device's name"}`. The answer is one object:
 `expired`, `used`, `unknown_code`, `bad_key`, `bad_request` -- and, when
 it is the machine rather than the code that is at fault,
 `engine_failed` (with the engine's words in `message`), `no_ruby`,
-`no_cd` or `unknown_command`. From then
+`no_cd` or `unknown_command`. `key_in_use` is a key that already stands
+on another line of the account's file -- another blog's, or one written
+by hand: sshd runs the first line a key is on and never a second, so an
+app makes one key for each blog it connects to. From then
 on the app's own key works as any app's does.
 
 ## Pinning a post to the front page

@@ -1160,6 +1160,7 @@ pair:
   container: "   Blog běží v kontejneru: klíče pro přihlášení drží hostitel, ne kontejner. Aplikaci nastav ručně podle docs/operations.md."
   no_keygen: "❌ Chybí ssh-keygen; bez něj kód nevyrobím."
   small_window: "Okno je na kód malé (potřebuje šířku %{cols} a výšku %{rows}). Zvětši ho a pusť ./blog.sh pair znovu, nebo použij kód jako text."
+  code_too_long: "Kód je na nakreslení moc dlouhý — vlož ho do aplikace jako text, řádek je níž."
   list_none: "K tomuhle blogu není kódem připojené žádné zařízení."
   list_head: "Zařízení připojená kódem:"
   list_row: "  %{number}. %{name}   SHA256:%{fingerprint}"

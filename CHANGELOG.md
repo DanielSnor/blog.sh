@@ -306,6 +306,15 @@ goes in is still being decided; the suffix and the date both come off at the tag
   for the page and for this year's post are two addresses, `/en/projects/` and
   `/en/posts/2026/projects/`; the build called them one, with `translate` having saved both and
   `check` finding nothing wrong.
+- **Pairing, on more machines and with fewer surprises.** A window too small for the code is asked
+  to grow before `pair` gives up on drawing it. The line written for sshd begins `env PATH=...`,
+  which a csh or tcsh login shell runs too. A key that already stands on another line of the
+  account's file is refused (`key_in_use`) instead of being written where sshd would never look.
+  A Ctrl-C that lands in the moment the app hands its key in says who came in, not "cancelled".
+  A device's name keeps its accents when it arrives decomposed. An address guessed from an SSH
+  session is not offered when it is the machine talking to itself or a link-local one. A site
+  name too long for the code is shortened until the code can be drawn. `pair --list` writes
+  nothing, and a key file with carriage returns or no final line feed comes back byte for byte.
 - **Six answers to a program that were written for a screen.** A file saying `edits:` for a slug
   two years have used opened the picker -- a question in prose and a status of 1; it answers
   `ambiguous_slug`. Every lookup that could not ask said the sentence written for `publish

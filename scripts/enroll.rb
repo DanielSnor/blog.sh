@@ -34,6 +34,7 @@ MESSAGES = {
   used: 'This code has already been used.',
   expired: 'This code has run out. Ask for a new one with ./blog.sh pair.',
   bad_key: 'The key has to be one ed25519 public key, as OpenSSH writes it.',
+  key_in_use: 'This key already opens something else on this account, and a key opens one thing. Make a key for this blog alone.',
   bad_request: 'Send one line of JSON: {"key": "ssh-ed25519 ...", "name": "..."}.'
 }.freeze
 

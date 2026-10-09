@@ -198,11 +198,30 @@ puts
 puts t('intro', site: site_name.empty? ? './blog.sh' : site_name, time: started[:expires].localtime.strftime('%H:%M'))
 puts
 qr = QrCode.render(started[:code])
+if qr.nil? && Tui.interactive?
+  puts Tui.paint(t('code_too_long'), :yellow)
+  puts
+end
 if qr && Tui.interactive?
   rows = qr.lines.size
   cols = qr.lines.first.to_s.chomp.length
-  height, width = IO.console ? IO.console.winsize : [rows, cols]
-  if width < cols || height < rows + 4
+  fits = lambda do
+    height, width = IO.console ? IO.console.winsize : [rows, cols]
+    width >= cols && height >= rows + 4
+  end
+  # A window too small for the code is asked to grow before it is given
+  # up on. The code needs some sixty columns by thirty-five rows and a
+  # terminal opens at eighty by twenty-four -- so the first thing somebody
+  # who has never used a terminal saw was a sentence about window sizes.
+  # A terminal that takes the request (xterm's, which Terminal on a Mac
+  # honours) is tall enough a moment later; one that does not is told
+  # what it was told before.
+  unless fits.call
+    print "\e[8;#{rows + 6};#{[cols + 2, 80].max}t"
+    $stdout.flush
+    sleep 0.4
+  end
+  if !fits.call
     puts Tui.paint(t('small_window', cols: cols, rows: rows + 4), :yellow)
   else
     puts t('how')
@@ -226,10 +245,20 @@ close = lambda do |message|
   next if closed
 
   closed = true
-  begin
+  came = begin
     Pairing.cancel(root: ROOT, id: id)
   rescue SystemCallError => e
     warn t('write_failed', path: Pairing.keys_file, error: e.message)
+    nil
+  end
+  # Somebody came through in the very moment this was being closed: the
+  # door is theirs now, and saying "cancelled" over it would be saying
+  # that a device which is in is not.
+  if came
+    puts Tui.paint(t('paired', device: came), :green)
+    puts Tui.paint(t('paired_note'), :dim)
+    puts
+    exit 0
   end
   puts message
 end

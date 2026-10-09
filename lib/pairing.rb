@@ -68,6 +68,10 @@ module Pairing
 
   # How long a code is good for.
   SECONDS = 600
+  # What the largest symbol the engine draws holds, in bytes (version 12
+  # at level L, lib/qr_code.rb). A code longer than this is still a line
+  # of text an app can be given; it is not a picture.
+  CODE_BYTES = 367
   # The closing comment of a line written here: `blog.sh-pair:<id>` while a
   # code is waiting, `blog.sh:<device>` once an app has come in.
   WAITING = 'blog.sh-pair:'
@@ -128,7 +132,12 @@ module Pairing
   # -- and a pairing that ends in "ruby: command not found" on the app's
   # first request is not a pairing.
   def forced_command(root, script, *words)
-    ["PATH=#{in_option(shell_quote(ENV['PATH'].to_s))}", script_token(root, script), *words].join(' ')
+    # `env` in front, so the line is one every login shell can run. sshd
+    # hands the command to the ACCOUNT's shell, and `PATH=... script` is
+    # how sh and its kin set a variable for one command -- csh and tcsh,
+    # which is what an account on FreeBSD often has, read it as a command
+    # called PATH=... and find none.
+    ['env', "PATH=#{in_option(shell_quote(ENV['PATH'].to_s))}", script_token(root, script), *words].join(' ')
   end
 
   # A piece of text as it stands inside the double quotes of an option.
@@ -208,15 +217,34 @@ module Pairing
     # Every kind of space becomes a space first -- a line break or a tab in
     # a name is two words, not one run-together -- and only then is
     # everything that is not a letter, a digit or one of four marks dropped.
+    #
+    # Composed first, and the marks a letter carries are part of the
+    # letter: a name typed on a Mac arrives decomposed ("u" and a ring for
+    # "ů"), and dropping what is not a letter took the ring and left
+    # "Danieluv"; in a script written with vowel signs it took the vowels.
     name = text.to_s.dup.force_encoding('UTF-8').scrub('')
-               .gsub(/[[:space:]]+/, ' ').gsub(/[^\p{L}\p{N} ._-]/, '').squeeze(' ').strip[0, 40].to_s.strip
+    name = name.unicode_normalize(:nfc) if name.valid_encoding?
+    name = name.gsub(/[[:space:]]+/, ' ').gsub(/[^\p{L}\p{M}\p{N} ._-]/, '').squeeze(' ').strip[0, 40].to_s.strip
     name.empty? ? 'device' : name
   end
 
   # --- reading and writing the file ---------------------------------------
 
+  # The lines, each without the line feed that ended it and with whatever
+  # else it ended in: a file written on Windows keeps its carriage returns
+  # on the lines that are not ours, because they are part of what is put
+  # back. And whether the file ended in a line feed at all is remembered
+  # and kept, through every rewrite: a line of ours added to a file with
+  # none is the last line with none, so that with our line gone again the
+  # file is what it was -- "byte for byte" is what its owner was promised.
+  #
+  # delete_suffix, not chomp: chomp("\n") takes a carriage return with it.
   def read_lines
-    File.file?(keys_file) ? File.read(keys_file, encoding: 'utf-8').lines.map(&:chomp) : []
+    return [] unless File.file?(keys_file)
+
+    text = File.read(keys_file, encoding: 'utf-8')
+    @open_ended = !text.empty? && !text.end_with?("\n")
+    text.lines.map { |line| line.delete_suffix("\n") }
   end
 
   # One change at a time: the terminal that is waiting and the app that
@@ -260,7 +288,8 @@ module Pairing
     if File.file?(target)
       AtomicWrite.write("#{keys_file}.blog-sh.bak", File.read(target, encoding: 'utf-8'), permissions: 0o600)
     end
-    AtomicWrite.write(target, lines.empty? ? '' : "#{lines.join("\n")}\n", permissions: mode)
+    ending = @open_ended ? '' : "\n"
+    AtomicWrite.write(target, lines.empty? ? '' : "#{lines.join("\n")}#{ending}", permissions: mode)
   end
 
   # --- this machine, as an app has to find it -----------------------------
@@ -276,9 +305,17 @@ module Pairing
   # network to have a number on.
   def guess_address
     server = ENV['SSH_CONNECTION'].to_s.split
-    return [server[2], server[3].to_i] if server.size == 4
+    return [lan_address || Socket.gethostname, 22] unless server.size == 4
 
-    [lan_address || Socket.gethostname, 22]
+    # ...unless the address the session came in on is one only this
+    # machine, or only this link, can use: `ssh localhost` to run the
+    # command, or a session over a link-local address with its interface
+    # on the end (fe80::...%en0 -- which this command's own check of an
+    # address then refused, so `pair` died on its own guess). The port is
+    # still the session's; the address is found the other way.
+    address = server[2]
+    private_to_here = address.include?('%') || address.downcase.start_with?('fe80:') || address.start_with?('127.') || address == '::1'
+    [private_to_here ? (lan_address || Socket.gethostname) : address, server[3].to_i]
   end
 
   # The address of the interface this machine reaches the rest of the
@@ -417,7 +454,16 @@ module Pairing
     # with a dot between two: a code is drawn module by module, and three
     # characters for every one that needed escaping is a larger code.
     query['f'] = fingerprints.map { |print| print.tr('+/', '-_') }.join('.') unless fingerprints.empty?
-    query['n'] = site.to_s[0, 24] unless site.to_s.strip.empty?
+    # The site's name is for the eye -- "connect to Sean.cz?" -- and is the
+    # one part that may be shortened: twenty-four characters, and no more
+    # of them than leave the code drawable. In a script that takes three
+    # bytes a letter and nine in a link, twenty characters of a name made
+    # a code no symbol holds, and nothing was drawn (CODE_BYTES).
+    wanted = site.to_s.strip[0, 24].to_s
+    until wanted.empty? || "blogsh://pair?#{URI.encode_www_form(query.merge('n' => wanted))}".bytesize <= CODE_BYTES
+      wanted = wanted[0...-1]
+    end
+    query['n'] = wanted unless wanted.strip.empty?
     "blogsh://pair?#{URI.encode_www_form(query)}"
   end
 
@@ -503,6 +549,15 @@ module Pairing
       # -- is the same device: its old line goes, so a list of devices is a
       # list of devices and not of attempts.
       taken = lines.each_index.select { |i| i != at && ours?(lines[i], root, DEVICE) && lines[i].include?(" #{public_key} ") }
+      # The same key on a line that is NOT this blog's -- another blog of
+      # the account, or a line somebody wrote -- is a key sshd already
+      # knows what to do with: it runs the first line that has it and
+      # never looks at a second. Written again here, both blogs said "ok"
+      # and one of them was never reached.
+      elsewhere = lines.each_index.any? do |i|
+        i != at && !taken.include?(i) && lines[i].match?(/(\A|\s)#{Regexp.escape(public_key)}(\s|\z)/)
+      end
+      raise Refused, :key_in_use if elsewhere
       lines[at] = device_line(root, public_key, device)
       taken.reverse_each { |i| lines.delete_at(i) }
       write_lines(lines)
@@ -522,17 +577,27 @@ module Pairing
   end
 
   # Closes a door nobody came through.
+  #
+  # Answers the device's name when somebody DID come through: the app
+  # hands its key in under the same lock, and a Ctrl-C -- or the code's
+  # last second -- that falls in the same moment used to find the line
+  # gone, tidy nothing and say "cancelled" about a device that was in.
   def cancel(root:, id:)
     opened = record(root, id)
-    in_keys_file(opened && opened['keys_file']) { cancel_locked(root, id) }
-    FileUtils.rm_f(record_path(root, id))
+    came = in_keys_file(opened && opened['keys_file']) { cancel_locked(root, id) }
+    FileUtils.rm_f(record_path(root, id)) unless came
+    came
   end
 
   def cancel_locked(root, id)
     locked do
+      known = record(root, id)
+      next known['device'].to_s if known && known['state'] == 'paired'
+
       lines = read_lines
       kept = lines.reject { |line| ours?(line, root, WAITING) && comment_of(line, WAITING) == id }
       write_lines(kept) unless kept == lines
+      nil
     end
   end
 
@@ -541,11 +606,17 @@ module Pairing
   # is the tidying.
   def sweep(root:, now: Time.now)
     removed = 0
-    locked do
-      lines = read_lines
-      kept = lines.reject { |line| expired_waiting?(line, root, now) }
-      removed = lines.size - kept.size
-      write_lines(kept) unless removed.zero?
+    # Looked at before anything is locked: with nothing to take out there
+    # is nothing to write, and a command that only lists devices has no
+    # business making a ~/.ssh for an account that has none, or failing
+    # beside one it may not write into.
+    if leftovers(root: root, now: now).positive?
+      locked do
+        lines = read_lines
+        kept = lines.reject { |line| expired_waiting?(line, root, now) }
+        removed = lines.size - kept.size
+        write_lines(kept) unless removed.zero?
+      end
     end
     # A record outlives its code only as long as the terminal that asked
     # might still be reading it: gone once the code has run out.

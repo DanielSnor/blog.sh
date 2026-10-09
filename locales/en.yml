@@ -1190,6 +1190,7 @@ pair:
   container: "   The blog runs in a container: the keys for logging in are the host's, not the container's. Set the app up by hand as docs/operations.md describes."
   no_keygen: "❌ ssh-keygen is missing; a code cannot be made without it."
   small_window: "The window is too small for the code (it wants at least %{cols} × %{rows} characters). Make it larger and run ./blog.sh pair again, or use the code as text."
+  code_too_long: "The code is too long to draw -- paste it into the app as text, the line is below."
   list_none: "No device has been let into this blog by a code."
   list_head: "Devices let in by a code:"
   list_row: "  %{number}. %{name}   SHA256:%{fingerprint}"
