@@ -96,6 +96,26 @@ ALLOWED = {
 
 WORD = /\A[a-z0-9-]{1,200}\z/
 
+# A word that is not a flag names a post. The engine makes slugs out of
+# lowercase letters, digits and hyphens, and that was the rule here -- but
+# it does not make every slug an archive holds: an import keeps the names
+# the old system gave (b2evolution wrote underscores; fourteen posts of
+# the first real archive behind this door have one), and those posts were
+# listed to the app by `list` and then refused when it asked for them by
+# the name it was given (fleet, 8. 10. 2026). So: what can be a file name
+# and reads as a name -- letters and digits of any alphabet, `_`, `.`, `-`
+# -- starting with a letter, a digit or `_`, which keeps out a hidden file,
+# a way up (`..`) and anything the engine would read as a switch. Still
+# no space, no separator and nothing a shell has a use for: none of them
+# is in a name any writer of slugs produces, and the door stays narrower
+# than the engine behind it on purpose.
+SLUG = /\A[\p{L}\p{N}_][\p{L}\p{N}._-]*\z/
+SLUG_BYTES = 255
+
+def slug?(word)
+  word.bytesize <= SLUG_BYTES && word.match?(SLUG)
+end
+
 def read_request
   ready = IO.select([$stdin], nil, nil, FIRST_SECONDS)
   refuse('empty_input', "Nothing arrived on standard input for #{FIRST_SECONDS} seconds.") if ready.nil?
@@ -165,7 +185,7 @@ def check(args)
         refuse('bad_args', "#{command} may not take #{name} here.")
       end
     else
-      refuse('bad_args', "#{word.inspect} is not a slug.") unless word.match?(WORD)
+      refuse('bad_args', "#{word.inspect} is not a slug.") unless slug?(word)
     end
   end
   args.include?('--json') ? args : args + ['--json']
