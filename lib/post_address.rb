@@ -216,7 +216,15 @@ module PostAddress
   # written.
   REDIRECT_SEGMENT_MAX_BYTES = 255
 
-  def redirect_refusal(origin)
+  #
+  # languages: the codes of the languages the site keeps under a folder
+  # each (/en/, /de/). Such a folder belongs to the run that builds that
+  # language: a stub the site's own run wrote into it is deleted by the
+  # next run of the language, on every build, so the address answers
+  # nothing -- and for as long as nobody was asked about languages here,
+  # the build wrote it, the checker counted it among the addresses the
+  # site answers at, and neither said a word.
+  def redirect_refusal(origin, languages: [])
     text = origin.to_s
     # Broken bytes cannot be matched against without raising, and a
     # segment nobody can print is not an address anybody typed. A leading
@@ -237,6 +245,7 @@ module PostAddress
     # about the segments the engine owns, and an imported address that
     # only differs from one by letter case is not an address anybody meant.
     return :reserved if REDIRECT_RESERVED.include?(parts.first.to_s.downcase)
+    return :reserved if languages.map { |code| code.to_s.downcase }.include?(parts.first.to_s.downcase)
 
     nil
   end

@@ -1517,7 +1517,7 @@ check:
   redirect_collision: "Na adresu %{origin} si dělá nárok víc příspěvků: %{slugs}."
   redirect_collision_fix: "Vyhraje ten, který se vysází později, a čtenáři ostatních skončí u něj. Nech ten záznam jen u jednoho příspěvku."
   redirect_from_reserved: "%{slug}: redirect_from %{entry} se obsluhovat nebude — jeho první část patří webu samotnému."
-  redirect_from_reserved_fix: "Sestavení ji odmítne a řekne to jednou, uprostřed logu, který si nikdo neschovává, takže stará adresa tiše hlásí 404. Nasměruj ji mimo vlastní jmenný prostor webu (posts, page, tag, type, assets, search, markdown), nebo záznam vyhoď."
+  redirect_from_reserved_fix: "Sestavení ji odmítne a řekne to jednou, uprostřed logu, který si nikdo neschovává, takže stará adresa tiše hlásí 404. Nasměruj ji mimo vlastní jmenný prostor webu (posts, page, tag, type, assets, search, markdown a složky jazyků, které web vydává), nebo záznam vyhoď."
   redirect_from_unusable: "%{slug}: redirect_from %{entry} se obsluhovat nebude — z takového tvaru sestavení žádný adresář neudělá."
   redirect_from_unusable_fix: "Dotaz, kotva, část . nebo .., anebo část delší, než unese jméno souboru. Čekala se cesta od kořene webu, třeba \"/stary-post/\". Oprav ji, nebo záznam vyhoď."
   former_slug_unusable: "%{slug}: položka former_slugs %{entry} se obsluhovat nebude — z takového tvaru sestavení žádný adresář neudělá."

@@ -159,6 +159,18 @@ module I18n
     vars.empty? ? value : value.gsub(/%\{(\w+)\}/) { vars.fetch(Regexp.last_match(1).to_sym, Regexp.last_match(0)).to_s }
   end
 
+  # A sentence in the language the build narrates in -- the site's own --
+  # whatever name it is filed under. `t` gives that language only to keys
+  # under `build.`; a sentence the build borrows from another command
+  # (doctor's words for a mistake in the menu) is said to the same person
+  # and belongs in the same language.
+  def narrate(key, **vars)
+    value = dig_key(narration_data, key) || dig_key(default_data, key)
+    return t(key, **vars) if value.nil?
+
+    vars.empty? ? value : value.gsub(/%\{(\w+)\}/) { vars.fetch(Regexp.last_match(1).to_sym, Regexp.last_match(0)).to_s }
+  end
+
   def dig_key(hash, key)
     key.split('.').reduce(hash) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
   end

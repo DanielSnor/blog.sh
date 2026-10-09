@@ -41,8 +41,8 @@
   <link rel="alternate" type="application/rss+xml" title="<%= h(SITE_SHORT_NAME) %> RSS" href="<%= loc('/rss.xml') %>">
   <meta property="og:type" content="<%= og_type %>">
   <meta property="og:site_name" content="<%= h(SITE_SHORT_NAME) %>">
-  <meta property="og:locale" content="<%= SITE_LOCALE %>">
-  <meta property="og:title" content="<%= h(page_title) %>">
+<% unless SITE_LOCALE.to_s.empty? %>  <meta property="og:locale" content="<%= SITE_LOCALE %>">
+<% end %>  <meta property="og:title" content="<%= h(page_title) %>">
   <meta property="og:description" content="<%= h(page_description) %>">
   <meta property="og:url" content="<%= h(page_url) %>">
   <meta property="og:image" content="<%= h(og_image) %>">

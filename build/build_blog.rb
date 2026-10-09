@@ -355,11 +355,16 @@ LOCALE_FOR_LANG = { 'cs' => 'cs_CZ', 'de' => 'de_DE', 'en' => 'en_US' }.freeze
 # variable set": `rebuild` sets BLOG_SH_LANG for every run, the site's own
 # included, so asking about the variable threw away a pinned en_GB/pt_BR
 # the day a site added its second language.
-SITE_LOCALE = if I18n.lang.to_s == SiteConfig.get('site', 'lang', default: 'en').to_s
-                SiteConfig.get('site', 'locale',
-                               default: LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US'))
+#
+# A language the engine has no locale for -- one that borrows its interface
+# (ui_language) -- has no territory this table knows, and the fallback for
+# it used to be en_US: every page of a Slovak branch said <html lang="sk">
+# and og:locale="en_US". Unknown is said as nothing; a site that wants one
+# for its own language names it (site.locale), as before.
+SITE_LOCALE = if SITE_LANG == SiteConfig.get('site', 'lang', default: 'en').to_s
+                SiteConfig.get('site', 'locale', default: LOCALE_FOR_LANG[SITE_LANG])
               else
-                LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US')
+                LOCALE_FOR_LANG[SITE_LANG]
               end
 # Where THIS run's content goes, and the addresses it carries.
 #
@@ -465,8 +470,14 @@ WIDGETS = SiteConfig::Chrome.widgets(SiteConfig.data)
 # from the same function, so the two cannot name different keys. Read as
 # empty rather than fatal: a build that refuses to run leaves the site
 # standing on whatever was deployed last, which helps nobody.
+#
+# In the SITE's language, whichever branch is being built: these are said
+# to the author, like everything else the build narrates, and the words
+# are doctor's only because doctor says the same thing. Taken from the
+# language of the branch, one mistake in the menu was reported three
+# times in three languages by one rebuild.
 SiteConfig::Chrome.complaint_sentences(SiteConfig.data,
-                                       ->(key, what) { I18n.t("doctor.#{key}", key: what, name: what, index: what) })
+                                       ->(key, what) { I18n.narrate("doctor.#{key}", key: what, name: what, index: what) })
                   .each { |sentence| warn "config/site.yml: #{sentence}" }
 
 # The column is only worth reserving when something would stand in it. A site
@@ -3055,16 +3066,22 @@ def nav_url(url)
   return url if LANG_ROOT.empty? || !url.start_with?('/')
   return url if SHARED_ROOTS.any? { |root| url.start_with?(root) }
 
-  known = NAV_POSTS_BY_ADDRESS[url] || NAV_POSTS_BY_ADDRESS["#{url}/"]
-  return post_href(known) if known
+  # The address is the part before `#` and `?`; what follows names a place
+  # ON the page and travels with it. Asked about whole, `/about/#contact`
+  # was no address the site knows, so an item pointing at a part of a
+  # page was never moved to that page's own slug in this language -- and
+  # one pointing at a part of a post led to an address nothing is at.
+  path, rest = url.match(/\A([^?#]*)(.*)\z/m).captures
+  known = NAV_POSTS_BY_ADDRESS[path] || NAV_POSTS_BY_ADDRESS["#{path}/"]
+  return "#{post_href(known)}#{rest}" if known
   # 🪤 The front page and the feed are this language's too, but they are
   # not directories, so the ROOT_DIRS rule below never reached them: `url:
   # /` -- the first item of most hand-written menus -- sent a Czech reader
   # to the English front page, and the Czech one never marked its own item.
-  return loc(url) if ['/', '/rss.xml'].include?(url)
+  return "#{loc(path)}#{rest}" if ['/', '/rss.xml'].include?(path)
 
-  first = url.split('/').reject(&:empty?).first.to_s
-  PostAddress::ROOT_DIRS.include?(first) ? loc(url) : url
+  first = path.split('/').reject(&:empty?).first.to_s
+  PostAddress::ROOT_DIRS.include?(first) ? "#{loc(path)}#{rest}" : url
 end
 
 def configured_nav_items
@@ -4136,7 +4153,12 @@ Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:robots]), robots_txt)
 (posts + pages + unlisted_posts).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
-    case PostAddress.redirect_refusal(origin)
+    # The folder of a language the site publishes is the site's own too:
+    # everything under /en/ is written by the run of English, which knows
+    # nothing of a stub the site's own run put there -- so the stub was
+    # written by one run and deleted by the next, on every build, and the
+    # address answered nothing.
+    case PostAddress.redirect_refusal(origin, languages: SITE_LOCALES - [SITE_OWN_LANG])
     when :unusable
       warn t('build.redirect_from_unusable', slug: post['slug'], entry: origin.inspect)
       next

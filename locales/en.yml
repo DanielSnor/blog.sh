@@ -1548,7 +1548,7 @@ check:
   redirect_collision: "%{origin} is claimed by more than one post: %{slugs}."
   redirect_collision_fix: "Whichever renders last wins and the others' readers land on it. Leave the entry on one post only."
   redirect_from_reserved: "%{slug}: the redirect_from %{entry} will not be served -- its first segment belongs to the site itself."
-  redirect_from_reserved_fix: "The build refuses it and says so once, in the middle of a log nobody keeps, so the old address quietly 404s. Point it somewhere outside the site's own namespace (posts, page, tag, type, assets, search, markdown), or take the entry out."
+  redirect_from_reserved_fix: "The build refuses it and says so once, in the middle of a log nobody keeps, so the old address quietly 404s. Point it somewhere outside the site's own namespace (posts, page, tag, type, assets, search, markdown, and the folder of each language the site publishes), or take the entry out."
   redirect_from_unusable: "%{slug}: the redirect_from %{entry} will not be served -- the build can make no directory of that shape."
   redirect_from_unusable_fix: "A query, a fragment, a . or .. segment, or a segment too long for a filename. Expected a site-root path like \"/old-post/\". Correct it, or take the entry out."
   former_slug_unusable: "%{slug}: the former_slugs entry %{entry} will not be served -- the build can make no directory of that shape."

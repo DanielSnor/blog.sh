@@ -227,7 +227,7 @@ module Checker
     findings.concat(guard(:orphan_media) { check_orphan_media(root, posts, cap) })
     findings.concat(guard(:stray_media) { check_stray_media(root, posts, cap) })
     findings.concat(guard(:redirects) { check_redirects(posts, cap) })
-    findings.concat(guard(:redirect_entries) { check_redirect_entries(posts, cap) })
+    findings.concat(guard(:redirect_entries) { check_redirect_entries(posts, cap, root: root) })
     findings.concat(guard(:series_names) { check_series_names(posts, cap) })
     # cap passed like everywhere else. Its absence meant the default of
     # twenty applied even under --json, which passes nil precisely to get
@@ -760,7 +760,7 @@ module Checker
         # site answers at passed every link to them as sound -- under a
         # closing sentence that names redirects by name.
         Array(post['redirect_from']).each do |origin|
-          paths << origin.to_s if PostAddress.redirect_refusal(origin).nil?
+          paths << origin.to_s if PostAddress.redirect_refusal(origin, languages: published_languages(root)).nil?
         end
       end
     end
@@ -1698,10 +1698,13 @@ module Checker
   # kept apart because they are different mistakes: a reserved first
   # segment is a redirect somebody wrote by hand into the site's own
   # namespace, an unusable one is a shape no directory can be made of.
-  def check_redirect_entries(posts, cap = nil)
+  def check_redirect_entries(posts, cap = nil, root: nil)
+    # The folders of the languages the site publishes are the site's own
+    # first segments too (PostAddress.redirect_refusal says why).
+    languages = published_languages(root)
     findings = posts.flat_map do |post|
       Array(post['redirect_from']).filter_map do |origin|
-        refusal = PostAddress.redirect_refusal(origin)
+        refusal = PostAddress.redirect_refusal(origin, languages: languages)
         next if refusal.nil?
 
         warn(t("redirect_from_#{refusal}", slug: post['slug'].to_s, entry: origin.to_s),
@@ -1759,7 +1762,7 @@ module Checker
                          data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'holder' => holder['slug'].to_s }.merge(lang ? { 'lang' => lang } : {}))
       end
       Array(post['redirect_from']).each do |origin|
-        next unless PostAddress.redirect_refusal(origin).nil?
+        next unless PostAddress.redirect_refusal(origin, languages: languages).nil?
 
         parts = origin.to_s.split('/').reject(&:empty?)
         next if parts.empty? || parts.last.match?(/\.html?\z/i)

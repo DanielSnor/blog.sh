@@ -1532,7 +1532,7 @@ check:
   redirect_collision: "Auf %{origin} erheben mehrere Beiträge Anspruch: %{slugs}."
   redirect_collision_fix: "Der zuletzt gerenderte gewinnt, die Leser der anderen landen bei ihm. Belasse den Eintrag bei nur einem Beitrag."
   redirect_from_reserved: "%{slug}: das redirect_from %{entry} wird nicht ausgeliefert -- sein erstes Segment gehört der Website selbst."
-  redirect_from_reserved_fix: "Der Build lehnt es ab und sagt es einmal, mitten in einem Log, das niemand aufhebt -- die alte Adresse liefert also stillschweigend 404. Zeige woandershin als in den eigenen Namensraum der Website (posts, page, tag, type, assets, search, markdown), oder nimm den Eintrag heraus."
+  redirect_from_reserved_fix: "Der Build lehnt es ab und sagt es einmal, mitten in einem Log, das niemand aufhebt -- die alte Adresse liefert also stillschweigend 404. Zeige woandershin als in den eigenen Namensraum der Website (posts, page, tag, type, assets, search, markdown und die Ordner der Sprachen, die die Website veröffentlicht), oder nimm den Eintrag heraus."
   redirect_from_unusable: "%{slug}: das redirect_from %{entry} wird nicht ausgeliefert -- aus dieser Form kann der Build kein Verzeichnis machen."
   redirect_from_unusable_fix: "Eine Query, ein Fragment, ein Segment . oder .., oder ein Segment, das für einen Dateinamen zu lang ist. Erwartet wird ein Pfad ab der Wurzel wie \"/alter-beitrag/\". Korrigiere ihn, oder nimm den Eintrag heraus."
   former_slug_unusable: "%{slug}: der former_slugs-Eintrag %{entry} wird nicht ausgeliefert -- aus dieser Form kann der Build kein Verzeichnis machen."

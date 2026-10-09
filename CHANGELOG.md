@@ -306,6 +306,16 @@ goes in is still being decided; the suffix and the date both come off at the tag
   for the page and for this year's post are two addresses, `/en/projects/` and
   `/en/posts/2026/projects/`; the build called them one, with `translate` having saved both and
   `check` finding nothing wrong.
+- **Four places where a second language met something written for one.** A menu item pointing
+  at a part of a page (`/about/#contact`) was not moved to that page's address in the other
+  language, and one pointing at a part of a post led nowhere. A language that borrows its
+  interface (`ui_language`) said `og:locale="en_US"` on every page; it now says none. What the
+  build has to say about `config/site.yml` came once per language, each time in that language's
+  words; it is said in the site's own. And a `redirect_from` into a language's folder
+  (`/en/old/`) was written by one run and deleted by the next on every build while `check` called
+  the address alive: the build refuses it aloud and `check` names it.
+- **A launcher on a Mac was replaced by another site's.** Two sites called the same -- any two
+  nobody has named yet -- wrote one icon, opening whichever was made last. The second is told so.
 - **Pairing, on more machines and with fewer surprises.** A window too small for the code is asked
   to grow before `pair` gives up on drawing it. The line written for sshd begins `env PATH=...`,
   which a csh or tcsh login shell runs too. A key that already stands on another line of the
