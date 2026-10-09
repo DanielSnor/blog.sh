@@ -7640,63 +7640,51 @@ end
 # So the question is asked the other way round: not "what did this block
 # lose", one field at a time, but "did the author change it". A stored
 # block is written out as the text an editor shows and read back, on its
-# own: that is what it looks like when nobody has touched it -- one block
-# or several, since a paragraph stored with a blank line inside it comes
-# back as two, and one stored with a space at its end comes back without.
-# Where the new text holds exactly that, the stored block is what is
-# saved. What the text changed is the author's, as parsed.
+# own: that is what it looks like when nobody has touched it -- which is
+# not always what it was stored as, since a paragraph stored with a space
+# at its end comes back without one. Where a block of the new text is
+# written exactly like that, the stored block is what is saved. What the
+# text changed is the author's, as parsed.
 #
-# Two kinds are left alone. A link card travels in the header, not in the
-# text, and has its own road back. And a block naming a file that ARRIVED
-# with this save: what was measured from the bytes a moment ago is what
-# is true now, and the stored block describes the file that was.
+# Three kinds are left alone. A link card travels in the header, not in
+# the text, and has its own road back. A stored block that does not read
+# back as ONE block has no single block of the new text to be recognised
+# in. And a block naming a file that ARRIVED with this save: what was
+# measured from the bytes a moment ago is what is true now, and the stored
+# block describes the file that was.
 def keep_untouched_blocks(blocks, original_blocks, media_files, media_dir)
   here = File.expand_path(media_dir.to_s)
   arriving = media_files.reject { |source, _| File.dirname(File.expand_path(source.to_s)) == here }.values.map(&:to_s)
-  written_as = lambda do |run|
-    MarkdownWriter.blocks_to_markdown(run, nil)
+  written_as = lambda do |block|
+    MarkdownWriter.blocks_to_markdown([block], nil)
   rescue StandardError
     nil
   end
-  # Each stored block by how many blocks it reads back as and what those
-  # are written as; first come, first kept, so two alike keep their order.
-  stored = Hash.new { |known, shape| known[shape] = [] }
-  Array(original_blocks).each_with_index do |block, at|
+  # Each stored block under what it is written as once read back; first
+  # come, first kept, so two written alike keep the order they stood in.
+  stored = Hash.new { |known, text| known[text] = [] }
+  Array(original_blocks).each do |block|
     next unless block.is_a?(Hash) && block['type'] != 'link'
 
     back = begin
-      MarkdownParser.parse_body(written_as.call([block]).to_s, media_dir, incoming_dir: nil, confined: true).first
+      MarkdownParser.parse_body(written_as.call(block).to_s, media_dir, incoming_dir: nil, confined: true).first
     rescue StandardError, SystemExit
       nil
     end
-    text = back && !back.empty? ? written_as.call(back) : nil
-    stored[[back.size, text]] << [at, block] if text
+    text = back && back.size == 1 ? written_as.call(back.first) : nil
+    stored[text] << block if text
   end
-  spans = stored.keys.map(&:first).uniq.sort
 
-  kept = []
-  at = 0
-  while at < blocks.size
-    found = spans.filter_map do |span|
-      run = blocks[at, span]
-      next if run.size < span || run.any? { |block| !block.is_a?(Hash) || block['type'] == 'link' }
+  blocks.map do |block|
+    next block if !block.is_a?(Hash) || block['type'] == 'link'
 
-      names = []
-      each_media_entry(run) { |entry| names << entry['url'].to_s }
-      next if (names & arriving).any?
+    names = []
+    each_media_entry([block]) { |entry| names << entry['url'].to_s }
+    next block if (names & arriving).any?
 
-      waiting = stored[[span, written_as.call(run)]]
-      waiting.empty? ? nil : [waiting.first.first, span, waiting]
-    end.min_by(&:first)
-    if found
-      kept << found.last.shift.last
-      at += found[1]
-    else
-      kept << blocks[at]
-      at += 1
-    end
+    text = written_as.call(block)
+    (text && stored[text].shift) || block
   end
-  kept
 end
 
 # The address a media file was downloaded from, carried over from the
