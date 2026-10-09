@@ -112,10 +112,25 @@ module PostAddress
   # A draft gets the year/slug key (its file and its media live there like
   # everyone else's) but never the page key: it is served under its token,
   # not at the root.
+  #
+  # One more thing the year/slug key was answering by accident. For a
+  # published PAGE it stands for the file and the media, never for an
+  # address -- a page is served at the root -- and a file is named by the
+  # page's own slug. In a second language a page answers at the slug its
+  # translation gave it, and keyed by THAT under its year, a page and a
+  # post of one year translated to the same word ("Projects") were called
+  # two posts at one address: /en/projects/ and /en/posts/2026/projects/,
+  # two directories, and the build of the whole site stopped on them --
+  # with `translate` having saved both and `check` calling the archive
+  # sound, since both ask about the addresses that are really served
+  # (fleet, 8. 10. 2026). So a page's place under its year is named by
+  # its own slug; its address is the 'page' key, as it always was.
   def collision_keys(post, slug: nil, year: nil)
     name = (slug || address_slug(post)).to_s
-    keys = [[(year || date_year(post)).to_s, name]]
-    keys << ['page', name] if page?(post) && !draft?(post)
+    at_root = page?(post) && !draft?(post)
+    filed = at_root ? (slug || post['slug'] || name).to_s : name
+    keys = [[(year || date_year(post)).to_s, filed]]
+    keys << ['page', name] if at_root
     keys
   end
 
