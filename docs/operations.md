@@ -1864,7 +1864,13 @@ What it looks for, each with a line saying what to do about it:
 - **A language named in `site.locales` that the engine has no locale file
   for.** A typo there is not a typo in one language: the build stops on it
   in EVERY language of the site, its own included, because the menu that
-  offers the other languages needs each one's name.
+  offers the other languages needs each one's name. A language the engine
+  has no words for may borrow another's: `ui_language: <code>` at the top
+  of that language's own file, `config/site.<code>.yml`.
+- **`site.fallback` or `site.ui_language` in `config/site.yml`.** That is
+  where a language's own settings were kept before 1.9 gave each language
+  a file; the build refuses the old place by name, in every language. Each
+  value goes to the top of its language's `config/site.<code>.yml`.
 
 It only reports, unless you ask it not to. On its own -- and that is how
 cron runs it -- nothing here deletes a directory or rewrites a post: the
