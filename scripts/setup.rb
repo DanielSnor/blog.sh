@@ -794,6 +794,9 @@ def make_launcher
   when :taken
     puts Tui.paint(t('launcher_taken', path: Launcher.path(launcher_name)), :yellow)
     false
+  when :other_site
+    puts Tui.paint(t('launcher_other_site', path: Launcher.path(launcher_name), folder: Launcher.site_of(Launcher.path(launcher_name)).to_s), :yellow)
+    false
   else
     puts Tui.paint(t('launcher_failed', error: problem), :yellow)
     false

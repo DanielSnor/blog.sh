@@ -138,8 +138,10 @@ Three things to know about it, all of them macOS's:
   Settings → Profiles → Shell → "When the shell exits".
 - It lands in `/Applications`, or in `~/Applications` for an account that
   may not write there. An application of the same name that blog.sh did
-  not make is never replaced; `BLOG_SH_LAUNCHER_DIR=<folder>` puts the
-  launcher somewhere else.
+  not make is never replaced, and neither is the launcher of ANOTHER site
+  called the same -- two sites nobody has named yet are both "blog.sh";
+  give one a `site.short_name` of its own. `BLOG_SH_LAUNCHER_DIR=<folder>`
+  puts the launcher somewhere else.
 
 ### Linux (Debian/Ubuntu shown; any distro works)
 

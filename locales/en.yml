@@ -1765,6 +1765,7 @@ setup:
   launcher_first_run: "   On the first double-click macOS asks whether it may control Terminal — allow it, or the icon does nothing. Terminal keeps its window open afterwards; closing it after a clean exit is a setting in Terminal (Settings → Profiles → Shell). ./setup.sh --launcher makes it again."
   launcher_failed: "⚠️  The launcher could not be made: %{error}"
   launcher_taken: "⚠️  %{path} is an application blog.sh did not make. Leaving it alone."
+  launcher_other_site: "⚠️  %{path} is the launcher of another site of the same name (%{folder}). Leaving it alone -- give one of the two a different site.short_name, or drag the old launcher to the Trash, and try again."
   launcher_mac_only: "blog.sh can only make a launcher on a Mac."
 
 # lib/wizard.rb -- what ./setup.sh and ./style.sh both say: asking a

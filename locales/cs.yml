@@ -1734,6 +1734,7 @@ setup:
   launcher_first_run: "   Při prvním poklepání se macOS zeptá, jestli smí ovládat Terminál — povol to, jinak ikona nic neudělá. Okno Terminálu po skončení zůstane otevřené; zavírat ho po čistém ukončení se nastavuje v Terminálu (Nastavení → Profily → Shell). Znovu ho vytvoří ./setup.sh --launcher."
   launcher_failed: "⚠️  Spouštěč se nepodařilo vytvořit: %{error}"
   launcher_taken: "⚠️  V %{path} už je aplikace, kterou blog.sh nevytvořil. Nechávám ji být."
+  launcher_other_site: "⚠️  %{path} je spouštěč jiného webu, který se jmenuje stejně (%{folder}). Nechávám ho být — dej jednomu z těch dvou jiné site.short_name, nebo ten starý spouštěč vyhoď do Koše a zkus to znovu."
   launcher_mac_only: "Spouštěč umí blog.sh vytvořit jen na Macu."
 
 # lib/wizard.rb — co říkají ./setup.sh i ./style.sh: otázka, která jde

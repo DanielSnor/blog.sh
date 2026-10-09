@@ -94,6 +94,13 @@ module Launcher
     File.file?(File.join(bundle, 'Contents', 'Resources', MARK))
   end
 
+  # The folder a launcher opens, as it says itself; nil for what is not one.
+  def site_of(bundle)
+    File.read(File.join(bundle, 'Contents', 'Resources', MARK), encoding: 'utf-8').strip
+  rescue SystemCallError
+    nil
+  end
+
   # The four lines. The folder is an AppleScript string, escaped as one;
   # `quoted form of` is AppleScript's own shell quoting, so a folder with a
   # space, a quote or an apostrophe in its name reaches `cd` as one word.
@@ -109,8 +116,15 @@ module Launcher
 
   # Makes the launcher, or makes it again. Answers [path, nil] when it
   # stands, [nil, reason] when it does not -- :unsupported off a Mac,
-  # :taken when an application that is not a launcher has the name, or
-  # the words the system gave.
+  # :taken when an application that is not a launcher has the name,
+  # :other_site when a launcher has it and opens ANOTHER site that is
+  # still there, or the words the system gave.
+  #
+  # A launcher is named after its site, and two sites may be called the
+  # same -- every site nobody has named yet is "blog.sh". The second one
+  # made used to replace the first without a word: one icon, opening the
+  # other blog. A launcher whose folder is gone is a site that moved, and
+  # is made again as before.
   #
   # Built in a scratch folder and moved into place whole, so a failure
   # half way leaves either the launcher that was there or none, never a
@@ -120,6 +134,11 @@ module Launcher
 
     bundle = path(site_name, dir: dir)
     return [nil, :taken] if File.exist?(bundle) && !ours?(bundle)
+
+    if File.exist?(bundle)
+      there = site_of(bundle).to_s
+      return [nil, :other_site] if !there.empty? && File.directory?(there) && !same_folder?(there, root)
+    end
 
     FileUtils.mkdir_p(dir)
     Dir.mktmpdir('blogsh-launcher') do |scratch|

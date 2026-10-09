@@ -1749,6 +1749,7 @@ setup:
   launcher_first_run: "   Beim ersten Doppelklick fragt macOS, ob er das Terminal steuern darf — erlauben, sonst tut das Symbol nichts. Das Terminal lässt sein Fenster danach offen; das Schließen nach sauberem Ende stellt man im Terminal ein (Einstellungen → Profile → Shell). ./setup.sh --launcher legt ihn neu an."
   launcher_failed: "⚠️  Der Starter konnte nicht angelegt werden: %{error}"
   launcher_taken: "⚠️  %{path} ist ein Programm, das blog.sh nicht angelegt hat. Es bleibt unangetastet."
+  launcher_other_site: "⚠️  %{path} ist der Starter einer anderen Website gleichen Namens (%{folder}). Er bleibt unangetastet -- gib einer der beiden ein anderes site.short_name oder zieh den alten Starter in den Papierkorb und versuch es noch einmal."
   launcher_mac_only: "Einen Starter kann blog.sh nur auf einem Mac anlegen."
 
 # lib/wizard.rb -- was ./setup.sh und ./style.sh gemeinsam sagen: eine
