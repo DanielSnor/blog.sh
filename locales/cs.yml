@@ -313,7 +313,7 @@ cli:
   translate_removed_addresses: "Jeho staré adresy (%{count}) teď vedou na příspěvek sám: přešly do jeho vlastního seznamu."
   translate_own_language: "„%{lang}“ je jazyk, ve kterém je příspěvek napsaný — ten se edituje přes `./blog.sh edit`."
   translate_unknown_language: "Tenhle web „%{lang}“ nepublikuje. Publikuje: %{known}. Nejdřív jazyk doplň do `site.locales` v config/site.yml."
-  translate_needs_language: "Do jakého jazyka? `./blog.sh translate <slug> --lang de`."
+  translate_needs_language: "Do jakého jazyka? `./blog.sh translate <slug> --lang %{lang}`. Tenhle web publikuje: %{langs}."
   translate_json_needs_slug: "--json musí pojmenovat příspěvek: `translate <slug> --lang <kód> --json`."
   translate_unknown_args: "❌ `translate` neví, co si počít s: %{args}. Bere jeden příspěvek a jeden jazyk — `./blog.sh translate <slug> --lang <kód>`."
   translate_needs_locales: "Tenhle web publikuje jeden jazyk. Nejdřív ostatní vyjmenuj v `site.locales` v config/site.yml."
@@ -726,6 +726,10 @@ cli:
       ./blog.sh bluesky [<slug>] [--force] [--json]
                                      (znovu) pošle oznámení na Bluesky (weby s Bluesky), stejná pravidla jako toot
       ./blog.sh rebuild [--full] [--force] [--json]
+                                     znovu sestaví a nasadí celý web, bez vazby na konkrétní příspěvek;
+                                     --full sestaví znovu každou stránku, ne jen ty změněné;
+                                     --force pustí nasazení přes pojistky a nahraje všechno;
+                                     --json odpoví jedním objektem místo vyprávění
       ./blog.sh preview [<port>]     servíruje public.nosync lokálně (výchozí port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                      vypíše příspěvky po řádcích, od nejnovějšího — prostý text do roury nebo skriptu

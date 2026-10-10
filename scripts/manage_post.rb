@@ -8453,7 +8453,16 @@ begin
       # the reader to site.locales to add it.
       abort t('cli.translate_unknown_args', args: args.join(' ')) unless args.empty?
       lang = nil if lang.to_s.start_with?('--')
-      abort t('cli.translate_needs_language') if lang.to_s.strip.empty?
+      if lang.to_s.strip.empty?
+        # Named from what THIS site publishes: the sentence used to say
+        # `--lang de` to everybody, and on a site in Czech and English
+        # following it was answered "this site does not publish de".
+        own = SiteConfig.get('site', 'lang', default: 'en').to_s
+        others = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
+        others = others.reject { |code| code.empty? || code == own }.uniq
+        abort t('cli.translate_needs_locales') if others.empty?
+        abort t('cli.translate_needs_language', lang: others.first, langs: others.join(', '))
+      end
       json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
     when 'edit'
       json = !ARGV.delete('--json').nil?

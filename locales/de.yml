@@ -322,7 +322,7 @@ cli:
   translate_removed_addresses: "Seine alten Adressen (%{count}) führen jetzt zum Beitrag selbst: sie stehen nun in dessen eigener Liste."
   translate_own_language: "„%{lang}“ ist die Sprache, in der der Beitrag geschrieben ist -- die ändert `./blog.sh edit`."
   translate_unknown_language: "Diese Website veröffentlicht „%{lang}“ nicht. Sie veröffentlicht: %{known}. Trage die Sprache zuerst in `site.locales` in config/site.yml ein."
-  translate_needs_language: "In welche Sprache? `./blog.sh translate <slug> --lang de`."
+  translate_needs_language: "In welche Sprache? `./blog.sh translate <slug> --lang %{lang}`. Diese Website veröffentlicht: %{langs}."
   translate_json_needs_slug: "--json muss den Beitrag benennen: `translate <slug> --lang <Code> --json`."
   translate_unknown_args: "❌ `translate` weiß nichts anzufangen mit: %{args}. Es nimmt einen Beitrag und eine Sprache -- `./blog.sh translate <slug> --lang <Code>`."
   translate_needs_locales: "Diese Website veröffentlicht eine Sprache. Nenne die anderen zuerst in `site.locales` in config/site.yml."
@@ -739,6 +739,10 @@ cli:
       ./blog.sh bluesky [<slug>] [--force] [--json]
                                      verschickt die Bluesky-Ankündigung (erneut) (Bluesky-Seiten); gleiche Regeln wie toot
       ./blog.sh rebuild [--full] [--force] [--json]
+                                     baut und deployt die ganze Seite, unabhängig von einem Beitrag;
+                                     --full baut jede Seite neu, nicht nur die geänderten;
+                                     --force lässt den Deploy an den Schutzprüfungen vorbei und lädt alles hoch;
+                                     --json antwortet mit einem Objekt statt der Erzählung
       ./blog.sh preview [<port>]     serviert public.nosync lokal (Standardport 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                      gibt die Beiträge zeilenweise aus, neueste zuerst -- reiner Text für Pipes und Skripte

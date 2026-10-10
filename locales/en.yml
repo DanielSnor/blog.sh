@@ -329,7 +329,7 @@ cli:
   translate_removed_addresses: "Its old addresses (%{count}) now lead to the post itself: they went to the post's own list."
   translate_own_language: "'%{lang}' is the language the post is already written in -- edit that with `./blog.sh edit`."
   translate_unknown_language: "This site does not publish '%{lang}'. It publishes: %{known}. Add the language to `site.locales` in config/site.yml first."
-  translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."
+  translate_needs_language: "Which language? `./blog.sh translate <slug> --lang %{lang}`. This site publishes: %{langs}."
   translate_json_needs_slug: "--json needs to name the post: `translate <slug> --lang <code> --json`."
   translate_unknown_args: "❌ `translate` does not know what to do with: %{args}. It takes a post and one language -- `./blog.sh translate <slug> --lang <code>`."
   translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
@@ -747,6 +747,10 @@ cli:
       ./blog.sh bluesky [<slug>] [--force] [--json]
                                      (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
       ./blog.sh rebuild [--full] [--force] [--json]
+                                     rebuilds and deploys the whole site, not tied to a specific post;
+                                     --full builds every page again instead of only the ones that changed;
+                                     --force lets the deploy past its guards and uploads everything;
+                                     --json answers with one object instead of the narration
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
       ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
