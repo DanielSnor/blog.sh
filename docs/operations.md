@@ -665,10 +665,13 @@ standard error.
 **This page and its shortcut are on their way out.** Native apps for iOS
 and Android are in preparation; they reach the engine over the same SSH
 ([Over SSH, from an app](#over-ssh-from-an-app)) and need neither. 1.11
-removes `/write/`, the `SendPost` shortcut, the delivery receipts and the
-`publish.txt` and `drafts.txt` requests described below. In 1.10
-everything in this section works as written, and nothing is being added
-to it. The receiver itself, `scripts/receive.sh`, stays.
+removes `/write/` -- the page and everything published under that
+address -- the `SendPost` shortcut and the `publish.txt` and `drafts.txt`
+requests described below. In 1.10 everything in this section works as
+written, and nothing is being added to it. Two things stay, because the
+apps use them as the page does: the receiver itself,
+`scripts/receive.sh`, and the `receipt:` line of a delivery, which is
+what makes a delivery that arrives twice one post.
 
 `write: true` publishes a page at `/write/` to write the post on: a title,
 the text, tags, and photographs each with its description. It keeps what
@@ -1344,7 +1347,8 @@ the engine that was. What a second send does:
   `receipt:`, a name the sender makes up once for the post (sixteen
   hexadecimal characters), and then the second delivery is the first one
   arriving again and updates the post it wrote ([A delivery that arrives
-  twice is one post](#a-post-sent-from-the-phone-itself)).
+  twice is one post](#a-post-sent-from-the-phone-itself)). The line is
+  the apps' as much as the page's, and stays when `/write/` goes.
 - An edit or a translation -- a file saying `edits:` and `base:` --
   delivered twice is `changed` the second time: `base:` is the digest of
   the post's file, and the first delivery changed it. The answer to a

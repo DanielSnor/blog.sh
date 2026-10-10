@@ -254,10 +254,12 @@ goes in is still being decided; the suffix and the date both come off at the tag
   to the engine over the SSH the server already has (`scripts/remote.sh`) and do what the page
   does and more -- the queue, a post's properties, a published post's text, a translation -- on
   Android as well, where the page could hand its files to nothing the engine ships. **1.11 takes
-  out** the page, the `SendPost` shortcut and what exists only for the two: the delivery receipts
-  and the `publish.txt` and `drafts.txt` requests. This is the notice. In 1.10 both work as they
-  do today, and nothing new is added to them. `scripts/receive.sh` stays -- it is what the apps
-  deliver through, and what `./blog.sh add <file>` has always been the other end of.
+  out** the page with everything published under `/write/`, the `SendPost` shortcut and what
+  exists only for the two: the `publish.txt` and `drafts.txt` requests. This is the notice. In
+  1.10 both work as they do today, and nothing new is added to them. `scripts/receive.sh` stays
+  -- it is what the apps deliver through, and what `./blog.sh add <file>` has always been the
+  other end of -- and so does the `receipt:` line of a delivery: the apps send it too, and it is
+  what makes a delivery that arrives twice one post.
 
 ### Fixed
 
