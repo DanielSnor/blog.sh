@@ -108,8 +108,8 @@ answer_from_engine() {
   case "$OUT" in
     \{*) printf '%s\n' "$OUT" ;;
     *)
-      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | LC_ALL=C awk '!c && /\.rb:[0-9]+:in .*\([A-Z][A-Za-z0-9_:]*\)$/ { c = $0 } { a = a $0 "\n" } END { if (c != "") print substr(c, 1, 600); else printf "%s", substr(a, length(a) - 599) }')
-      printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | tr '\n' ' ')")"
+      REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | LC_ALL=C awk 'function whole(s, n, i, ch, need) { while (length(s) && substr(s, 1, 1) >= "\200" && substr(s, 1, 1) < "\300") s = substr(s, 2); n = length(s); for (i = n; i > 0 && i > n - 4; i--) { ch = substr(s, i, 1); if (ch < "\200") break; if (ch >= "\300") { need = (ch >= "\360") ? 4 : (ch >= "\340") ? 3 : 2; if (n - i + 1 < need) s = substr(s, 1, i - 1); break } } return s } !c && /\.rb:[0-9]+:in .*\([A-Z][A-Za-z0-9_:]*\)$/ { c = $0 } { a = a $0 "\n" } END { if (c != "") print whole(substr(c, 1, 600)); else printf "%s", whole(substr(a, length(a) - 599)) }')
+      printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | LC_ALL=C tr '\n' ' ')")"
       ;;
   esac
 }

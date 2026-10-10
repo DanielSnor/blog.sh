@@ -83,6 +83,21 @@ only="pixelfed.json,toots.json,commits.json,bluesky.json,rss.json,stats.json,com
 for locale in locales/*.yml; do
   only="$only,$(basename "$locale" .yml)/on-this-day.json"
 done
+# ...and under every language the site keeps a catalogue for, which is
+# every language it publishes: one that borrows its interface from another
+# (ui_language) has no locale file of its own, so its file was written
+# over by this very run each midnight and never sent -- and the card,
+# which hides without today's window, showed there only on the day of a
+# full deploy.
+for catalogue in .on-this-day.*.json; do
+  [ -e "$catalogue" ] || continue
+  lang="${catalogue#.on-this-day.}"
+  lang="${lang%.json}"
+  case ",$only," in
+    *",$lang/on-this-day.json,"*) ;;
+    *) only="$only,$lang/on-this-day.json" ;;
+  esac
+done
 
 # Nothing has ever been built here, so there is nothing to send and nothing
 # on the target to take down either -- a site that has not been deployed has
