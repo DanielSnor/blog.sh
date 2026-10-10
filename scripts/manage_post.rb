@@ -5419,6 +5419,23 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
       address = address.sub(/-+\z/, '')
     end
     one['slug'] = address
+    # A text that was out at one address and is given another owes the
+    # old one a redirect, as a post renamed by its own slug does
+    # (rename_apply). Nothing wrote that down: the list below was "for the
+    # merge, which is done by hand", so `slug:` changed in this header --
+    # a line the engine itself puts there -- left the page the language
+    # had stood at answering nothing, with no warning and nothing for
+    # `check` to find (trial of an upgrade, 9. 10. 2026). The address it
+    # WAS served at, asked the way the build asks; and never its own new
+    # one, so a text renamed back does not redirect to itself. A page has
+    # no year in its address and this list has no way to say one: there
+    # the old address is still the author's to keep (redirect_from).
+    if !draft?(post) && !PostAddress.page?(post) && Translations.written?(entry)
+      year = PostAddress.date_year(post)
+      was = Translations.for_lang(post, lang)['address_slug'].to_s
+      owed |= ["#{year}/#{was}"] unless was.empty? || was == address
+      owed -= ["#{year}/#{address}"]
+    end
     # The entry is written anew on every save -- and the old addresses this
     # language's text is owed redirects at are not something a save may
     # drop. They are not text and no editor shows them, so they are carried

@@ -464,12 +464,16 @@ under a name the translation's blocks then use: `delete` takes a post's
 media to the trash with it, and a translation shows files from the
 folder of the post it belongs to. Deleting a published post also takes
 its announcement down where the network allows it, as any `delete` does.
-The same list covers a translation whose `slug:` you change by hand: the
-old address in that language's tree redirects to the new one. Nothing
-writes this list for you -- it is for the merge, which is done by hand --
-but nothing drops it either: `translate` and an edit from an app carry it
-across, and taking the language off the post hands the list to the post
-itself, where each address then leads to the post.
+The same list covers a translation whose `slug:` is changed -- in the
+header `translate` opens, or in a text an app sends -- on a post that is
+out: the address its page stood at is written into the list by that
+save, as a post's own old address is when it is renamed, and redirects
+to the new one in that language's tree. (A translated *page* has no year
+in its address and the list has no way to say one; there the old address
+is yours to keep, with `redirect_from`.) For the merge the list is
+written by hand, and nothing drops it: `translate` and an edit from an
+app carry it across, and taking the language off the post hands the list
+to the post itself, where each address then leads to the post.
 
 Such an address is answered in two places and no others -- the site's
 root and that language's tree -- and only while the language is

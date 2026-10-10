@@ -307,6 +307,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
   same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
   receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
   told `busy` and stores nothing.
+- **A translation given another address left the old one dead.** `slug:` in the header of a
+  translation is a line the engine puts there; changed on a post that is out, it moved that
+  language's page and wrote down nothing, where a post renamed by its own slug has always kept
+  a redirect. The address the text was out at goes into `translations.<lang>.former_slugs` by
+  the same save.
 - **A note to oneself in a file was published.** A line starting with `//` is dropped by the
   editor on save, and the cheat sheet says of any text that it disappears; in a file handed to
   `add` -- a new post, an edit, a translation -- it was saved as a paragraph, and with
