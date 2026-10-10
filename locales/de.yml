@@ -1472,6 +1472,8 @@ check:
   language_address_taken_fix: "Gib einem davon eine andere Adresse: die `slug:`-Zeile im Kopf, den `./blog.sh translate <slug> --lang %{lang}` öffnet."
   language_address_taken: "In %{lang} wollen %{slugs} beide %{address} -- der Build hält daran an, und die Seite wird nicht ausgeliefert."
   language_address_taken_pages: "In %{lang} wollen die Seiten %{slugs} beide %{address} -- die Website wird gebaut, aber dort wird nur eine von ihnen ausgeliefert, und die andere hat in dieser Sprache keine Seite."
+  translation_own_language: "%{slug}: enthält einen Text unter %{lang}, der eigenen Sprache der Website. In dieser Sprache ist der Beitrag sein eigener Titel und Text, also wird dieser Eintrag nicht gelesen und seine Worte erscheinen nirgends."
+  translation_own_language_fix: "Wenn der Beitrag genau diese Worte haben soll, setze sie in den Beitrag selbst (./blog.sh edit) und nimm translations.%{lang} aus der Datei des Beitrags. Wenn die Sprache der Website geändert wurde, stehen die eigenen Texte der Beiträge noch in der alten: site.lang sagt, in welcher Sprache die Beiträge geschrieben sind."
   unknown_locale: "%{langs}: `site.locales` nennt die Sprache, und die Engine hat keine Sprachdatei dafür -- keine Sprache dieser Website wird gebaut."
   unknown_locale_fix: "Lege locales/<Code>.yml dafür an, nimm den Code aus `site.locales` heraus, oder nenne die Sprache, aus der die Oberflächenwörter kommen: `ui_language: <Code>` oben in der eigenen Datei dieser Sprache, config/site.<Code>.yml."
   language_key_moved: "`site.%{key}` in config/site.yml: die Einstellungen einer Sprache sind mit 1.9 in ihre eigene Datei gezogen, und der Build lehnt den alten Ort ab -- keine Sprache dieser Website wird gebaut."

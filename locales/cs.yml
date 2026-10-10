@@ -1457,6 +1457,8 @@ check:
   language_address_taken_fix: "Dej jednomu z nich jinou adresu: řádek `slug:` v hlavičce, kterou otevře `./blog.sh translate <slug> --lang %{lang}`."
   language_address_taken: "V jazyce %{lang} chtějí %{slugs} tutéž adresu %{address} — sestavení se na tom zastaví a web se nenasadí."
   language_address_taken_pages: "V jazyce %{lang} chtějí stránky %{slugs} tutéž adresu %{address} — web se sestaví, ale na té adrese je jen jedna z nich a druhá v tom jazyce stránku nemá."
+  translation_own_language: "%{slug}: nese text uložený pod %{lang}, což je vlastní jazyk webu. V tom jazyce je příspěvek svým vlastním titulkem a textem, takže se tenhle záznam nečte a jeho slova nejsou na webu nikde."
+  translation_own_language_fix: "Jestli má příspěvek mít právě tahle slova, dej je do příspěvku samotného (./blog.sh edit) a translations.%{lang} ze souboru příspěvku vyndej. Jestli se změnil jazyk webu, vlastní texty příspěvků jsou pořád v tom starém: site.lang říká, v jakém jazyce jsou příspěvky napsané."
   unknown_locale: "%{langs}: `site.locales` ten jazyk jmenuje, ale engine k němu nemá soubor s překlady — nesestaví se žádný jazyk tohoto webu."
   unknown_locale_fix: "Přidej pro něj locales/<kód>.yml, vyndej kód ze `site.locales`, nebo řekni, z jakého jazyka vzít slova rozhraní: `ui_language: <kód>` nahoře ve vlastním souboru toho jazyka, config/site.<kód>.yml."
   language_key_moved: "`site.%{key}` v config/site.yml: nastavení jazyka se v 1.9 přestěhovalo do jeho vlastního souboru a staré místo sestavení odmítá — nesestaví se žádný jazyk tohoto webu."

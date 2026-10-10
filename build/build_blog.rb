@@ -2752,7 +2752,13 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # run reads, when the two differ: what KIND of post it is in another
   # language is read off that language's blocks, and for a language the
   # post was never written in those are the post's own (Languages.type_in).
-  in_this_language = Translations.for_lang(parsed, SITE_LANG, chain: FALLBACK_CHAIN)
+  # In the site's own language the post is the post: a text filed under
+  # that language's code in `translations` is a mistake -- made by hand, or
+  # left by changing `site.lang` over an archive that has translations --
+  # and reading it served that text at that entry's slug, with the post's
+  # own words on the site nowhere and `check` counting the address the
+  # post itself has. Not read; `check` names it (translation_own_language).
+  in_this_language = LANG_ROOT.empty? ? parsed : Translations.for_lang(parsed, SITE_LANG, chain: FALLBACK_CHAIN)
   in_this_language = in_this_language.merge('__own_content' => parsed['content']) unless in_this_language.equal?(parsed)
   parsed = in_this_language
 
@@ -4208,7 +4214,13 @@ Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:robots]), robots_txt)
     # same loud skip -- the build's own output always wins over a stub.
     prefix_file = (0...parts.size).map { |i| File.join(CONTENT_ROOT, *parts[0..i]) }.find { |p| written_already?(p) }
     if written_already?(dest) || prefix_file
-      warn t('build.redirect_from_taken', slug: post['slug'], origin: origin)
+      # Said by the run that writes the ROOT, where the address is one
+      # somebody may follow. In the tree of a language it is nobody's: an
+      # old address of the web a post came from stood at the root, and
+      # that a page of this language stands at the same words under /en/
+      # is no collision -- but it was said as one, by this run, on every
+      # build, with nothing for `check` to say and nothing to be done.
+      warn t('build.redirect_from_taken', slug: post['slug'], origin: origin) if LANG_ROOT.empty?
       next
     end
     # The third collision: the destination is a DIRECTORY an earlier stub

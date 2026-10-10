@@ -1488,6 +1488,8 @@ check:
   language_address_taken_fix: "Give one of them another address: the `slug:` line in the header that `./blog.sh translate <slug> --lang %{lang}` opens."
   language_address_taken: "In %{lang}, %{slugs} both ask for %{address} -- the build stops on it, and the site is not deployed."
   language_address_taken_pages: "In %{lang}, the pages %{slugs} both ask for %{address} -- the site still builds, but only one of them is served there, and the other has no page in that language."
+  translation_own_language: "%{slug}: holds a text filed under %{lang}, which is the site's own language. In that language the post is its own title and text, so this entry is not read and its words are shown nowhere."
+  translation_own_language_fix: "If those words are the ones the post should have, put them into the post itself (./blog.sh edit) and take translations.%{lang} out of the post's file. If the site's language was changed, the posts' own texts are still in the old one: site.lang says what language the posts are written in."
   unknown_locale: "%{langs}: `site.locales` names it, and the engine has no locale file for it -- no language of this site will build."
   unknown_locale_fix: "Add locales/<code>.yml for it, take the code out of `site.locales`, or name the language its interface words come from: `ui_language: <code>` at the top of that language's own file, config/site.<code>.yml."
   language_key_moved: "`site.%{key}` in config/site.yml: a language's own settings moved to its own file in 1.9, and the build refuses the old place -- no language of this site will build."

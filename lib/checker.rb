@@ -237,6 +237,7 @@ module Checker
     findings.concat(guard(:duplicate_addresses) { check_duplicate_addresses(posts, cap) })
     findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
     findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
+    findings.concat(guard(:own_language_entries) { check_own_language_entries(posts, root, cap) })
     findings.concat(guard(:unknown_locales) { check_unknown_locales(root) })
     findings.concat(guard(:language_key_moved) { check_language_key_moved(root) })
     findings.concat(guard(:language_files) { check_language_files(root, posts) })
@@ -765,6 +766,12 @@ module Checker
           # Counted among the rest it was called live under every language
           # the site has -- /de/posts/<old English address>/, where the
           # build writes nothing.
+          # Written down as the build reads it -- by its parts, whatever
+          # slashes stand around them. `/2019/old` is a list somebody
+          # wrote by hand; the build served it and this counted
+          # /posts//2019/old/, so a link to the address that answers was
+          # called dead.
+          former = former.to_s.split('/').reject(&:empty?).join('/')
           lang ? in_language << [lang, former] : paths << "/posts/#{former}/"
         end
         # The same question of a redirect_from, which the build refuses
@@ -774,7 +781,15 @@ module Checker
         # site answers at passed every link to them as sound -- under a
         # closing sentence that names redirects by name.
         Array(post['redirect_from']).each do |origin|
-          paths << origin.to_s if PostAddress.redirect_refusal(origin, languages: languages).nil?
+          next unless PostAddress.redirect_refusal(origin, languages: languages).nil?
+
+          # Both spellings: the stub is a folder with an index in it, so
+          # the address answers with the slash and without. An entry
+          # written without one (as an import writes them) made a link
+          # WITH one dead here -- and the repair then wrote the second
+          # spelling down as a second entry, which the build has
+          # complained about on every run since.
+          paths << origin.to_s << "#{origin.to_s.chomp('/')}/"
         end
       end
     end
@@ -830,7 +845,10 @@ module Checker
     posts.each do |post|
       per_post[post_path(post)] = post
     end
-    shared = paths.select { |path| path.start_with?('/write/', '/assets/') }
+    # ...and the two files the site has ONE of: the build writes
+    # robots.txt and sitemap.xml at the root alone (one sitemap names every
+    # language), so /en/sitemap.xml is an address nothing answers at.
+    shared = paths.select { |path| path.start_with?('/write/', '/assets/') || %w[/robots.txt /sitemap.xml].include?(path) }
     base = paths.to_a - shared.to_a
     langs.each do |lang|
       paths << "/#{lang}/"
@@ -1348,6 +1366,25 @@ module Checker
     end
   end
 
+  # A text filed under the site's own language. The post IS its text in
+  # that language, so the build does not read such an entry -- and somebody
+  # who wrote one, or changed `site.lang` over an archive of translations,
+  # has words in the archive that the site shows nowhere. Said, with the
+  # one place those words can go.
+  def check_own_language_entries(posts, root, cap = CAP)
+    own = site_own_language(root)
+    return [] if own.empty?
+
+    held = posts.select do |post|
+      entry = post['translations'].is_a?(Hash) ? post['translations'][own] : nil
+      entry.is_a?(Hash) && entry.slice(*Translations::TEXT_KEYS).compact.any?
+    end
+    capped(held.map do |post|
+      warn(t('translation_own_language', slug: post['slug'].to_s, lang: own), t('translation_own_language_fix', lang: own),
+           kind: :translation_own_language, data: { 'slug' => post['slug'].to_s, 'year' => PostAddress.file_year(post).to_s, 'lang' => own })
+    end, cap)
+  end
+
   def check_language_addresses(posts, root, cap = CAP)
     langs = published_languages(root)
     return [] if langs.empty?
@@ -1389,7 +1426,16 @@ module Checker
     rescue StandardError
       nil
     end
-    data.is_a?(Hash) ? data.dig('site', 'lang').to_s : ''
+    site_section(data)['lang'].to_s
+  end
+
+  # `site:` as the map it is meant to be, or nothing. A config saying
+  # `site: cs` is one SiteConfig reads as a site with every default -- and
+  # asking it for a key with dig was a TypeError and a stack trace where
+  # `check --languages --json` owes an object.
+  def site_section(data)
+    site = data.is_a?(Hash) ? data['site'] : nil
+    site.is_a?(Hash) ? site : {}
   end
 
   # What a language says about itself: config/site.<lang>.yml beside the
@@ -1531,8 +1577,8 @@ module Checker
     end
     return [] unless data.is_a?(Hash)
 
-    own = data.dig('site', 'lang').to_s
-    named = Array(data.dig('site', 'locales')).map { |code| code.to_s.strip }.reject(&:empty?)
+    own = site_section(data)['lang'].to_s
+    named = Array(site_section(data)['locales']).map { |code| code.to_s.strip }.reject(&:empty?)
     (named - [own]).uniq
   end
 
