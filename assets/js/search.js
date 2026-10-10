@@ -133,6 +133,12 @@
       var units = Array.from(foldChar(ch));
       units.forEach(function (u) { folded += u; owner.push(i); });
     });
+    // An accent written as a character of its own -- how an import or a
+    // Mac may keep "ě" -- folds to nothing, so it owned no unit and no
+    // word could mark it: the mark closed in front of it and opened again
+    // behind, one word as three pieces with its accents left outside.
+    // Such a character belongs to the letter before it.
+    var joins = chars.map(function (ch, i) { return i > 0 && foldChar(ch) === '' && /\p{M}/u.test(ch); });
     // Counted in code points on both sides, so a pair of surrogates in the
     // folded run cannot shift every mark after it by one.
     var run = Array.from(folded);
@@ -149,6 +155,7 @@
     var out = '';
     var open = false;
     chars.forEach(function (ch, i) {
+      if (joins[i]) marked[i] = marked[i - 1];
       if (marked[i] && !open) { out += '<mark>'; open = true; }
       if (!marked[i] && open) { out += '</mark>'; open = false; }
       out += escapeHtml(ch);

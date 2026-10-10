@@ -1799,7 +1799,12 @@ def series_nav_html(slug, in_series, index, position, post = nil)
     draft_slug = Series.series_slug_of(post)
     published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || []) : []
     label = if published.any?
-              spelled = (defined?(SERIES_NAMES) && SERIES_NAMES[draft_slug]) || name
+              # The name this LANGUAGE gives the series, as the published
+              # parts say it (series_name): the preview of a draft said the
+              # series by the name the posts carry, on a page whose every
+              # other word was the other language's.
+              spelled = defined?(SERIES_NAMES) ? series_name(draft_slug) : ''
+              spelled = name if spelled.empty?
               # The number is the one the POST PAGE will print once this
               # is published, so it is asked of the function that decides
               # that -- the same one the listing and the prev/next chain
@@ -3340,7 +3345,7 @@ def post_page_key(post, source_media_dir)
                  # the count, and the cached preview would have kept the old
                  # one.
                  draft_slug = Series.series_slug_of(post)
-                 ['draft', post['series'], draft_slug, SERIES_NAMES[draft_slug],
+                 ['draft', post['series'], draft_slug, series_name(draft_slug),
                   Array(SERIES_PUBLISHED[draft_slug]).map { |p| POST_DIGEST[p['__path']] }.join(',')].join('/')
                else
                  ''
