@@ -328,11 +328,7 @@ author writes in.
 
 Metadata once, words per language. A post with no `translations` key is a
 post in the site's own language -- which is every post in every archive
-today, so nothing has to be migrated. (It follows that `translations`
-never holds the site's own language: the post is its own text there. An
-entry filed under that code is not read, and `check` names it -- which is
-also what changing `site.lang` over an archive of translations leaves
-behind: `site.lang` says what language the posts are written in.)
+today, so nothing has to be migrated:
 
 ```json
 {
@@ -346,6 +342,12 @@ behind: `site.lang` says what language the posts are written in.)
   }
 }
 ```
+
+`translations` never holds the site's own language: the post is its own
+text there. An entry filed under that code is not read, and `check` names
+it -- which is also what changing `site.lang` over an archive of
+translations leaves behind: `site.lang` says what language the posts are
+written in.
 
 A language counts as written when it has a BODY. A title with nothing
 under it is a translation somebody started: it stays in the archive and
