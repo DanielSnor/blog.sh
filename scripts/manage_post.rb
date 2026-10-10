@@ -1619,12 +1619,21 @@ end
 # the public one, and its `deploy` is what the rebuild it just ran
 # returned rather than what the marker file says afterwards. Two shapes,
 # one for a post that is out and one for a post that is not.
+#
+# The same keys every action answers with (acted_answer): `ok`, and when
+# the post is dated. They were missing here and on the draft answer below
+# -- so one command, `add <file> --json`, said three different sets of
+# keys depending on what the file held, and a caller that knows success
+# by `ok` did not know these two.
 def post_answer(path, warnings)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   {
+    'ok' => true,
     'slug' => post['slug'],
     'path' => path,
     'state' => post['state'],
+    'scheduled' => post['scheduled'] == true,
+    'date' => draft?(post) && !post['scheduled'] ? nil : post_time!(post).iso8601,
     'url' => SITE_BASE_URL.to_s.empty? ? '' : published_url(post['slug'], post_time!(post).year,
                                                             page: PostAddress.page?(post)),
     'deploy' => File.exist?(Publishing::DEPLOY_PENDING) ? 'pending' : 'done',
@@ -1791,9 +1800,13 @@ def report_added(path, warnings, json:, publish: false)
   end
 
   puts JSON.pretty_generate(
+    'ok' => true,
     'slug' => post['slug'],
     'path' => path,
     'state' => post['state'],
+    'scheduled' => post['scheduled'] == true,
+    # nil for a plain draft, as everywhere (acted_answer).
+    'date' => post['scheduled'] ? post_time!(post).iso8601 : nil,
     # An address only where there is one. A key called url whose value is
     # "/draft/ab12/x/" is worse than an empty one: a caller cannot tell a
     # deliberately relative answer from a hostless mistake.

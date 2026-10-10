@@ -307,6 +307,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
   same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
   receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
   told `busy` and stores nothing.
+- **`add <file> --json` answered with three shapes.** A new post and an edit had no `ok`, a
+  translation had it and `scheduled` and `date` besides, and `publish --json` was a fourth.
+  Every action on a post answers with the same nine keys: `ok`, `slug`, `path`, `state`,
+  `scheduled`, `date`, `url`, `deploy`, `warnings`.
 - **A translation given another address left the old one dead.** `slug:` in the header of a
   translation is a line the engine puts there; changed on a post that is out, it moved that
   language's page and wrote down nothing, where a post renamed by its own slug has always kept

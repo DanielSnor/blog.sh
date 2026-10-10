@@ -608,7 +608,8 @@ front of the world* -- publishing stays a second command:
 
 `--yes` answers the draft dialog with "publish" in advance. `--json`,
 which needs `--yes` beside it, prints the same object `add --json` does --
-`slug`, `path`, `state`, `url`, `deploy`, `warnings` -- or a refusal with
+`ok`, `slug`, `path`, `state`, `scheduled`, `date`, `url`, `deploy`,
+`warnings`, the keys every action on a post answers with -- or a refusal with
 its reason as a code (`not_found`, `already_published`, `publish_refused`),
 and leaves with **zero** either way, for the reason `add` does: a phone
 throws away the output of a command that failed.
@@ -1044,9 +1045,10 @@ whole point of the answer. The cost is that Shortcuts then reports a tick
 for a refusal exactly as it does for a post. End the shortcut by opening the
 page with the answer, as the second run above does, or with a *Show Content*
 of the SSH output. The reply is one JSON object per file, so read it
-whole: a picture answers `"ok":true`, a refusal answers `"ok":false` and
-names the reason, and the post that was written answers with a `slug`
-and no `ok` at all. Without that, a shortcut whose Input field is empty connects,
+whole: a picture answers `"ok":true` and the name it was `stored` under,
+a refusal answers `"ok":false` and names the reason, and the post that
+was written answers with its `slug` (and, since 1.10, `"ok":true` like
+every other answer). Without that, a shortcut whose Input field is empty connects,
 waits out the thirty-second deadline, is refused for `empty_input`, and
 shows a tick -- which is a slow, silent way to learn nothing.
 
@@ -1223,6 +1225,12 @@ A command that writes a post -- `props --set`, `--drop-address`,
 another of these. Nothing was written, and the same request a moment
 later is the way through. (A text sent as a file is not among them: it
 says which version it edited and is refused as `changed`.)
+
+An action on a post answers with the same nine keys whichever action it
+was -- `ok`, `slug`, `path`, `state`, `scheduled`, `date` (null for a
+plain draft), `url`, `deploy`, `warnings` -- and with what its row of the
+table adds. `add` of a file through a delivery answers that way too, for
+a new post, an edit and a translation alike.
 
 One thing about types, for a consumer written in a language that has
 them: a post's `year` is a string wherever a post is named -- it is the
