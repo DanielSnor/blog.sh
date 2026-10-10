@@ -1916,6 +1916,7 @@ style:
   e_account_id: "Tohle musí být ID účtu, ne @jméno — na Mastodonu číslo, na GoToSocial ULID. Se jménem widget tiše nezobrazí nic."
   e_feed_url: "Tohle musí být URL začínající na http:// nebo https://."
   widget_set: "✅ Widget %{name} je nastavený. Naplní ho ./scripts/refresh-sidebar.sh; pouštěj ho z cronu, ať je aktuální."
+  widget_incomplete: "Widget %{name} nastavený není: chybí mu odpověď na „%{what}“ a bez ní by karta nic neukázala. Nic se nezapsalo."
   widget_removed: "✅ Widget %{name} je odebraný. V configu zůstal zakomentovaný, takže se dá kdykoli zapnout zpátky."
 
   fonts_intro: "Písma nastavená tady platí jen pro dva řádky v hlavičce -- název a popis; zbytek typografie webu přichází s enginem. Vlastní soubor písma dej do assets/fonts/ a otázky níže ho za tebe zapíšou do config/site.yml pod fonts.faces."

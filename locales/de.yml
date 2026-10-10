@@ -1931,6 +1931,7 @@ style:
   e_account_id: "Das muss die Konto-ID sein, nicht der @Name -- auf Mastodon eine Nummer, auf GoToSocial eine ULID. Mit einem Namen zeigt das Widget stillschweigend nichts."
   e_feed_url: "Das muss eine URL sein, die mit http:// oder https:// beginnt."
   widget_set: "✅ Das Widget %{name} ist eingerichtet. Gefüllt wird es von ./scripts/refresh-sidebar.sh; per Cron bleibt es aktuell."
+  widget_incomplete: "Das Widget %{name} ist nicht eingerichtet: die Antwort auf „%{what}“ fehlt, und ohne sie würde die Karte nichts zeigen. Es wurde nichts geschrieben."
   widget_removed: "✅ Das Widget %{name} ist entfernt. Es bleibt auskommentiert in der Konfiguration und lässt sich jederzeit wieder einschalten."
 
   fonts_intro: "Die hier gesetzten Schriften gelten nur für zwei Zeilen im Banner -- den Namen und die Beschreibung; die übrige Typografie kommt mit der Engine. Eine eigene Schriftdatei kommt nach assets/fonts/, und die Fragen unten tragen sie für dich in config/site.yml unter fonts.faces ein."

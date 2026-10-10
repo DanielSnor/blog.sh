@@ -1947,6 +1947,7 @@ style:
   e_account_id: "That has to be the account's id, not the @handle -- a number on Mastodon, a ULID on GoToSocial. With a handle the widget silently shows nothing."
   e_feed_url: "That has to be a URL starting with http:// or https://."
   widget_set: "✅ The %{name} widget is set up. ./scripts/refresh-sidebar.sh fills it in; run it from cron to keep it fresh."
+  widget_incomplete: "The %{name} widget was not set up: it has no answer to “%{what}”, and without one the card would show nothing. Nothing was written."
   widget_removed: "✅ The %{name} widget is gone. It stays commented out in the config, so you can switch it back on any time."
 
   fonts_intro: "Fonts set here apply to just two lines on the banner -- the name and the description; the rest of the site's type comes with the engine. A font file of your own goes in assets/fonts/, and the questions below add it to config/site.yml under fonts.faces for you."

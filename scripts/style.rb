@@ -1054,6 +1054,9 @@ WIDGETS = {
   # Nothing to ask but the heading: the card reads the site's own archive.
   'on_this_day' => []
 }.freeze
+# The answers without which a card has nothing to show: whose posts, which
+# feed, whose commits. doctor calls a card without one an error.
+NEEDED_BY_A_WIDGET = %w[account_id feed_url username].freeze
 
 def section_widgets
   loop do
@@ -1112,16 +1115,23 @@ def configure_widget(name)
   engine = I18n.t("chrome.widget_#{name}")
   written = at('widgets', name, 'heading')
   heading = Wizard.ask(t('q_widget_heading'), written || inactive_default(name, 'heading') || engine)
+  # Nothing is written until every question has its answer. Each write
+  # used to happen as its question was answered, so a card whose one
+  # needed answer was skipped with Enter -- a feed with no address -- was
+  # written half, called "set up", and reported as an error by doctor a
+  # moment later.
+  writes = []
   if heading && heading != engine
-    site.set(['widgets', name, 'heading'], heading)
+    writes << -> { site.set(['widgets', name, 'heading'], heading) }
   elsif heading == engine && written
-    site.deactivate(['widgets', name, 'heading'])
+    writes << -> { site.deactivate(['widgets', name, 'heading']) }
   end
   # A card with nothing else to set up exists by its name alone. Without
   # this, keeping the engine's heading wrote nothing at all, and the card
   # the wizard had just said was set up never appeared.
-  site.switch_on(['widgets', name]) if WIDGETS[name].empty? && !(heading && heading != engine)
+  writes << -> { site.switch_on(['widgets', name]) } if WIDGETS[name].empty? && !(heading && heading != engine)
 
+  unanswered = nil
   WIDGETS[name].each do |key|
     value = Wizard.ask_valid(t("q_widget_#{key}"),
                              at('widgets', name, key) || inactive_default(name, key) || default_for(key),
@@ -1150,6 +1160,7 @@ def configure_widget(name)
         end
       end
     end
+    unanswered ||= key if NEEDED_BY_A_WIDGET.include?(key) && value.to_s.strip.empty?
     next unless value
 
     # An empty instance is not a value, it is the default: writing
@@ -1157,8 +1168,14 @@ def configure_widget(name)
     # deliberately left blank.
     next if key == 'instance' && value.to_s.strip.empty?
 
-    site.set(['widgets', name, key], key == 'limit' ? value.to_i : value)
+    writes << -> { site.set(['widgets', name, key], key == 'limit' ? value.to_i : value) }
   end
+  if unanswered
+    Wizard.say(t('widget_incomplete', name: name, what: t("q_widget_#{unanswered}")), :yellow)
+    Wizard.say('')
+    return
+  end
+  writes.each(&:call)
   # Into the frame: the widget menu repaints as soon as this returns, and
   # the sentence names the cron job without which the widget stays empty.
   Wizard.say(t('widget_set', name: name), :green)
