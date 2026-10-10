@@ -122,7 +122,10 @@ already carries, so each can be read as well as changed:
   (`base_required`), and saving one rebuilds and deploys. What the new
   text leaves out is taken out: a paragraph, a picture or a rule its
   author removed is the edit, and a picture the text stops naming is
-  deleted from the post's media. Taking everything out is not an edit: a
+  deleted from the post's media. A picture the text names by a name the
+  post already has is the post's own file -- so a new one sent under
+  that name is not used (the answer says so in `warnings`); a picture is
+  replaced by sending the new one under a name of its own. Taking everything out is not an edit: a
   file with no text under its header is refused (`empty`), as a new one
   is, because that is also what a program sends when it never had the
   text. What the text leaves as it was is saved
@@ -1181,7 +1184,7 @@ Three rules follow from "nobody is at the keyboard":
 | `list [--type=<type>] [--tag=<tag>] [--search=<words>] [--drafts] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned, match), `count`, `drafts`, `search`; `--search="words"` is the search `browse` runs behind [/] -- the same query language, over the whole text -- and `match` is the line that says why a row is there (null when the hit is in the title or a tag); `search` says the query back, null when there was none. A filter's value is written after `=` or as the next word (`--tag=cats`, `--tag cats`); a filter with nothing after it (`--tag`, or `--tag=`), or a word the command has no use for, is an abort -- but an empty `--search=` is a query, which matches nothing | -- |
 | `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back, and so is `series_part` -- a string or null, though the post's file holds a number; `languages` names the site's own (`own`) and says of each other one (`others`) `none`, `started` or `written` -- the three states `check --languages --json` calls `missing`, `title_only` and `written` | `not_found`, `ambiguous_slug` |
 | `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property`, `busy`, `not_found`, `ambiguous_slug` |
-| `props <slug> --drop-address <address> --json` | the screen after the drop. The address is one `addresses` lists -- each with its `kind`: `former_slugs`, `redirect_from`, or `translations.<lang>.former_slugs` for an old address of the post's text in another language | `address_unknown`, `busy`, `not_found`, `ambiguous_slug` |
+| `props <slug> --drop-address <address> [--kind <kind>] --json` | the screen after the drop. The address is one `addresses` lists -- each with its `kind`: `former_slugs`, `redirect_from`, or `translations.<lang>.former_slugs` for an old address of the post's text in another language. An address two of the lists hold is taken out of the one `--kind` names | `address_unknown`, `address_ambiguous` (in two lists, and no `--kind`), `busy`, `not_found`, `ambiguous_slug` |
 | `props <slug> --rename <slug> --yes [--rebuild] --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable`, `not_found`, `ambiguous_slug` |
 | `props <slug> --versions --json` | `versions`: name, date, label, newest first | `not_found`, `ambiguous_slug` |
 | `props <slug> --restore-version <name> --yes --json` | the screen after the restore, the preview rebuilt | `version_unknown`, `version_unreadable`, `not_found`, `ambiguous_slug` |

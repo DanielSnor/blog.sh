@@ -423,6 +423,8 @@ cli:
   props_one_action: "Eine Aktion pro Aufruf: --set (beliebig oft), --drop-address, --rename, --versions oder --restore-version, nicht zwei davon."
   props_bad_property: "%{key} lässt sich nicht auf \"%{value}\" setzen. Die Schlüssel sind %{keys}; series_part ist eine Zahl oder -, tags eine kommagetrennte Zeile oder -, type einer der acht Typen der Engine oder -, unlisted und pinned yes oder no, hero und toc yes, no oder default."
   props_address_unknown: "Dieser Beitrag hat keine alte Adresse %{address}."
+  props_address_ambiguous: "%{address} steht in mehr als einer Liste dieses Beitrags (%{kinds}). Sag, welche gemeint ist: --kind mit einem dieser Namen."
+  edit_incoming_name_taken: "%{file} kam auch in incoming/ an und wurde nicht verwendet: Der Beitrag hat bereits eine Datei dieses Namens, und ein vergebener Name meint die Datei, die ihn trägt. Um ein Bild zu ersetzen, schicke das neue unter einem anderen Namen."
   props_version_unknown: "Dieser Beitrag hat keine Version namens %{name} -- props --versions --json listet die vorhandenen."
   props_rename_needs_yes: "--rename braucht --yes daneben: der Bildschirm bestätigt eine Umbenennung mit einer Taste, ein Programm mit dem Schalter."
   props_restore_needs_yes: "--restore-version braucht --yes daneben: es überschreibt den Text in Arbeit (der aktuelle wird zuerst als Version behalten)."

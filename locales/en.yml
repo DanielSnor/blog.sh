@@ -427,6 +427,8 @@ cli:
   props_one_action: "One action per call: --set (any number of times), --drop-address, --rename, --versions or --restore-version, not two of them."
   props_bad_property: "Cannot set %{key} to \"%{value}\". The keys are %{keys}; series_part is a number or -, tags a comma-separated line or -, type one of the engine's eight or -, unlisted and pinned yes or no, hero and toc yes, no or default."
   props_address_unknown: "This post has no old address %{address}."
+  props_address_ambiguous: "%{address} stands in more than one of this post's lists (%{kinds}). Say which one is meant: --kind with one of those names."
+  edit_incoming_name_taken: "%{file} also arrived in incoming/ and was not used: the post already has a file by that name, and a name that is taken means the file that has it. To replace a picture, send the new one under another name."
   props_version_unknown: "This post has no version called %{name} -- props --versions --json lists the ones it has."
   props_rename_needs_yes: "--rename needs --yes beside it: the screen confirms a rename with a key, and a program confirms it with the flag."
   props_restore_needs_yes: "--restore-version needs --yes beside it: it overwrites the text being worked on (the current text is kept as a version first)."

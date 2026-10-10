@@ -1382,9 +1382,12 @@ end
 class Refused < StandardError
   attr_reader :code
 
+  # Without the line ends a sentence for the terminal closes on: several
+  # of them end "\n\n" to leave a blank line under themselves, and a
+  # program was handed that as part of the message.
   def initialize(code, message)
     @code = code
-    super(message)
+    super(message.to_s.rstrip)
   end
 end
 
@@ -5460,6 +5463,11 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
     # write: a key somebody put there by hand, or one a later version
     # will. The words are the editor's to replace; the rest is not.
     entry.each { |key, value| one[key] = value unless one.key?(key) || Translations::TEXT_KEYS.include?(key) || key == Translations::FORMER_KEY }
+    # ...and the one text key no editor shows: a summary written for this
+    # language by hand. The save has nothing to replace it with, and it
+    # was the only key of a translation the documentation names that a
+    # save dropped.
+    one['excerpt'] = entry['excerpt'] if entry.key?('excerpt') && !one.key?('excerpt')
     # A PAGE lives in the root of its language, which is where the engine
     # keeps its own names: a page addressed `assets` in German would be
     # written over /de/assets/ and take the stylesheet down with it. The
@@ -6080,10 +6088,27 @@ def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined:
   end
   discard_editor_buffer if interactive
   File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
+  # A bare name the post already has means the file the post has: that is
+  # what lets a second save find its pictures. So a NEW file sent under
+  # such a name -- the natural way to try to replace a picture -- was not
+  # looked at, the answer was a success with no word about it, and the
+  # file lay in incoming/ to be met again by the next save that names it.
+  # Said, and where nobody is at a keyboard the file is tidied with the
+  # rest of what this text named.
+  brought = media_files.keys.map { |source| File.expand_path(source.to_s) }
+  shadowed = []
+  each_media_entry(updated['content']) do |entry|
+    name = entry['url'].to_s
+    waiting = File.join(INCOMING_DIR, name)
+    next if name.empty? || File.basename(name) != name || !File.file?(waiting) || brought.include?(File.expand_path(waiting))
+
+    shadowed << waiting
+  end
+  shadowed.uniq.each { |waiting| warn t('cli.edit_incoming_name_taken', file: File.basename(waiting)) }
   # Housekeeping only, and it runs last on purpose: an incoming/ the CLI
   # user can't unlink in must not be able to abort a save that already
   # succeeded.
-  cleanup_incoming(media_files, heic_consumed + consume)
+  cleanup_incoming(media_files, heic_consumed + consume + (interactive ? [] : shadowed.uniq))
   [new_path, updated]
 end
 
@@ -7137,12 +7162,22 @@ def props_set_as_json(slug, sets:, rebuild:)
 end
 
 # `props <slug> --drop-address <address> --json`: the [a] screen's one action.
-def props_drop_address_as_json(slug, address, rebuild:)
+#
+# kind: which of the post's lists, where an address stands in more than
+# one of them -- its own and a translation's, or two translations'. The
+# screen picks a ROW; a program named an address, got the first row that
+# held it, and that was the one `check` had just advised keeping (the
+# list the root leads to). Named once, an address in two lists is
+# refused with the kinds it could mean.
+def props_drop_address_as_json(slug, address, rebuild:, kind: nil)
   answer_json do
     with_post_for_write(slug) do |path, post|
-      entry = address_entries(post).find { |_, value| value == address }
-      refuse('address_unknown', t('cli.props_address_unknown', address: address)) unless entry
-      key, former = entry
+      entries = address_entries(post).select { |key, value| value == address && (kind.nil? || key == kind) }
+      refuse('address_unknown', t('cli.props_address_unknown', address: address)) if entries.empty?
+      if entries.size > 1
+        refuse('address_ambiguous', t('cli.props_address_ambiguous', address: address, kinds: entries.map(&:first).join(', ')))
+      end
+      key, former = entries.first
       AtomicWrite.write_json(path, without_address(post, key, former))
     end
     warnings = []
@@ -8624,9 +8659,11 @@ begin
       versions = !ARGV.delete('--versions').nil?
       sets = option_values!('--set')
       drop = option_value!('--drop-address')
+      kind = option_value!('--kind')
       rename = option_value!('--rename')
       restore = option_value!('--restore-version')
       unknown = ARGV.find { |arg| arg.start_with?('--') }
+      unknown ||= '--kind' if kind && drop.nil?
       abort t('cli.props_unknown_option', option: unknown) if unknown
       # One key of the screen per call, the way one keypress does one thing.
       actions = [sets.any?, !drop.nil?, !rename.nil?, versions, !restore.nil?].count(true)
@@ -8640,7 +8677,7 @@ begin
         if sets.any?
           props_set_as_json(slug, sets: sets, rebuild: rebuild)
         elsif drop
-          props_drop_address_as_json(slug, drop, rebuild: rebuild)
+          props_drop_address_as_json(slug, drop, rebuild: rebuild, kind: kind)
         elsif rename
           # The screen confirms a rename with a key; a program says --yes.
           abort t('cli.props_rename_needs_yes') unless yes

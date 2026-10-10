@@ -410,6 +410,8 @@ cli:
   props_one_action: "Jedna akce na volání: --set (třeba vícekrát), --drop-address, --rename, --versions nebo --restore-version, ne dvě najednou."
   props_bad_property: "%{key} nejde nastavit na \"%{value}\". Klíče jsou %{keys}; series_part je číslo nebo -, tags řádek oddělený čárkami nebo -, type jeden z osmi typů enginu nebo -, unlisted a pinned yes nebo no, hero a toc yes, no nebo default."
   props_address_unknown: "Tenhle příspěvek nemá starou adresu %{address}."
+  props_address_ambiguous: "%{address} stojí ve víc než jednom seznamu tohohle příspěvku (%{kinds}). Řekni, který se myslí: --kind a jedno z těch jmen."
+  edit_incoming_name_taken: "%{file} přišel i do incoming/ a nepoužil se: příspěvek soubor toho jména už má a obsazené jméno znamená ten soubor, který ho má. Obrázek vyměníš tak, že nový pošleš pod jiným jménem."
   props_version_unknown: "Tenhle příspěvek nemá verzi jménem %{name} — props --versions --json vypíše ty, které má."
   props_rename_needs_yes: "--rename potřebuje vedle sebe --yes: obrazovka přejmenování potvrzuje klávesou, program ho potvrzuje přepínačem."
   props_restore_needs_yes: "--restore-version potřebuje vedle sebe --yes: přepíše rozepsaný text (ten současný se napřed uloží jako verze)."

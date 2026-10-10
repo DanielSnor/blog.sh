@@ -100,7 +100,7 @@ ALLOWED = {
   'drafts' => %w[],
   'edit' => %w[],
   'translate' => %w[--lang=],
-  'props' => %w[--set= --drop-address= --rename= --versions --restore-version= --yes --rebuild],
+  'props' => %w[--set= --drop-address= --kind= --rename= --versions --restore-version= --yes --rebuild],
   'queue' => %w[--up= --down= --move= --to=],
   'schedule' => %w[--at= --cancel --compact --allow-partial],
   'publish' => %w[--yes --no-announce --allow-partial --compact],
