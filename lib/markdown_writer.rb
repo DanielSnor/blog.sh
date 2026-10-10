@@ -27,7 +27,10 @@ module MarkdownWriter
   # backslash on the next save. Listed here, escape_markdown doubles that
   # backslash on the way out and the two directions agree again. ")" itself
   # is never escaped; only a backslash before it is.
-  ESCAPABLE = '*`~[]!\\#>|.+_-)'
+  # "/" is here for the same rule: escape_block_starts writes "\//" so a
+  # paragraph beginning "//" is not read as an author's note and dropped
+  # by the save (strip_editor_notes), and the parser unescapes \/.
+  ESCAPABLE = '*`~[]!\\#>|.+_-)/'
 
   # Higher number = renders further out when two spans cover the exact same
   # range (e.g. "**[text](url)**", where the bold and the link entries end up
@@ -205,7 +208,12 @@ module MarkdownWriter
     /\A\#{1,6}[ \t]/,        # heading
     /\A>/,                   # quote (the bare ">" swallows the sign)
     /\A[-+][ \t]/,           # unordered list ("*" is escaped globally)
-    /\A(?:-{3,}|_{3,})[ \t]*\z/ # horizontal rule
+    /\A(?:-{3,}|_{3,})[ \t]*\z/, # horizontal rule
+    # An author's note to the editor, which the save drops: a stored
+    # paragraph that begins so -- an import's "// edit: ..." -- was handed
+    # out as a note and lost by being saved back unchanged (third fleet,
+    # 10. 10. 2026).
+    %r{\A//}
   ].freeze
 
   # Quoted titles -- an image's caption and a link's title -- are delimited

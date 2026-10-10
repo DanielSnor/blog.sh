@@ -62,7 +62,9 @@ module MarkdownParser
   # published a visible "1\)" the moment anything else in the post was
   # edited. The block sigils
   # (# > - + . _ |) joined for the writer's line-start escaping -- a
-  # paragraph beginning ">50 %" must not round-trip into a quote.
+  # paragraph beginning ">50 %" must not round-trip into a quote; "/" the
+  # same way, for a paragraph beginning "//", which the save reads as a
+  # note to the editor.
   #
   # The link target allows one level of balanced parentheses
   # ("/Page(ID-123).aspx"), matching what CommonMark does; the writer
@@ -117,7 +119,7 @@ module MarkdownParser
   # that never came back at thirty-seven. An unclosed `**` is ordinary
   # (`**kwargs`, `2**10`, a glob), and so is a paragraph about regular
   # expressions after it.
-  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*)[^*])+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?!\*)(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:\\.|(?!\*\*)[^\\])+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*\\])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\\)(?<!(?<!\\)\*)\*(?!\*)|~~(?<strike>.+?)(?<!\\)~~|(?<fence>`+)(?<code>.+?)\k<fence>|\[(?<ltext>(?:\\.|[^\]\\])*)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)\/-])|\*\*\*(?<bi>(?:(?!\*\*)[^*])+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?!\*)(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:\\.|(?!\*\*)[^\\])+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*\\])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\\)(?<!(?<!\\)\*)\*(?!\*)|~~(?<strike>.+?)(?<!\\)~~|(?<fence>`+)(?<code>.+?)\k<fence>|\[(?<ltext>(?:\\.|[^\]\\])*)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same

@@ -1699,7 +1699,11 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
   # nothing is written. (A translation is another matter: an empty one
   # takes the language off the post, which is said where that is done.)
   _, body = MarkdownParser.parse_frontmatter(raw)
-  refuse('empty', t('cli.add_file_empty', file: file)) if body.to_s.strip.empty?
+  # ...and only of a post that HAD a body. One that is a title and its
+  # tags, or a link card -- which travels in the header -- has nothing
+  # under the header to begin with, and a change to its title or its tags
+  # from a file was refused as empty every time (third fleet, 10. 10. 2026).
+  refuse('empty', t('cli.add_file_empty', file: file)) if body.to_s.strip.empty? && stored_body?(post)
   # `edits:` and `base:` stay in the text: they belong to the delivery, and
   # the save reads them as file-only keys, like `publish:` and `receipt:`.
   (new_path, _updated), warnings = quietly(json, keep_stdout: true) do
@@ -1710,6 +1714,14 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
 rescue Refused => e
   puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
   exit 0
+end
+
+# Whether a post's own text, as it is handed out, has anything under the
+# header at all.
+def stored_body?(post)
+  !MarkdownParser.parse_frontmatter(edit_markdown_for(post, nil)).last.to_s.strip.empty?
+rescue StandardError
+  true
 end
 
 def report_added(path, warnings, json:, publish: false)
@@ -5409,7 +5421,18 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
     # an old address leads to the post itself: the same words in another
     # language rather than nothing.
     inherited = owed - Array(post['former_slugs']).map(&:to_s)
-    said += " #{t('cli.translate_removed_addresses', count: owed.size)}" unless owed.empty?
+    # ...and the address the text stood at until this moment, an old
+    # address from now on like the rest: taking the language off left it
+    # answering nothing, with nothing for `check` to find (third fleet,
+    # 10. 10. 2026). Not where the text stood at the post's own slug -- the
+    # tree of that language shows the post there as it is.
+    if !draft?(post) && !PostAddress.page?(post)
+      stood = Translations.for_lang(post, lang)['address_slug'].to_s
+      unless stood.empty? || stood == post['slug'].to_s
+        inherited |= ["#{PostAddress.date_year(post)}/#{stood}"] - Array(post['former_slugs']).map(&:to_s)
+      end
+    end
+    said += " #{t('cli.translate_removed_addresses', count: inherited.size)}" unless inherited.empty?
   else
     # What the new text left alone is saved as it was stored. A
     # translation's blocks carry what markdown cannot say exactly as the
@@ -6932,7 +6955,9 @@ def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
       # alone, for today, as the dialog takes it.
       time = begin
         said = at.to_s.strip
-        whole = said.match(/\A(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?\z/i)
+        # The time is not optional: a day alone went through as its
+        # midnight, which the documentation said it would not.
+        whole = said.match(/\A(\d{4})-(\d{1,2})-(\d{1,2})[ T]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?\z/i)
         if whole
           Date.valid_date?(*whole.captures.map(&:to_i)) ? Time.parse(said).getlocal : nil
         elsif said.match?(/\A\d{1,2}:\d{2}\z/)
@@ -7214,11 +7239,17 @@ end
 def props_drop_address_as_json(slug, address, rebuild:, kind: nil)
   answer_json do
     with_post_for_write(slug) do |path, post|
-      entries = address_entries(post).select { |key, value| value == address && (kind.nil? || key == kind) }
-      refuse('address_unknown', t('cli.props_address_unknown', address: address)) if entries.empty?
-      if entries.size > 1
-        refuse('address_ambiguous', t('cli.props_address_ambiguous', address: address, kinds: entries.map(&:first).join(', ')))
-      end
+      held = address_entries(post).select { |_, value| value == address }
+      refuse('address_unknown', t('cli.props_address_unknown', address: address)) if held.empty?
+      entries = kind.nil? ? held : held.select { |key, _| key == kind }
+      # A kind the address does not stand under is its own mistake, and
+      # was "the post has no such address" about one it had (third fleet,
+      # 10. 10. 2026).
+      refuse('kind_unknown', t('cli.props_kind_unknown', address: address, kind: kind, kinds: held.map(&:first).uniq.join(', '))) if entries.empty?
+      # Twice in ONE list is one address written twice, not two meanings:
+      # without_address takes every copy out, as the screen does.
+      kinds = entries.map(&:first).uniq
+      refuse('address_ambiguous', t('cli.props_address_ambiguous', address: address, kinds: kinds.join(', '))) if kinds.size > 1
       key, former = entries.first
       AtomicWrite.write_json(path, without_address(post, key, former))
     end
@@ -7291,7 +7322,11 @@ end
 # rebuilds once on the way out, and a program calls `rebuild --json` when
 # it is done moving things.
 def queue_move_as_json(which, slug, to)
-  answer_json do
+  # Under the archive's lock from the first read: the queue was read above
+  # it, and a cancel landing in the gap made the move answer `refused`
+  # with the editor's sentence about a post changed on disk (third fleet,
+  # 10. 10. 2026).
+  answer_json(writes: 'queue') do
     entries = queue_entries
     matches = entries.each_index.select do |i|
       [entries[i][:slug], "#{File.basename(File.dirname(entries[i][:path]))}/#{entries[i][:slug]}"].include?(slug)
@@ -8038,20 +8073,24 @@ def keep_untouched_blocks(blocks, original_blocks, media_files, media_dir)
   end
   # Each stored block under what it is written as once read back; first
   # come, first kept, so two written alike keep the order they stood in.
+  # What each reads back AS is kept too, for the second pass below.
+  originals = Array(original_blocks).select { |block| block.is_a?(Hash) && block['type'] != 'link' }
+  read_back = {}.compare_by_identity
   stored = Hash.new { |known, text| known[text] = [] }
-  Array(original_blocks).each do |block|
-    next unless block.is_a?(Hash) && block['type'] != 'link'
-
+  originals.each do |block|
     back = begin
       MarkdownParser.parse_body(written_as.call(block).to_s, media_dir, incoming_dir: nil, confined: true).first
     rescue StandardError, SystemExit
       nil
     end
-    text = back && back.size == 1 ? written_as.call(back.first) : nil
+    next unless back && back.size == 1
+
+    read_back[block] = back.first
+    text = written_as.call(back.first)
     stored[text] << block if text
   end
 
-  blocks.map do |block|
+  kept = blocks.map do |block|
     next block if !block.is_a?(Hash) || block['type'] == 'link'
 
     names = []
@@ -8060,6 +8099,69 @@ def keep_untouched_blocks(blocks, original_blocks, media_files, media_dir)
 
     text = written_as.call(block)
     (text && stored[text].shift) || block
+  end
+  carry_unsaid(kept, originals, read_back)
+end
+
+# What is never carried from a stored block to the one that rewrote it:
+# its kind, and everything the text itself decides or another step fills
+# in (restore_media_src, fill_image_dimensions).
+UNCARRIED = %w[type text formatting items media poster embed_html].freeze
+
+# A block the text REWROTE -- a word corrected in a paragraph -- is saved
+# as parsed, and parsed it has only what markdown can say. What the stored
+# block held beyond that went with it, unasked: the kind of a paragraph an
+# import marked indented or as a line of chat (a list item became a
+# paragraph in the middle of its list), a video's origin (`provider`,
+# `url`). 317 blocks in 37 posts of sean.cz, and 13 videos (third fleet,
+# 10. 10. 2026).
+#
+# So a rewritten block is paired with the stored block it rewrote and
+# takes from it every key the TEXT could not have changed: one the stored
+# block reads back as something else, where the new block says exactly
+# what that read-back says -- nothing, or the default. A key the author
+# could have written, a quote's marker or a caption, the new block
+# decides. Paired only where the pairing is beyond doubt: between two
+# blocks kept as stored, the rewritten blocks of a type are paired in order
+# with the stored blocks of that type the window holds -- when there are as
+# many of each. A paragraph inserted beside a corrected one makes two for
+# one, and both stay unpaired, which is what happened before.
+def carry_unsaid(kept, originals, read_back)
+  # Where each block of the result stands among the originals: an index
+  # for a block kept as stored, nil for one the text wrote anew.
+  places = kept.map { |block| originals.index { |original| original.equal?(block) } }
+  taken = places.compact
+  bounds = [-1] + kept.each_index.select { |i| places[i] } + [kept.size]
+  bounds.each_cons(2) do |lo, hi|
+    from_index = lo.negative? ? 0 : places[lo] + 1
+    to_index = hi == kept.size ? originals.size : places[hi]
+    # Kept blocks that changed places leave no window between them.
+    next if to_index <= from_index
+
+    rewritten = ((lo + 1)...hi).select { |j| kept[j].is_a?(Hash) && kept[j]['type'] != 'link' }
+    candidates = (from_index...to_index).reject { |k| taken.include?(k) }
+    rewritten.group_by { |j| kept[j]['type'] }.each do |type, js|
+      ks = candidates.select { |k| originals[k]['type'] == type }
+      next unless ks.size == js.size
+
+      js.zip(ks).each { |j, k| carry_from(originals[k], kept[j], read_back[originals[k]]) }
+    end
+  end
+  kept
+end
+
+# One rewritten block takes from the stored block it rewrote every key the
+# text could not have changed (carry_unsaid says which).
+def carry_from(from, block, back)
+  return unless back
+  # The same file, or nothing is carried: a video replaced by another the
+  # post already had keeps the new one's own origin, which is none.
+  return if from.key?('media') && Array(from['media']).dig(0, 'url') != Array(block['media']).dig(0, 'url')
+
+  from.each do |key, value|
+    next if UNCARRIED.include?(key) || value == back[key] || block[key] != back[key]
+
+    block[key] = value
   end
 end
 
@@ -8701,12 +8803,23 @@ begin
       versions = !ARGV.delete('--versions').nil?
       sets = option_values!('--set')
       drop = option_value!('--drop-address')
+      said_kind = ARGV.count { |arg| arg == '--kind' || arg.start_with?('--kind=') }
       kind = option_value!('--kind')
       rename = option_value!('--rename')
       restore = option_value!('--restore-version')
       unknown = ARGV.find { |arg| arg.start_with?('--') }
-      unknown ||= '--kind' if kind && drop.nil?
       abort t('cli.props_unknown_option', option: unknown) if unknown
+      # --kind belongs to --drop-address, and is said once. Under --json
+      # these are refusals with a code: "Unknown option" in prose was
+      # engine_failed to the program that said --kind (third fleet,
+      # 10. 10. 2026).
+      misused = if said_kind > 1 then ['kind_once', t('cli.props_kind_once')]
+                elsif kind && drop.nil? then ['kind_needs_drop', t('cli.props_kind_needs_drop')]
+                end
+      if misused
+        answer_json { refuse(*misused) } if json
+        abort misused.last
+      end
       # One key of the screen per call, the way one keypress does one thing.
       actions = [sets.any?, !drop.nil?, !rename.nil?, versions, !restore.nil?].count(true)
       abort t('cli.props_one_action') if actions > 1

@@ -647,8 +647,18 @@ module Tui
           # needs nothing more, and only a line still being typed goes on
           # to the cooked read.
           waiting = pending_input
-          typed, newline, = waiting.partition(/[\r\n]/)
-          typed = "#{key}#{typed}"
+          pasted, newline, = waiting.partition(/[\r\n]/)
+          # Esc in a pasted line backs out, as it does everywhere: "abc^["
+          # came back as the slug to open (second trial, 25. 9. 2026).
+          return nil if pasted.include?("\e")
+
+          # ...and the rest is taken in as typed, key by key. Glued on as
+          # bytes, a Backspace that arrived in the same read as the first
+          # letter stood in the line as a byte and became a space in the
+          # slug: "y⌫z" + "en" opened "y zen" (third fleet, 10. 10. 2026).
+          typed = pasted.each_char.inject(key) { |line, char| edit_query(line, char) }
+          next if typed.empty?
+
           print "\r\n\e[?25h#{typed_row(text_prompt, typed)}"
           if newline.empty?
             # The rest of the line is read here, key by key, and not by the
@@ -663,10 +673,6 @@ module Tui
           else
             puts
           end
-          # Esc in a pasted line backs out, as it does everywhere: "abc^["
-          # came back as the slug to open (second trial, 25. 9. 2026).
-          return nil if typed.include?("\e")
-
           line = typed.gsub(/[[:cntrl:]]+/, ' ').strip
           # numeric_pick: false for menus whose rows carry no numbers and
           # whose VALUES can be numbers (tag names like "365") -- there a
