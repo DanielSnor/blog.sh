@@ -1313,6 +1313,11 @@ died of an exception, the line that names the error. Two clocks answer
 `timeout`: the request's one line has `BLOGSH_LINE_SECONDS` (30) to end
 once it has begun, and an engine still running after
 `BLOGSH_RUN_SECONDS` (1800) is stopped with whatever it had started.
+A delivery through `deliver` is held to the same: the whole of it has
+the receiver's `BLOGSH_BODY_SECONDS` (600) from its first byte, however
+it trickles and wherever in a line it stops; it is measured against the
+ceiling as it comes, not line by line; and the receiver it is handed to
+has `BLOGSH_RUN_SECONDS` like any engine.
 Unlike the shortcut's key this one may
 be ed25519; the forced command runs in the same environment
 `receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.

@@ -157,9 +157,20 @@ end
 
 # The engine, run against a clock. In a process group of its own, so that
 # stopping it stops the build and the upload it started as well.
-def run_engine(env, command, args)
+#
+# input: what to hand it on standard input -- the delivery, for the
+# receiver. Written from a thread of its own: a delivery is megabytes, and
+# a pipe written from here while nobody reads the other two would stop
+# all three.
+def run_engine(env, command, args, input: nil)
   Open3.popen3(env, command, *args, chdir: ROOT, pgroup: true) do |stdin, stdout, stderr, runner|
-    stdin.close
+    feeder = Thread.new do
+      stdin.write(input) if input
+    rescue SystemCallError, IOError
+      nil
+    ensure
+      stdin.close unless stdin.closed?
+    end
     said = [Thread.new { stdout.read }, Thread.new { stderr.read }]
     if runner.join(RUN_SECONDS).nil?
       %w[TERM KILL].each do |signal|
@@ -168,6 +179,7 @@ def run_engine(env, command, args)
       rescue SystemCallError
         break
       end
+      feeder.kill
       refuse('timeout', "The engine was still running after #{RUN_SECONDS} seconds and was stopped.")
     end
     [said[0].value.to_s, said[1].value.to_s, runner.value]
@@ -249,24 +261,54 @@ def check(args)
   args.include?('--json') ? args : args + ['--json']
 end
 
-# The delivery, line by line, up to `end`. A line is a name, a line of
+# The delivery, up to a line saying `end`. A line is a name, a line of
 # base64 or the closing dot of receive.sh's frame; `end` is none of those
 # -- three characters are not a base64 line, and a file called `end` is
 # the one name this road cannot carry. The bytes go to receive.sh exactly
 # as they came, newline for newline.
+#
+# Read as it comes rather than line by line, against the clocks `run` is
+# read against. Waiting for a whole line had neither: a phone that lost
+# its signal in the middle of a picture left half a line and a process
+# that waited for the rest of it for as long as the connection stayed
+# open, the ceiling was looked at only when a line ended -- so a line that
+# never did was read into memory without end -- and the receiver, once
+# started, had no time limit at all (second fleet, 9. 10. 2026). The
+# first byte has FIRST_SECONDS; the whole of the delivery has the
+# receiver's own BLOGSH_BODY_SECONDS from then on, however it trickles.
+END_LINE = /(?:\A|\n)end\r?\n/n
+END_AT_THE_END = /(?:\A|\n)end\r?\z/n
+
 def deliver
-  collected = +''
-  deadline = FIRST_SECONDS
+  collected = String.new(encoding: Encoding::BINARY)
+  refuse('timeout', "The delivery stalled for #{FIRST_SECONDS} seconds and was dropped.") if IO.select([$stdin], nil, nil, FIRST_SECONDS).nil?
+
+  deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + BODY_SECONDS
   loop do
-    ready = IO.select([$stdin], nil, nil, deadline)
-    refuse('timeout', "The delivery stalled for #{deadline} seconds and was dropped.") if ready.nil?
+    left = deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC)
+    if left <= 0 || IO.select([$stdin], nil, nil, left).nil?
+      refuse('timeout', "The delivery did not finish within #{BODY_SECONDS} seconds and was dropped.")
+    end
 
-    line = $stdin.gets
-    break if line.nil? || line.chomp == 'end'
+    chunk = $stdin.read_nonblock(65_536, exception: false)
+    next if chunk == :wait_readable
 
-    collected << line
+    if chunk.nil?
+      # The stream closed instead: a sender that can close it need not say
+      # `end`, and one that said it without a line break after it has.
+      collected.sub!(END_AT_THE_END) { |found| found.start_with?("\n") ? "\n" : '' }
+      break
+    end
+    seen = collected.bytesize
+    collected << chunk.force_encoding(Encoding::BINARY)
     refuse('too_large', "The delivery is over #{DELIVER_LIMIT / 1_048_576} MB on the wire.") if collected.bytesize > DELIVER_LIMIT
-    deadline = BODY_SECONDS
+    # Looked for from a little before what just arrived: the word may lie
+    # across two reads.
+    hit = collected.index(END_LINE, [seen - 5, 0].max)
+    next unless hit
+
+    collected = collected[0, collected[hit] == "\n" ? hit + 1 : hit]
+    break
   end
   refuse('empty_input', 'Nothing arrived before the end.') if collected.strip.empty?
 
@@ -276,10 +318,12 @@ def deliver
   # died with the shell complaining that half the path did not exist.
   receiver = File.join(ROOT, 'scripts', 'receive.sh')
   out, err, = begin
-    Open3.capture3([receiver, 'receive.sh'], chdir: ROOT, stdin_data: collected)
+    run_engine({}, [receiver, 'receive.sh'], [], input: collected)
   rescue SystemCallError => e
     refuse('engine_failed', "Could not run the receiver: #{e.message}")
   end
+  out = out.dup.force_encoding(Encoding::UTF_8)
+  err = err.dup.force_encoding(Encoding::UTF_8)
   if out.lstrip.start_with?('{')
     print out
     exit 0

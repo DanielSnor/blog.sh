@@ -307,6 +307,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
   same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
   receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
   told `busy` and stores nothing.
+- **A delivery from an app that stopped in the middle of a line was waited on for ever.**
+  `deliver` read a line at a time and waited for each to end: a phone that lost its signal
+  inside a picture left a process waiting for as long as the connection stayed open, a line
+  that never ended was read into memory past the ceiling, and the receiver, once started, had no
+  time limit. A delivery has `BLOGSH_BODY_SECONDS` for the whole of it, is measured as it comes,
+  and its receiver is stopped after `BLOGSH_RUN_SECONDS` like any engine -- each answered
+  `timeout` or `too_large`.
 - **`add <file> --json` answered with three shapes.** A new post and an edit had no `ok`, a
   translation had it and `scheduled` and `date` besides, and `publish --json` was a fourth.
   Every action on a post answers with the same nine keys: `ok`, `slug`, `path`, `state`,
