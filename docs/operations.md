@@ -295,7 +295,8 @@ refused as an object (`"ok": false`, `not_found` or `ambiguous_slug`)
 with a zero exit, the way `add --json` refuses; the slug is required,
 because an object for an answer means nobody is there to pick one.
 
-**Undoing an edit** is what `[v]` is for. Every `edit` keeps the previous
+**Undoing an edit** is what `[v]` is for. Every `edit` and every
+`translate` keeps the previous
 text first, up to ten of them per post, and `[v]` lists them newest first
 with the line under the cursor showing what that version said -- its
 title, or its opening words when it has none -- so the choice is made by
@@ -305,7 +306,10 @@ only on a post that has been edited at least once.
 Choosing one is itself undoable: the current text is kept as a version
 before it is replaced, so a wrong choice is one `[v]` away from being
 walked back -- which is why a single key confirms it. Only the text comes
-back -- images are not versioned, and the line above the list says so. A
+back -- images are not versioned, and the line above the list says so.
+The text of every language the version holds comes back with it; a
+language the post was given since is left as it is, and so is the address
+each language serves the post at. A
 version that will not parse stays in the list without a preview. Versions
 travel with the post into the trash and back out again.
 
@@ -404,6 +408,14 @@ text being translated is in front of you rather than in another window.
 The editor drops every `//` line on save, which is also why a translation
 left half-done cannot save the original as though it were this language's.
 
+What a translation's text does not say is kept, as it is for the post's
+own: a block the new text left alone is saved as it was stored, with a
+paragraph's kind or a video's player still on it. What the text cannot
+carry at all -- a link card, a player with no address to write -- is
+asked about before it goes; from a file it is refused (`content_lost`),
+and `translate --json` marks such a translation `editable: false`
+beforehand.
+
 **Publishing a post the site cannot show in every language it publishes**
 is a decision, not an accident: the command line refuses it and names
 `--allow-partial`, and the wizard asks -- write the missing language now,
@@ -412,7 +424,9 @@ or publish it as it stands.
 **Taking a language off a post** is emptying the title and deleting the
 body. The post then looks exactly as it did before the translation existed
 -- which matters, because a half-empty translation would otherwise give
-that language a page with the wrong words on it.
+that language a page with the wrong words on it. Two things of it are
+kept: the text as it was, as a version `[v]` restores, and the old
+addresses that text was owed, which go to the post's own list.
 
 **An address that belonged to a translation** is kept with it. When two
 posts that were the same piece in two languages are made one -- the
@@ -432,7 +446,8 @@ The same list covers a translation whose `slug:` you change by hand: the
 old address in that language's tree redirects to the new one. Nothing
 writes this list for you -- it is for the merge, which is done by hand --
 but nothing drops it either: `translate` and an edit from an app carry it
-across.
+across, and taking the language off the post hands the list to the post
+itself, where each address then leads to the post.
 
 Such an address is answered in two places and no others -- the site's
 root and that language's tree -- and only while the language is
@@ -1138,7 +1153,7 @@ Three rules follow from "nobody is at the keyboard":
 | `queue --up <slug> --json`, `--down <slug>`, `--move <slug> --to <n>` | the queue afterwards, `warnings`; nothing is rebuilt -- the screen rebuilds once on the way out, a program calls `rebuild --json` when it is done | `not_scheduled`, `ambiguous_slug`, `not_moved` (first, last, or its time has passed), `bad_position`, `overdue` |
 | `toot <slug> [--force] --json`, `bluesky <slug> [--force] --json` | `url`, `recovered` (Bluesky found the announcement on the account instead of sending one) | `wrong_network`, `no_network`, `still_draft`, `already_announced`, `unlisted`, `outside_window` (unless `--force`), `failed`, `not_sent` |
 | `drafts --json [<slug>]` | the drafts with their text, as the phone opens them; every entry says `omitted` -- true where its text was left out of a long answer and has to be asked for by name | `not_found` |
-| `translate <slug> --lang <code> --json` | the post's text in that language as the editor opens it (empty when there is none yet), the original beside it, the post's media by name, and `base:`; the words come back through `add` of a file saying `edits:`, `base:` and `lang:` -- a title and a body both empty take the language off the post | `no_locales`, `own_language`, `unknown_language`, `not_found` |
+| `translate <slug> --lang <code> --json` | the post's text in that language as the editor opens it (empty when there is none yet), the original beside it, the post's media by name, `base:`, and `editable` with `problem` as `edit --json` says them; the words come back through `add` of a file saying `edits:`, `base:` and `lang:` -- a title and a body both empty take the language off the post, and what the text could not carry is refused (`content_lost`) | `no_locales`, `own_language`, `unknown_language`, `not_found` |
 | `edit <slug> --json` | one post, any state, with its text as the editor opens it, its media, its address and the digest `base:` hands back; the text comes back through `add` of a file saying `edits:` -- for a published post `base:` is required, and the save rebuilds and deploys | `not_found`, `ambiguous_slug` |
 | `schedule <slug> --at <time> --json` | the post, `position` in the queue, `compacted` (0). The time may be said in any zone (`...Z`, `+02:00`); it is written down, and the post filed, in the site's own. A day the calendar does not have is `bad_date` | `schedule_needs_at`, `bad_date`, `not_future`, `already_published`, `partial_translation`, `busy` |
 | `schedule <slug> --cancel [--compact] --json` | the post back among the drafts, `compacted`: how many moved forward | `not_scheduled`, `busy` |

@@ -343,6 +343,16 @@ goes in is still being decided; the suffix and the date both come off at the tag
   And `check --languages --json` over a `config/site.yml` that cannot be read answered with the
   empty table of a site in one language and a zero exit; it refuses, with what `check` says about
   that file, and exits 1 -- and the table on the screen no longer says "one language" above it.
+- **Saving a translation rebuilt it from its text.** Every block of it, so whatever markdown has
+  no word for was gone after any save -- a paragraph's kind, a video's poster and player, a link
+  card whole -- and on a real archive half the translations would have changed by being saved
+  unchanged. A block the text left alone is now stored as it was, as the post's own blocks are;
+  what the text cannot carry at all is asked about at the desk, refused from a file
+  (`content_lost`), and said by `translate --json` beforehand (`editable`, `problem`). Every save
+  of a translation keeps a version, and `[v]` brings back the words of every language the version
+  holds. Taking a language off a post no longer drops the old addresses its text was owed: they
+  go to the post's own list. And a file saying `lang:` with nothing after it is refused, where it
+  was saved over the post's own text.
 - **`check` and the build agree about a translation's old addresses.** An address in
   `translations.<lang>.former_slugs` is served in two places: at the root and in that language's
   tree. `check` called it live under every language the site has, and still live after the

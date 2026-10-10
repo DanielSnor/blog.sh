@@ -319,6 +319,7 @@ cli:
   translate_hint: "<!--\nÜBERSETZUNG nach %{lang}, Beitrag: %{title}\nHier stehen nur die Worte. Datum, Schlagwörter, Serie und Status gehören zum Beitrag -- die ändert `props` oder `edit`, und sie gelten in jeder Sprache.\nTitel leer lassen und den Text löschen nimmt diese Sprache vom Beitrag; er sieht dann aus wie vor der Übersetzung.\nZeilen, die mit // beginnen, werden beim Speichern entfernt.\n-->\n"
   translate_saved: "Gespeichert: der %{lang}-Text von „%{slug}“."
   translate_removed: "Entfernt: der %{lang}-Text von „%{slug}“."
+  translate_removed_addresses: "Seine alten Adressen (%{count}) führen jetzt zum Beitrag selbst: sie stehen nun in dessen eigener Liste."
   translate_own_language: "„%{lang}“ ist die Sprache, in der der Beitrag geschrieben ist -- die ändert `./blog.sh edit`."
   translate_unknown_language: "Diese Website veröffentlicht „%{lang}“ nicht. Sie veröffentlicht: %{known}. Trage die Sprache zuerst in `site.locales` in config/site.yml ein."
   translate_needs_language: "In welche Sprache? `./blog.sh translate <slug> --lang de`."

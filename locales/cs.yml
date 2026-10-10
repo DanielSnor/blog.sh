@@ -310,6 +310,7 @@ cli:
   translate_hint: "<!--\nPŘEKLAD do %{lang}, příspěvek: %{title}\nJsou tu jen slova. Datum, štítky, série i stav patří příspěvku — ty se mění přes `props` nebo `edit` a platí ve všech jazycích.\nNech titulek prázdný a smaž tělo, a jazyk z příspěvku zmizí; bude to vypadat přesně jako předtím, než překlad vznikl.\nŘádky začínající // se při uložení zahodí.\n-->\n"
   translate_saved: "Uloženo: %{lang} text příspěvku „%{slug}“."
   translate_removed: "Odebráno: %{lang} text příspěvku „%{slug}“."
+  translate_removed_addresses: "Jeho staré adresy (%{count}) teď vedou na příspěvek sám: přešly do jeho vlastního seznamu."
   translate_own_language: "„%{lang}“ je jazyk, ve kterém je příspěvek napsaný — ten se edituje přes `./blog.sh edit`."
   translate_unknown_language: "Tenhle web „%{lang}“ nepublikuje. Publikuje: %{known}. Nejdřív jazyk doplň do `site.locales` v config/site.yml."
   translate_needs_language: "Do jakého jazyka? `./blog.sh translate <slug> --lang de`."

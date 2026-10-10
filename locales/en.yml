@@ -326,6 +326,7 @@ cli:
   translate_hint: "<!--\nTRANSLATION into %{lang} of: %{title}\nOnly the words are here. The date, the tags, the series and the state belong to the post itself -- change those with `props` or `edit`, and they hold in every language.\nLeave the title empty and delete the body to take this language off the post; it then looks exactly as it did before the translation existed.\nLines starting with // are removed on save.\n-->\n"
   translate_saved: "Saved the %{lang} text of '%{slug}'."
   translate_removed: "Took the %{lang} text off '%{slug}'."
+  translate_removed_addresses: "Its old addresses (%{count}) now lead to the post itself: they went to the post's own list."
   translate_own_language: "'%{lang}' is the language the post is already written in -- edit that with `./blog.sh edit`."
   translate_unknown_language: "This site does not publish '%{lang}'. It publishes: %{known}. Add the language to `site.locales` in config/site.yml first."
   translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."

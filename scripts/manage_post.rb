@@ -1656,7 +1656,12 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
     refuse('changed', t('cli.edit_from_changed', slug: slug))
   end
   # `lang:` makes it a translation: the words of one language, not the post.
-  unless meta['lang'].to_s.strip.empty?
+  # The LINE makes it one, not what the line holds: `lang:` with nothing
+  # after it was read as no line at all, and what a program had written as
+  # a translation was saved over the post's own text, with a success for
+  # an answer. An empty code is no language this site has, and is refused
+  # as one (translate_language!).
+  if meta.key?('lang')
     refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty?
     return translation_from_file(file, raw, meta, path, original_raw, post, json: json, confined: confined)
   end
@@ -4670,6 +4675,23 @@ def restore_version(path, restored)
   %w[title tags content type hero].each do |key|
     restored.key?(key) ? current[key] = restored[key] : current.delete(key)
   end
+  # ...and the words of every language the version has. Its WORDS: the
+  # address a language serves the post at and the old addresses it is
+  # owed stay as they are now, for the reason the redirects above do. A
+  # language the post has lost since comes back whole, as the version
+  # held it; one the version never had is left alone -- a restore puts
+  # words back, it does not take a language away.
+  if restored['translations'].is_a?(Hash)
+    languages = current['translations'].is_a?(Hash) ? current['translations'].dup : {}
+    restored['translations'].each do |lang, was|
+      next unless was.is_a?(Hash)
+
+      now = languages[lang].is_a?(Hash) ? languages[lang].dup : was.dup
+      Translations::TEXT_KEYS.each { |key| was.key?(key) ? now[key] = was[key] : now.delete(key) }
+      languages[lang] = now
+    end
+    current['translations'] = languages unless languages.empty?
+  end
   # `src` is engine-side too, and older than this dialog knows: every
   # version written before media entries started carrying the address the
   # file came from -- which is every version in every archive that predates
@@ -5189,9 +5211,20 @@ def translate_as_json(slug, lang)
     entry = post.dig('translations', lang)
     entry = {} unless entry.is_a?(Hash)
     media_dir = File.join(MEDIA_DIR, year, slug)
+    # Said before the text is handed out, as `drafts --json` and `edit
+    # --json` say it of the post's own: a translation holding something
+    # its text cannot say is not one to edit from here, and the save
+    # would be refused (content_lost).
+    lost = unwritable_translation(entry, media_dir)
+    problem = if lost.nil?
+                'unreadable'
+              else
+                lost.any? ? 'content_lost' : nil
+              end
     { 'ok' => true,
       'post' => { 'slug' => slug, 'lang' => lang, 'title' => post_name_for(post),
                   'written' => Translations.written?(entry),
+                  'editable' => problem.nil?, 'problem' => problem,
                   'text' => translation_skeleton(entry, nil),
                   'original' => translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
                                                        'content' => LinkCard.split(post['content']).last }, nil),
@@ -5209,7 +5242,7 @@ def translation_from_file(file, raw, meta, path, original_raw, post, json:, conf
   translate_language!(lang)
   slug = post['slug'].to_s
   _said, warnings = quietly(json, keep_stdout: true) do
-    apply_translation(slug, lang, path, original_raw, post, raw, confined: confined)
+    apply_translation(slug, lang, path, original_raw, post, raw, confined: confined, interactive: false)
   end
   # Consumed the way every other file handed over is: out of incoming/,
   # and from nowhere else. This deleted the file wherever it lay -- the
@@ -5275,7 +5308,7 @@ end
 # when both the title and the body are empty. Returns the sentence said.
 # `confined:` is the file route's: a picture may be named only by a bare
 # name, and none at all here, since a translation carries no media.
-def apply_translation(slug, lang, path, original_raw, post, raw, confined: false)
+def apply_translation(slug, lang, path, original_raw, post, raw, confined: false, interactive: true)
   year = File.basename(File.dirname(path))
   media_dir = File.join(MEDIA_DIR, year, slug)
   entry = post.dig('translations', lang)
@@ -5292,10 +5325,44 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
 
   title = meta['title'].to_s.strip
   translations = post['translations'].is_a?(Hash) ? post['translations'].dup : {}
+  # The old addresses of this language's text, held here so that both
+  # branches below can see them.
+  owed = Array(entry[Translations::FORMER_KEY]).map(&:to_s).reject { |former| former.strip.empty? }
+  inherited = []
   if title.empty? && blocks.empty?
     translations.delete(lang)
     said = t('cli.translate_removed', lang: lang, slug: slug)
+    # Taking the language off takes its page away, and with the page went
+    # the addresses that text was owed a redirect at: the entry was
+    # deleted whole, list and all. They are not this language's to lose --
+    # somebody still follows them. They go to the post's own list, where
+    # an old address leads to the post itself: the same words in another
+    # language rather than nothing.
+    inherited = owed - Array(post['former_slugs']).map(&:to_s)
+    said += " #{t('cli.translate_removed_addresses', count: owed.size)}" unless owed.empty?
   else
+    # What the new text left alone is saved as it was stored. A
+    # translation's blocks carry what markdown cannot say exactly as the
+    # post's own do -- a paragraph's kind, a video's poster and player --
+    # and this save rebuilt every one of them from the text: on a real
+    # archive 67 of 130 translations changed by being saved unchanged, and
+    # eight lost a whole block (fleet, 9. 10. 2026). keep_untouched_blocks
+    # is the rule the post's own text has had since the first fleet.
+    blocks = keep_untouched_blocks(blocks, entry['content'], media_files, media_dir)
+    # ...and what would still be gone is asked about, or refused. At a
+    # keyboard anything that goes is a question; from a file only what its
+    # author never saw going -- a link card, a player with no address to
+    # write, which the text this was edited from did not show.
+    lost = blocks_lost(entry['content'], blocks)
+    lost = unwritable_translation(entry, media_dir) || lost unless interactive
+    if lost.any?
+      summary = content_loss_summary(lost)
+      refuse('content_lost', t('cli.content_loss_warning', summary: summary)) unless interactive
+      puts
+      puts t('cli.content_loss_warning', summary: summary)
+      print t('cli.confirm_continue_yes', word: t('cli.confirm_word'))
+      abort t('cli.cancelled_nothing_saved') unless $stdin.gets&.strip&.downcase == t('cli.confirm_word')
+    end
     one = {}
     one['title'] = title unless title.empty?
     one['content'] = blocks unless blocks.empty?
@@ -5327,8 +5394,7 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
     # language's text is owed redirects at are not something a save may
     # drop. They are not text and no editor shows them, so they are carried
     # across untouched (Translations.former_slugs).
-    kept = Array(entry[Translations::FORMER_KEY]).map(&:to_s).reject { |former| former.strip.empty? }
-    one[Translations::FORMER_KEY] = kept unless kept.empty?
+    one[Translations::FORMER_KEY] = owed unless owed.empty?
     # ...and so is anything else the entry holds that this save does not
     # write: a key somebody put there by hand, or one a later version
     # will. The words are the editor's to replace; the rest is not.
@@ -5374,8 +5440,14 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
   end
   updated = post.dup
   translations.empty? ? updated.delete('translations') : updated['translations'] = translations
+  updated['former_slugs'] = Array(post['former_slugs']) + inherited unless inherited.empty?
 
   abort_if_post_changed(path, original_raw, slug)
+  # The text as it was, kept before it is written over -- what every save
+  # of the post's own text does, and what `[v]` restores from. A
+  # translation had no way back at all: no version was kept, and a
+  # language taken off left no file on the disk that held its words.
+  PostVersions.keep(path, content_dir: CONTENT_DIR)
   AtomicWrite.write_json(path, updated)
   said
 end
@@ -5523,13 +5595,6 @@ end
 # stayed a text block, so counting block types alone said nothing had
 # happened and no confirmation was asked for.
 def edit_content_loss(post, blocks, new_card)
-  counts = lambda do |list|
-    list.each_with_object(Hash.new(0)) do |b, h|
-      h[['block', b['type']]] += 1
-      spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| Array(i['formatting']) }
-      spans.each { |f| h[['span', f['type']]] += 1 }
-    end
-  end
   # ⚠️ The card the header just created does not stand in for one the body
   # dropped. Counting by type alone, an edit that ADDS `link:` to a post
   # whose second link block markdown cannot write keeps the total at one
@@ -5537,9 +5602,37 @@ def edit_content_loss(post, blocks, new_card)
   # is the exact failure this guard exists to prevent. So the comparison
   # is made on the blocks as the editor saw them: without the card that
   # was lifted into the header, and without the one put back from it.
-  before = counts.call(split_link_card(post['content']).last)
-  after = counts.call(new_card ? blocks.drop(1) : blocks)
-  before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
+  blocks_lost(split_link_card(post['content']).last, new_card ? blocks.drop(1) : blocks)
+end
+
+# What `after` has less of than `before`, by block type and by span.
+def blocks_lost(before, after)
+  counts = lambda do |list|
+    Array(list).each_with_object(Hash.new(0)) do |b, h|
+      next unless b.is_a?(Hash)
+
+      h[['block', b['type']]] += 1
+      spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| i.is_a?(Hash) ? Array(i['formatting']) : [] }
+      spans.each { |f| h[['span', f['type']]] += 1 if f.is_a?(Hash) }
+    end
+  end
+  was = counts.call(before)
+  now = counts.call(after)
+  was.filter_map { |type, n| [type, n - now[type]] if n > now[type] }
+end
+
+# The same question for the words of one language: what its text cannot
+# say, and a save of that text back untouched would therefore drop. Asked
+# of the blocks as a save would STORE them -- with every block the text
+# left alone kept as it was -- so a paragraph's kind or a video's player
+# is no loss here; a link card or a player with no address to write is.
+# nil when the text cannot be read back at all.
+def unwritable_translation(entry, media_dir)
+  _, body = MarkdownParser.parse_frontmatter(translation_skeleton(entry, nil))
+  blocks, = MarkdownParser.parse_body(body, media_dir, incoming_dir: nil, confined: true)
+  blocks_lost(entry['content'], keep_untouched_blocks(blocks, entry['content'], {}, media_dir))
+rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
+  nil
 end
 
 # What the post holds that its own text cannot say: what would be gone
