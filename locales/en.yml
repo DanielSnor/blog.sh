@@ -1390,6 +1390,8 @@ doctor:
   slots_shape: "publishing.slots has to be a list."
   slots_bad: "Publishing slots that will be ignored: %{values}."
   slots_bad_fix: "The format is \"<day> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun or daily, then a 24-hour time. Full day names do not work."
+  allow_partial_shape: "publishing.allow_partial is %{value}, which is neither true nor false -- it is read as off."
+  allow_partial_shape_fix: "Write publishing.allow_partial: true (no quotes), or delete the line."
   scheduler_ok: "The queue has %{count} post(s) waiting and something ran it %{ago} ago."
   scheduler_never: "%{count} post(s) are waiting in the queue, but nothing has ever run it here -- they will not publish on their own."
   scheduler_stale: "Nothing has run the queue for %{ago}, and %{count} post(s) are waiting -- it runs every fifteen minutes when it runs at all."

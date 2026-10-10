@@ -279,6 +279,9 @@ The example is fully commented. The short version:
   `publishing.slots` (the times posts usually go out, so scheduling stops
   asking for a date --
   [operations.md](operations.md#publishing-slots)),
+  `publishing.allow_partial` (on a site of several languages, lets a post
+  out without the words of every one of them, unasked --
+  [localization.md](localization.md#publishing-a-post-that-is-not-in-every-language)),
   `media` (`convert_heic`, `remux_video` and `strip_location`, all discussed under
   [Writing from a phone](operations.md#writing-from-a-phone)),
   `tag_icons` (an icon a tag carries, on its own listing and on the date

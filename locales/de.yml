@@ -1373,6 +1373,8 @@ doctor:
   slots_shape: "publishing.slots muss eine Liste sein."
   slots_bad: "Veröffentlichungszeiten, die ignoriert werden: %{values}."
   slots_bad_fix: "Das Format ist \"<Tag> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun oder daily, dann eine Uhrzeit im 24-Stunden-Format. Ausgeschriebene Tagesnamen funktionieren nicht."
+  allow_partial_shape: "publishing.allow_partial ist %{value}, also weder true noch false -- es wird als aus gelesen."
+  allow_partial_shape_fix: "Schreib publishing.allow_partial: true (ohne Anführungszeichen) oder lösch die Zeile."
   scheduler_ok: "In der Warteschlange warten %{count} Beitrag/Beiträge, und zuletzt hat sie vor %{ago} etwas ausgeführt."
   scheduler_never: "%{count} Beitrag/Beiträge warten in der Warteschlange, aber hier hat sie noch nie etwas ausgeführt -- von allein erscheinen sie nicht."
   scheduler_stale: "Seit %{ago} hat nichts die Warteschlange ausgeführt, und %{count} Beitrag/Beiträge warten -- dabei sollte sie alle fünfzehn Minuten laufen."

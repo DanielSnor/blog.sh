@@ -432,7 +432,9 @@ beforehand.
 **Publishing a post the site cannot show in every language it publishes**
 is a decision, not an accident: the command line refuses it and names
 `--allow-partial`, and the wizard asks -- write the missing language now,
-or publish it as it stands.
+or publish it as it stands. A site that has made that decision for every
+post says `publishing.allow_partial: true` in `config/site.yml`, and is
+neither refused nor asked ([localization.md](localization.md)).
 
 **Taking a language off a post** is emptying the title and deleting the
 body. The post then looks exactly as it did before the translation existed
@@ -1170,7 +1172,9 @@ Three rules follow from "nobody is at the keyboard":
   the flag the answer is no -- a program that did not say it did not mean
   it. (On a site of more than one language that last one decides whether
   anything can be scheduled or published at all before it is translated:
-  without it both answer `partial_translation`.)
+  without it both answer `partial_translation` -- unless the site itself
+  says `publishing.allow_partial: true`, which `props --json` shows as
+  `languages.allow_partial`, and then neither does.)
 - **Those flags are for `--json` only.** `delete <slug> --yes` without
   `--json` is refused: at the terminal the dialog is there to ask, and
   a flag that silently skips a confirmation is how a shell history
@@ -1185,7 +1189,7 @@ Three rules follow from "nobody is at the keyboard":
 |---|---|---|
 | `version --json` | `engine`, `site`: name, claim, url, lang, locales, accent (`light`, `dark`: the palette's accent as colors.css resolves it), palette (`light`, `dark`, each `bg`, `text`, `meta_text`, `border`, resolved the same way) -- the identity block as data; answers on a broken config with what it can | -- |
 | `list [--type=<type>] [--tag=<tag>] [--search=<words>] [--drafts] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned, match), `count`, `drafts`, `search`; `--search="words"` is the search `browse` runs behind [/] -- the same query language, over the whole text -- and `match` is the line that says why a row is there (null when the hit is in the title or a tag); `search` says the query back, null when there was none. A filter's value is written after `=` or as the next word (`--tag=cats`, `--tag cats`); a filter with nothing after it (`--tag`, or `--tag=`), or a word the command has no use for, is an abort -- but an empty `--search=` is a query, which matches nothing | -- |
-| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back, and so is `series_part` -- a string or null, though the post's file holds a number; `languages` names the site's own (`own`) and says of each other one (`others`) `none`, `started` or `written` -- the three states `check --languages --json` calls `missing`, `title_only` and `written` | `not_found`, `ambiguous_slug` |
+| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back, and so is `series_part` -- a string or null, though the post's file holds a number; `languages` names the site's own (`own`) and says of each other one (`others`) `none`, `started` or `written` -- the three states `check --languages --json` calls `missing`, `title_only` and `written`; `languages.allow_partial` is true on a site that lets a post out without the words of every language (`publishing.allow_partial`), where `publish` and `schedule` need no `--allow-partial` | `not_found`, `ambiguous_slug` |
 | `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property`, `busy`, `not_found`, `ambiguous_slug` |
 | `props <slug> --drop-address <address> [--kind <kind>] --json` | the screen after the drop. The address is one `addresses` lists -- each with its `kind`: `former_slugs`, `redirect_from`, or `translations.<lang>.former_slugs` for an old address of the post's text in another language. An address two of the lists hold is taken out of the one `--kind` names | `address_unknown`, `address_ambiguous` (in two lists, and no `--kind`), `busy`, `not_found`, `ambiguous_slug` |
 | `props <slug> --rename <slug> --yes [--rebuild] --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable`, `not_found`, `ambiguous_slug` |

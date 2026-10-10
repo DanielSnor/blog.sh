@@ -1721,7 +1721,7 @@ def report_added(path, warnings, json:, publish: false)
   # site, published in one language without a word. It stays a draft here,
   # and says why and how to send it anyway -- the answer carries the
   # sentence, so the phone shows it too.
-  missing = publish ? missing_translations(post) : []
+  missing = publish && !partial_allowed? ? missing_translations(post) : []
   if missing.any?
     kept = t('cli.add_publish_partial', slug: post['slug'], langs: missing.join(', '))
     # Into the answer under --json; said on the terminal otherwise, where
@@ -5081,6 +5081,19 @@ def missing_translations(post)
   (named - [own]) - Translations.languages(post)
 end
 
+# The site's own answer to the question below, given once: it publishes a
+# post in the languages the post has. `publishing.allow_partial: true` in
+# config/site.yml is `--allow-partial` said for every post -- for the site
+# where a translation is the exception. Such a site was asked at every
+# publish what it had long decided, and its phone could not answer at
+# all: a file sent with `publish: yes` stayed a draft every time.
+#
+# Only `true` says it. Left out, false, or a word in quotes, the question
+# stays where it was; doctor names a value that is neither true nor false.
+def partial_allowed?
+  SiteConfig.get('publishing', 'allow_partial', default: false) == true
+end
+
 # Every language the site publishes except the one it is written in --
 # the languages a post can be translated INTO. Empty on a site that names
 # no `site.locales`, which is what keeps every screen below unchanged for
@@ -5124,6 +5137,8 @@ end
 #
 # true means carry on publishing.
 def offer_missing_languages(slug, post)
+  return true if partial_allowed?
+
   missing = missing_translations(post)
   return true if missing.empty?
 
@@ -5150,7 +5165,7 @@ end
 # by a person who already answered this question, and a refusal nobody is
 # looking at strands the post in the queue instead of asking anybody.
 def refuse_partial!(post, slug, allow_partial, json: false)
-  return if allow_partial
+  return if allow_partial || partial_allowed?
 
   missing = missing_translations(post)
   return if missing.empty?
@@ -6748,8 +6763,12 @@ def props_as_json(slug)
     'series_part' => post['series_part'].to_s.empty? ? nil : post['series_part'].to_s,
     'pinned' => truthy_frontmatter?(post['pinned']),
     'unlisted' => Publishing.unlisted?(post),
+    # allow_partial: whether the site lets a post out without the words of
+    # every language (publishing.allow_partial) -- so a program knows not
+    # to ask what the engine is not going to ask either.
     'languages' => { 'own' => own,
-                     'others' => other_languages.to_h { |lang| [lang, language_state(post, lang).to_s] } },
+                     'others' => other_languages.to_h { |lang| [lang, language_state(post, lang).to_s] },
+                     'allow_partial' => partial_allowed? },
     'announced' => announced,
     'announces' => announces,
     # Which network [t] would announce on, so a program knows whether to

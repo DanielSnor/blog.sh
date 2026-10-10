@@ -163,6 +163,14 @@ goes in is still being decided; the suffix and the date both come off at the tag
   draws its own header and hides the picture looks exactly as it did, and its readers stop
   downloading a file nobody showed them. `banner.src` stays: it is also the picture a page with
   none of its own is shared with.
+- **`publishing.allow_partial`.** A site of several languages is asked about every post whether
+  it may go out without the words of all of them: `publish` and `schedule` refuse until
+  `--allow-partial` is said, the wizard asks, and a post sent from a phone with `publish: yes`
+  stays a draft. Right for a site that means to publish everything in every language, and a
+  question with one answer for the site where a translation is the exception.
+  `publishing.allow_partial: true` in `config/site.yml` gives that answer once. Only `true` does;
+  doctor names a value that is neither true nor false, and `props <slug> --json` tells a program
+  as `languages.allow_partial`. Left out, nothing changes.
 - **`layout.lead_card`.** With it on, the card that opens the front page -- the pinned post where
   there is one -- leads with its post's first picture, under the title and above the opening
   words. A card is cut by height, so a picture written after the first paragraph is usually left

@@ -1360,6 +1360,8 @@ doctor:
   slots_shape: "publishing.slots musí být seznam."
   slots_bad: "Publikační sloty, které se budou ignorovat: %{values}."
   slots_bad_fix: "Formát je \"<den> HH:MM\" — mon, tue, wed, thu, fri, sat, sun nebo daily, pak čas ve 24hodinovém formátu. Plné názvy dnů nefungují."
+  allow_partial_shape: "publishing.allow_partial je %{value}, což není ani true, ani false — čte se jako vypnuto."
+  allow_partial_shape_fix: "Napiš publishing.allow_partial: true (bez uvozovek), nebo řádek smaž."
   scheduler_ok: "Ve frontě čeká příspěvků: %{count}, a naposledy ji něco spustilo před %{ago}."
   scheduler_never: "Ve frontě čeká příspěvků: %{count}, ale tady ji nikdy nic nespustilo — samy se nezveřejní."
   scheduler_stale: "Frontu už %{ago} nic nespustilo a čeká v ní příspěvků: %{count} — přitom má běžet každých patnáct minut."

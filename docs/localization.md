@@ -521,6 +521,24 @@ and offer `--allow-partial` in the same sentence. A site that publishes
 in several languages usually means to publish in all of them at once, and
 the exceptions are worth saying out loud rather than discovering later.
 
+A site where it is the other way round -- most posts stay in one
+language, and a translation is the exception -- says so once, in
+`config/site.yml`:
+
+```yaml
+publishing:
+  allow_partial: true
+```
+
+That is `--allow-partial` for every post. `publish` and `schedule` no
+longer refuse, the wizard no longer asks, and a post sent from a phone
+with `publish: yes` is published instead of being kept as a draft. The
+post goes out in the languages it has; the others show it the way they
+show any post that was never translated (see `fallback:` above). Only
+`true` says it -- left out or `false`, nothing changes, and `./blog.sh
+doctor` names a value that is neither. A program reads the setting as
+`languages.allow_partial` in `props <slug> --json`.
+
 The cron that publishes the queue never asks: a post got there through
 `schedule`, where somebody already answered this. That holds for a post
 scheduled while the site had its languages. One that was already in the

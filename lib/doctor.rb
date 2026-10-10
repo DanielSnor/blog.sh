@@ -1070,6 +1070,20 @@ module Doctor
   end
 
   def check_publishing(data)
+    publishing_partial(data) + publishing_slots(data)
+  end
+
+  # publishing.allow_partial is read as on only when it IS true. A word in
+  # quotes ("true", "yes") is a string, the engine goes on asking about
+  # every post, and nothing but this line says why.
+  def publishing_partial(data)
+    said = dig(data, 'publishing', 'allow_partial')
+    return [] if said.nil? || said == true || said == false
+
+    [error(t('allow_partial_shape', value: said.inspect), t('allow_partial_shape_fix'))]
+  end
+
+  def publishing_slots(data)
     slots = dig(data, 'publishing', 'slots')
     return [] unless slots
 

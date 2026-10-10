@@ -55,7 +55,7 @@
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
 #   comments    (approval)
-#   publishing  (slots)
+#   publishing  (slots), (allow_partial)
 #   media       (convert_heic), (remux_video), (strip_location)
 #   seo         (block_ai_crawlers), (robots_extra)
 #   analytics   (src), (website_id)
@@ -581,11 +581,23 @@ social:
 # a slot never moves a post that is already scheduled. Format is
 # "<day> HH:MM" (mon/tue/.../sun, or daily); omit the key entirely and
 # scheduling behaves exactly as before.
+#
+# allow_partial is for a site of several languages (site.locales) where a
+# translation is the exception rather than the rule. Such a site is asked
+# about every post whether it may go out without the words of every one
+# of them -- `publish` and `schedule` refuse until --allow-partial is
+# said, the wizard asks, and a post sent from a phone marked to be
+# published stays a draft. true is that answer given once, for every
+# post. A post then goes out in the languages it has, and the others show
+# it as they show any post that was never translated. Only true says it;
+# left out, or false, nothing changes. A site of one language has no use
+# for it.
 # publishing:
 #   slots:
 #     - "mon 09:30"
 #     - "wed 09:30"
 #     - "fri 09:30"
+#   allow_partial: true
 # --- end of publishing ---
 
 # Optional. HEIC photos (the iPhone default) display only in Safari --
