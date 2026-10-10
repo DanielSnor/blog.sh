@@ -1456,7 +1456,7 @@ check:
   repair_no_offer_duplicate: "Zwei Beiträge tragen diesen Slug in verschiedenen Jahren, er benennt also keinen von beiden. Hier muss ein Mensch entscheiden."
   repair_no_offer_language: "Diese Adresse liegt im Baum einer Sprache, in der der Beitrag nicht geschrieben ist, dort steht also keine Seite von ihm -- und eine Weiterleitung in diesen Ordner lehnt der Build ab. Das braucht einen Menschen: verlinke die eigene Adresse des Beitrags oder übersetze ihn."
   repair_add_redirect: "%{origin} in redirect_from von %{slug} (%{to}) eintragen -- eine hinzugefügte Zeile, und jeder Link auf die alte Adresse wird beantwortet, auch die von außen."
-  repair_rewrite_link: "Den Link in %{slug} umschreiben: %{from} -> %{to}"
+  repair_rewrite_link: "Den Link in %{slug} umschreiben: %{from} -> %{shown}"
   repair_decode_entities: "Die Entity-Codes in %{slug} durch die Zeichen ersetzen, für die sie stehen (Stellen: %{count}, erste: \"%{before}\" -> \"%{after}\"). Es ist eine Entscheidung für den ganzen Beitrag. Die vorherige Version bleibt im Verlauf."
   repair_decode_changed: "Der Beitrag hat sich seit der Prüfung geändert, daher wurde nichts geschrieben -- führe check --repair erneut über seinen jetzigen Stand aus."
   repair_decode_another_layer: "Eine Schicht ist entfernt. Der Text enthält noch Entities (%{entities}) -- die Quelle hat ihn mehrfach maskiert. Der nächste Lauf bietet sie als eigene Entscheidung an."

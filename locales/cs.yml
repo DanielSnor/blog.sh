@@ -1441,7 +1441,7 @@ check:
   repair_no_offer_duplicate: "Ten slug nesou dva příspěvky v různých letech, takže nepojmenovává ani jeden. Tady musí rozhodnout člověk."
   repair_no_offer_language: "Ta adresa je ve stromu jazyka, ve kterém ten příspěvek napsaný není, takže tam žádná jeho stránka nestojí — a přesměrování do té složky sestavení odmítne. Tohle chce člověka: odkaž na vlastní adresu příspěvku, nebo ho přelož."
   repair_add_redirect: "Zapsat %{origin} do redirect_from příspěvku %{slug} (%{to}) — jeden přidaný řádek, a odpoví se na všechny odkazy na starou adresu včetně těch zvenčí."
-  repair_rewrite_link: "Přepsat odkaz v příspěvku %{slug}: %{from} -> %{to}"
+  repair_rewrite_link: "Přepsat odkaz v příspěvku %{slug}: %{from} -> %{shown}"
   repair_decode_entities: "Přepsat v příspěvku %{slug} kódy entit na znaky, které zastupují (míst: %{count}, první: „%{before}“ → „%{after}“). Je to jedno rozhodnutí za celý příspěvek. Předchozí verze příspěvku zůstane v historii."
   repair_decode_changed: "Příspěvek se od kontroly změnil, takže nic nepřepisuju — pusť check --repair znovu nad tím, jak vypadá teď."
   repair_decode_another_layer: "Sundaná jedna vrstva. V textu zůstaly další entity (%{entities}) — zdroj je escapoval víckrát. Příští běh je nabídne jako samostatné rozhodnutí."

@@ -1472,7 +1472,7 @@ check:
   repair_no_offer_duplicate: "Two posts carry that slug, in different years, so it names neither of them. This one needs a person."
   repair_no_offer_language: "That address is in the tree of a language the post is not written in, so no page of it stands there -- and a redirect into that folder is one the build refuses. This one needs a person: link the post's own address, or translate the post."
   repair_add_redirect: "Write %{origin} into the redirect_from of %{slug} (%{to}) -- one added line, every link to the old address answered, including the ones from outside."
-  repair_rewrite_link: "Rewrite the link in %{slug}: %{from} -> %{to}"
+  repair_rewrite_link: "Rewrite the link in %{slug}: %{from} -> %{shown}"
   repair_decode_entities: "Replace the entity codes in %{slug} with the characters they stand for (places: %{count}, first: \"%{before}\" -> \"%{after}\"). It is one decision for the whole post. The previous version stays in its history."
   repair_decode_changed: "The post has changed since it was checked, so nothing was written -- run check --repair again over what it says now."
   repair_decode_another_layer: "One layer came off. The text still carries entities (%{entities}) -- the source escaped it more than once. The next run offers them as a decision of their own."

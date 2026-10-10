@@ -301,9 +301,10 @@ module Repair
     return nil if target.nil? || !Translations.languages(target).include?(lang)
 
     anchor = data['url'].to_s[/#.*\z/].to_s
+    to = "/#{lang}#{post_path(Translations.for_lang(target, lang))}#{anchor}"
     Proposal.new(action: :rewrite_link,
                  data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s, 'from' => data['url'].to_s,
-                         'to' => "/#{lang}#{post_path(Translations.for_lang(target, lang))}#{anchor}" })
+                         'to' => to, 'shown' => to })
   end
 
   # A relative link often carries its target in the QUERY rather than in the
@@ -336,9 +337,38 @@ module Repair
     # rewriting it to /about/ lands the reader at the top of the page with
     # nothing to say what they came for.
     anchor = data['url'].to_s[/#.*\z/].to_s
+    to = "#{post_path(target)}#{anchor}"
+    # A link in the text of another language leads to the target's page in
+    # THAT language, where it has one -- the rule a dead link into a
+    # language's tree is repaired by (propose_in_language). Rewritten to
+    # the post's own address wherever it stood, ../article/ in an English
+    # text sent the English reader to the Czech page of a post that has an
+    # English one, a paragraph away from a link that led there (second
+    # fleet, 9. 10. 2026).
+    there = Array(idx['languages']).select { |lang| Translations.languages(target).include?(lang) }
+                                   .to_h { |lang| [lang, "/#{lang}#{post_path(Translations.for_lang(target, lang))}#{anchor}"] }
     Proposal.new(action: :rewrite_link,
                  data: { 'slug' => data['slug'].to_s, 'year' => data['year'].to_s,
-                         'from' => data['url'].to_s, 'to' => "#{post_path(target)}#{anchor}" })
+                         'from' => data['url'].to_s, 'to' => to, 'in' => there,
+                         'shown' => shown_rewrite(data, to, there, idx) })
+  end
+
+  # What the offer says the link becomes: the address, and where the text
+  # of another language holds the link and gets another one, that one too.
+  def shown_rewrite(data, to, there, idx)
+    source = Array(idx['by_slug'][data['slug'].to_s])
+    source = source.find { |post| PostAddress.file_year(post).to_s == data['year'].to_s } || source.first
+    return to if source.nil? || there.empty?
+
+    holding = lambda do |blocks|
+      urls_in(blocks).include?(data['url'].to_s)
+    end
+    texts = source['translations'].is_a?(Hash) ? source['translations'] : {}
+    others = there.select { |lang, _| holding.call(texts[lang].is_a?(Hash) ? texts[lang]['content'] : nil) }
+    return to if others.empty?
+
+    said = others.map { |lang, address| "#{lang}: #{address}" }.join(', ')
+    holding.call(source['content']) ? "#{to} (#{said})" : said
   end
 
   # --- applying -------------------------------------------------------------
@@ -562,19 +592,25 @@ module Repair
 
     post = JSON.parse(File.read(path, encoding: 'utf-8'))
     touched = false
-    bodies(post).flatten(1).each do |block|
-      next unless block.is_a?(Hash)
+    # Each text with the address its language reads the target at.
+    translations = post['translations'].is_a?(Hash) ? post['translations'] : {}
+    texts = [[data['to'], post['content']]] +
+            translations.map { |lang, one| [(data['in'] || {})[lang.to_s] || data['to'], one.is_a?(Hash) ? one['content'] : nil] }
+    texts.each do |to, blocks|
+      Array(blocks).each do |block|
+        next unless block.is_a?(Hash)
 
-      if block['url'].to_s == data['from']
-        block['url'] = data['to']
-        touched = true
-      end
-      [block['formatting'], *Array(block['items']).map { |i| i.is_a?(Hash) ? i['formatting'] : nil }].each do |spans|
-        Array(spans).each do |span|
-          next unless span.is_a?(Hash) && span['url'].to_s == data['from']
-
-          span['url'] = data['to']
+        if block['url'].to_s == data['from']
+          block['url'] = to
           touched = true
+        end
+        [block['formatting'], *Array(block['items']).map { |i| i.is_a?(Hash) ? i['formatting'] : nil }].each do |spans|
+          Array(spans).each do |span|
+            next unless span.is_a?(Hash) && span['url'].to_s == data['from']
+
+            span['url'] = to
+            touched = true
+          end
         end
       end
     end
@@ -582,7 +618,7 @@ module Repair
     # rewrote every occurrence of that address: a success, not a refusal.
     # Two findings can name one address, and the second must not be reported
     # -- nor counted -- as something that failed.
-    return true if !touched && link_urls(post).include?(data['to'])
+    return true if !touched && ([data['to']] + (data['in'] || {}).values).any? { |to| link_urls(post).include?(to) }
     return false unless touched
     return false unless keep_version(path, root)
 
@@ -640,8 +676,12 @@ module Repair
   end
 
   def link_urls(post)
+    urls_in(bodies(post).flatten(1))
+  end
+
+  def urls_in(blocks)
     urls = []
-    bodies(post).flatten(1).each do |block|
+    Array(blocks).each do |block|
       next unless block.is_a?(Hash)
 
       urls << block['url'].to_s if block['type'] == 'link'
