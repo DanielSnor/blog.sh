@@ -6854,9 +6854,21 @@ def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
       # Year's midnight is not the site's. And a day the calendar does not
       # have is refused: Time.parse reads 30 February as 2 March and says
       # nothing.
+      # The calendar was asked only of a moment written YYYY-M-D; written
+      # any other way Time.parse reads -- 2027/02/30, 30.2.2027, 20270230 --
+      # the thirtieth of February went through as the second of March, and
+      # a year of five digits founded posts/12027/. So a program says the
+      # moment one way, the way the answer says it back: YYYY-MM-DD, a
+      # space or a T, HH:MM, seconds and a zone if it likes -- or the time
+      # alone, for today, as the dialog takes it.
       time = begin
-        said = at.to_s[/\A\s*(\d{4})-(\d{1,2})-(\d{1,2})(?!\d)/]
-        said.nil? || Date.valid_date?(*said.split('-').map(&:to_i)) ? Time.parse(at).getlocal : nil
+        said = at.to_s.strip
+        whole = said.match(/\A(\d{4})-(\d{1,2})-(\d{1,2})(?:[ T]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?\z/i)
+        if whole
+          Date.valid_date?(*whole.captures.map(&:to_i)) ? Time.parse(said).getlocal : nil
+        elsif said.match?(/\A\d{1,2}:\d{2}\z/)
+          Time.parse(said)
+        end
       rescue ArgumentError, TypeError
         nil
       end
