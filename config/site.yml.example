@@ -591,13 +591,14 @@ social:
 # post. A post then goes out in the languages it has, and the others show
 # it as they show any post that was never translated. Only true says it;
 # left out, or false, nothing changes. A site of one language has no use
-# for it.
+# for it. Two '#' below: switching the block on for its slots does not
+# switch this on with it.
 # publishing:
 #   slots:
 #     - "mon 09:30"
 #     - "wed 09:30"
 #     - "fri 09:30"
-#   allow_partial: true
+#   # allow_partial: true
 # --- end of publishing ---
 
 # Optional. HEIC photos (the iPhone default) display only in Safari --

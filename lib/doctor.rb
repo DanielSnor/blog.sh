@@ -1070,17 +1070,27 @@ module Doctor
   end
 
   def check_publishing(data)
+    section = dig(data, 'publishing')
+    # A section that is not a map -- a string, a list, `publishing: true`
+    # -- holds neither slots nor the key: the engine reads both as unset,
+    # and nothing said why (third fleet, 10. 10. 2026).
+    return [error(t('publishing_shape', value: section.inspect[0, 60]), t('publishing_shape_fix'))] if !section.nil? && !section.is_a?(Hash)
+
     publishing_partial(data) + publishing_slots(data)
   end
 
   # publishing.allow_partial is read as on only when it IS true. A word in
   # quotes ("true", "yes") is a string, the engine goes on asking about
-  # every post, and nothing but this line says why.
+  # every post, and nothing but this line says why. The key written with
+  # nothing after it is nil, and is said as "".
   def publishing_partial(data)
-    said = dig(data, 'publishing', 'allow_partial')
-    return [] if said.nil? || said == true || said == false
+    section = dig(data, 'publishing')
+    return [] unless section.is_a?(Hash) && section.key?('allow_partial')
 
-    [error(t('allow_partial_shape', value: said.inspect), t('allow_partial_shape_fix'))]
+    said = section['allow_partial']
+    return [] if said == true || said == false
+
+    [error(t('allow_partial_shape', value: said.nil? ? '""' : said.inspect), t('allow_partial_shape_fix'))]
   end
 
   def publishing_slots(data)
@@ -1378,7 +1388,8 @@ module Doctor
     require_relative 'pairing'
     count = begin
       Pairing.leftovers(root: root)
-    rescue SystemCallError, ArgumentError
+    rescue SystemCallError, ArgumentError, Pairing::Refused
+      # ...and a key file whose path cannot be expanded: pair says so itself.
       0
     end
     return [] if count.zero?
