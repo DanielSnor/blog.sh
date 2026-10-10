@@ -307,6 +307,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
   same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
   receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
   told `busy` and stores nothing.
+- **A note to oneself in a file was published.** A line starting with `//` is dropped by the
+  editor on save, and the cheat sheet says of any text that it disappears; in a file handed to
+  `add` -- a new post, an edit, a translation -- it was saved as a paragraph, and with
+  `publish: yes` it stood on the page. A file is read as the editor's buffer is.
 - **An edit from an app was refused for a loss it would not have caused.** The question was
   asked of the post's whole text read back, which does not see that a block left alone is saved
   as it stood: a bold range an import wrote down twice, a link of no length or an attachment the

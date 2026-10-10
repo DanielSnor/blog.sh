@@ -1443,6 +1443,14 @@ def add_from_file(source, json: false, confined: false)
   # here, where the file can still be named, rather than as an encoding
   # error thrown from somewhere inside the markdown parser.
   refuse('not_text', t('cli.add_file_not_text', file: file)) unless raw.valid_encoding?
+  # A file is read as the editor's buffer is: a line starting with // is a
+  # note to oneself and does not reach the post, and neither does a comment
+  # block. The cheat sheet every site publishes says so of any text, and
+  # the editor has always done it -- while a note left in a file handed
+  # over here was saved as a paragraph, and with `publish: yes` stood on
+  # the public page (trial of a clean installation, 9. 10. 2026). A file
+  # that holds nothing but notes is an empty one.
+  raw = strip_editor_notes(raw)
   refuse('empty', t('cli.add_file_empty', file: file)) if raw.strip.empty?
 
   # created_at == date marks an auto-suggested date, the same contract the

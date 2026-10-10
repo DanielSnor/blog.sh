@@ -565,7 +565,10 @@ photo, asks what to do with the draft. `./blog.sh add <file>` is the same
 work with the conversation removed -- it takes a markdown file with the
 usual header, writes the draft, and returns. It never asks anything, so
 it is the route for a shortcut, a script or anything else running where
-nobody is at the keyboard.
+nobody is at the keyboard. The file is read as the editor's buffer is:
+a line starting with `//` is a note to yourself and does not reach the
+post (`//--more--//` is the one that does, and a `//` inside a code
+fence is the code), and neither does a `<!-- ... -->` block.
 
 ```bash
 ./blog.sh add clanek.md
