@@ -51,18 +51,17 @@ FIRST_SECONDS = 30
 # byte is here. FIRST_SECONDS watched only for that first byte, so a
 # sender that wrote half a line and went quiet held a process for as long
 # as it cared to hold the connection.
-LINE_SECONDS = ENV.fetch('BLOGSH_LINE_SECONDS', '30').to_i
+# (Its value is read below, where a wrong one can be answered.)
 # Long enough for a full rebuild of a large archive and its upload -- and
 # a ceiling that is kept: an engine still running after this is stopped,
 # with everything it started, and the caller is told. (For as long as
 # this file has existed the number was written here and read nowhere.)
-RUN_SECONDS = ENV.fetch('BLOGSH_RUN_SECONDS', '1800').to_i
+# (Read below, likewise.)
 # A delivery's ceiling, the receiver's own plus room for the names and the
 # line breaks; the receiver measures the exact one. How long the lines may
 # take to keep coming is the receiver's BLOGSH_BODY_SECONDS too.
 MAX_MB = ENV.fetch('BLOGSH_MAX_MB', '24').to_i
 DELIVER_LIMIT = (MAX_MB.positive? ? MAX_MB : 24) * 1_048_576 * 2
-BODY_SECONDS = ENV.fetch('BLOGSH_BODY_SECONDS', '600').to_i
 
 def answer(object)
   puts JSON.generate(object)
@@ -72,6 +71,25 @@ end
 def refuse(code, message)
   answer('ok' => false, 'error' => code, 'message' => message)
 end
+
+# The three clocks, each a whole number of seconds or a refusal that says
+# which one is not -- as the receiver says of its own (bad_limit). Read
+# with to_i they were whatever to_i made of them: empty, a word or 0 were
+# no time at all, so every request and every delivery was answered
+# `timeout` after "0 seconds" and the app was shut out by a typo in the
+# key's line; `30m` was thirty seconds. Unset or empty is the default, as
+# `${VAR:-default}` reads it for the receiver.
+def whole_seconds(name, default)
+  raw = ENV[name].to_s.strip
+  return default if raw.empty?
+
+  refuse('bad_limit', "#{name} is not a whole number of seconds: #{raw[0, 40]}") unless raw.match?(/\A[1-9]\d{0,8}\z/)
+  raw.to_i
+end
+
+LINE_SECONDS = whole_seconds('BLOGSH_LINE_SECONDS', 30)
+RUN_SECONDS = whole_seconds('BLOGSH_RUN_SECONDS', 1800)
+BODY_SECONDS = whole_seconds('BLOGSH_BODY_SECONDS', 600)
 
 # The commands a program may run, each with the flags it may say. A flag
 # listed with a trailing `=` takes a value, as `--flag=value` or as the
@@ -353,4 +371,13 @@ if out.lstrip.start_with?('{')
   exit 0
 end
 reason = failure_words("#{out}\n#{err}".scrub('').gsub(/[\u0000-\u0008\u000b-\u001f\u007f]/, '').strip)
-refuse('engine_failed', "#{reason.tr("\n", ' ')} (status #{status.exitstatus})")
+# How it left: its status, or the signal that ended it -- which is what a
+# build killed for memory on a small server looks like, and used to read
+# "(status )".
+left = if status.signaled?
+         name = Signal.signame(status.termsig.to_i)
+         "ended by signal #{status.termsig}#{name ? " (#{name})" : ''}"
+       else
+         "status #{status.exitstatus}"
+       end
+refuse('engine_failed', "#{reason.tr("\n", ' ')} (#{left})".strip)

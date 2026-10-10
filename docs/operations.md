@@ -1309,7 +1309,9 @@ a connection that says none of the three words as `no_command`,
 and the engine answering in prose --
 no `env.sh`, a configuration that will not parse -- is wrapped as
 `engine_failed` with its words: the end of what it said, or, where it
-died of an exception, the line that names the error. Two clocks answer
+died of an exception, the line that names the error -- and how it left,
+its status or the signal that ended it (a build killed for memory reads
+"ended by signal 9 (KILL)"). Two clocks answer
 `timeout`: the request's one line has `BLOGSH_LINE_SECONDS` (30) to end
 once it has begun, and an engine still running after
 `BLOGSH_RUN_SECONDS` (1800) is stopped with whatever it had started.
@@ -1317,7 +1319,9 @@ A delivery through `deliver` is held to the same: the whole of it has
 the receiver's `BLOGSH_BODY_SECONDS` (600) from its first byte, however
 it trickles and wherever in a line it stops; it is measured against the
 ceiling as it comes, not line by line; and the receiver it is handed to
-has `BLOGSH_RUN_SECONDS` like any engine.
+has `BLOGSH_RUN_SECONDS` like any engine. Each of the three is a whole
+number of seconds; anything else -- a word, a zero, `30m` -- is refused
+as `bad_limit`, naming the variable, rather than read as no time at all.
 Unlike the shortcut's key this one may
 be ed25519; the forced command runs in the same environment
 `receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.
