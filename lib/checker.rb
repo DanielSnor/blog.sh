@@ -1557,7 +1557,10 @@ module Checker
                 end
         [lang, state]
       end
-      { 'slug' => post['slug'].to_s, 'title' => post['title'].to_s, 'cells' => cells }
+      # The year beside the slug: a slug is unique within a year, not
+      # across the archive, and two rows a program cannot tell apart are
+      # two posts it cannot act on.
+      { 'slug' => post['slug'].to_s, 'year' => PostAddress.file_year(post).to_s, 'title' => post['title'].to_s, 'cells' => cells }
     end
     { 'languages' => langs, 'rows' => rows }
   end
@@ -1785,6 +1788,16 @@ module Checker
         live[lang][fold_name(post_path(Translations.for_lang(post, lang)))] ||= post
       end
     end
+    # Every old address some post is owed at the root, by a list the site
+    # serves: what an entry of an unpublished language is measured against.
+    owed = Set.new
+    posts.each do |post|
+      next if draft?(post)
+
+      former_addresses(post, languages).each do |former|
+        owed << fold_name("/posts/#{former.to_s.split('/').reject(&:empty?).join('/')}/") if PostAddress.former_slug_refusal(former).nil?
+      end
+    end
     posts.each do |post|
       former_addresses_by_language(post, languages).each do |lang, former|
         next unless PostAddress.former_slug_refusal(former).nil?
@@ -1831,6 +1844,15 @@ module Checker
       # after taking a language out of site.locales looks like.
       unless draft?(post)
         former_addresses_unpublished(post, languages + [own]).each do |lang, former|
+          # ...unless something answers there all the same: the post's own
+          # list or another's holds the address too, or a live page stands
+          # at it. "Nothing answers there, a link to it is dead" was said
+          # of all three, in the same run that counted the link as sound
+          # -- and of the very state its own advice leads through, the
+          # entry written into the post's list and not yet dropped here.
+          address = fold_name("/posts/#{former.to_s.split('/').reject(&:empty?).join('/')}/")
+          next if owed.include?(address) || live[''].key?(address)
+
           findings << warn(t('former_slug_unpublished', slug: post['slug'].to_s, entry: former.to_s, lang: lang),
                            t('former_slug_unpublished_fix', lang: lang), kind: :former_slug_unpublished,
                            data: { 'slug' => post['slug'].to_s, 'entry' => former.to_s, 'lang' => lang,

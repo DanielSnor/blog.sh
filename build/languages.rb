@@ -194,11 +194,24 @@ module Languages
   # and the feed are built in every language from the same posts; a
   # listing by TYPE is the one that is not, because a type is read off the
   # blocks a language shows a post with (TYPES_BY_LANGUAGE).
+  #
+  # ...and a PAGE of that listing only as far as the listing goes there:
+  # /type/<t>/page/N/ is there when that language has at least N fixed
+  # pages of the type (TYPE_PAGES_BY_LANGUAGE).
   def listing_there?(bare, lang)
-    type = bare.to_s[%r{\A/type/([^/]+)/}, 1]
+    type, number = bare.to_s.match(%r{\A/type/([^/]+)/(?:page/(\d+)/)?})&.captures
     return true if type.nil? || !defined?(TYPES_BY_LANGUAGE)
+    return false unless TYPES_BY_LANGUAGE.fetch(lang.to_s, []).include?(type)
 
-    TYPES_BY_LANGUAGE.fetch(lang.to_s, []).include?(type)
+    number.nil? || !defined?(TYPE_PAGES_BY_LANGUAGE) || number.to_i <= TYPE_PAGES_BY_LANGUAGE.fetch(lang.to_s, {}).fetch(type, 0)
+  end
+
+  # Where a reader is sent when a page of a listing is not there in a
+  # language: to the listing's own first page when the language has the
+  # listing, which is nearer what they were reading than its front page.
+  def listing_start(bare, lang)
+    type = bare.to_s[%r{\A/type/([^/]+)/page/\d+/}, 1]
+    type && defined?(TYPES_BY_LANGUAGE) && TYPES_BY_LANGUAGE.fetch(lang.to_s, []).include?(type) ? "/type/#{type}/" : '/'
   end
 
   def lang_root_for(lang)
@@ -230,7 +243,7 @@ module Languages
       root = lang_root_for(lang)
       has = post.nil? ? listing_there?(bare, lang) : (lang == SITE_OWN_LANG || Translations.languages(post).include?(lang))
       href = if !has
-               "#{root}/"
+               post ? "#{root}/" : "#{root}#{listing_start(bare, lang)}"
              elsif post
                # 🪤 Asked of the POST, never worked out from the address being
                # read: the other language serves it under a slug of its own

@@ -2021,8 +2021,15 @@ end
 # unchanged, and the landing is decided in landing_page? instead -- page 1
 # for a series, the flexible page for a timeline -- with labels that speak
 # of parts rather than of time (pagination_html).
+# How many fixed pages a listing of `count` posts has -- the pages under
+# /page/N/. Its own method because another language's listing is asked the
+# same question without being built here (TYPE_PAGES_BY_LANGUAGE).
+def fixed_pages(count)
+  count < 2 * PAGE_SIZE ? 0 : (count / PAGE_SIZE) - 1
+end
+
 def anchored_pages(posts, oldest_first: false)
-  fixed = posts.length < 2 * PAGE_SIZE ? 0 : (posts.length / PAGE_SIZE) - 1
+  fixed = fixed_pages(posts.length)
   flexible_length = posts.length - fixed * PAGE_SIZE
   return [[[fixed + 1, posts]], fixed] if fixed.zero?
 
@@ -3021,6 +3028,17 @@ PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_typ
 TYPES_BY_LANGUAGE = SITE_LOCALES.to_h do |lang|
   [lang, lang == SITE_LANG ? PRESENT_TYPES : CONTENT_TYPES & posts.map { |post| Languages.type_in(post, lang) }.uniq]
 end.freeze
+# ...and how many PAGES each of those listings has there. Having the
+# listing was all that was asked, and /type/<t>/page/N/ was offered in the
+# other language by swapping the language on the address: one post that
+# is text here and a photo there puts the two listings a page apart, and
+# the page past the shorter one's end promised a crawler and the switcher
+# an address nobody wrote (second fleet, 9. 10. 2026 -- one page of a
+# real archive of 6 593 posts, and a different one every tenth post).
+TYPE_PAGES_BY_LANGUAGE = SITE_LOCALES.to_h do |lang|
+  kinds = posts.map { |post| lang == SITE_LANG ? dominant_content_type(post) : Languages.type_in(post, lang) }
+  [lang, kinds.tally.transform_values { |count| fixed_pages(count) }]
+end.freeze
 NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
           'video' => 'video', 'audio' => 'audio', 'link' => 'links',
@@ -3187,7 +3205,8 @@ TIMEZONE_FACT = timezone_fact
 BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
                  SITE_BASE_URL, TIMEZONE_FACT,
-                 TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG })
+                 TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG },
+                 TYPE_PAGES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG })
 
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
