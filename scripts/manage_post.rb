@@ -5470,18 +5470,27 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
     # a line the engine itself puts there -- left the page the language
     # had stood at answering nothing, with no warning and nothing for
     # `check` to find (trial of an upgrade, 9. 10. 2026). The address it
-    # WAS served at, asked the way the build asks; and never its own new
-    # one, so a text renamed back does not redirect to itself. A page has
-    # no year in its address and this list has no way to say one: there
-    # the old address is still the author's to keep (redirect_from). A
-    # text that had no page yet -- a title and nothing under it -- had no
-    # address either: for_lang answers with the post itself for it, which
-    # carries none.
+    # WAS served at, asked the way the build asks. A page has no year in
+    # its address and this list has no way to say one: there the old
+    # address is still the author's to keep (redirect_from). A text that
+    # had no page yet -- a title and nothing under it -- had no address
+    # either: for_lang answers with the post itself for it, which carries
+    # none.
+    #
+    # 🪤 Nothing is ever taken OUT here, the address the text stands at
+    # now included. This used to drop it, "so a text renamed back does not
+    # redirect to itself" -- but the list is served in two places, the
+    # language's tree and the root of the site, and at the root the text's
+    # own address is an old one like any other: it is where the text stood
+    # as a post of its own before it was merged into this one. All 68
+    # merged posts of sean.cz carry exactly that entry, and the first save
+    # of such a text, changed or not, deleted its redirect -- no warning,
+    # nothing for `check` to find (third fleet, 10. 10. 2026). In its own
+    # tree the build has the page there and writes no redirect over it.
     if !draft?(post) && !PostAddress.page?(post)
       year = PostAddress.date_year(post)
       was = Translations.for_lang(post, lang)['address_slug'].to_s
       owed |= ["#{year}/#{was}"] unless was.empty? || was == address
-      owed -= ["#{year}/#{address}"]
     end
     # The entry is written anew on every save -- and the old addresses this
     # language's text is owed redirects at are not something a save may
