@@ -164,6 +164,7 @@ site:
 ```yaml
 # config/site.sk.yml -- what "this site in Slovak" means
 ui_language: cs
+language_name: "Slovenčina"
 ```
 
 The Slovak branch is then built and is Slovak in every way a reader or a
@@ -172,6 +173,14 @@ crawler can see -- `/sk/` addresses, `<html lang="sk">`, its own
 search box) is Czech. Borrowing a near language beats publishing an
 English-speaking Slovak site, and unlike the silent inheritance it is a
 decision somebody made.
+
+`language_name` is the one word a borrowed interface cannot lend: what
+the language is called in itself, which is what the language switcher
+says of the language a click leads to. The engine has it for every
+language it speaks; for one it does not, the switch would say only the
+code -- "SK" beside "English" and "Deutsch" -- and `./blog.sh check` says
+so while the line is missing. (A language the engine does speak may be
+named here too; the site's word wins.)
 
 The other two ways out are to write `locales/sk.yml` -- the engine takes
 translations, see the top of this page -- or to stop publishing the
@@ -212,8 +221,9 @@ Start one from `config/site.lang.yml.example`: copy it to
 comments. Like site.yml, these files are the site's own, not the engine's,
 and git ignores them.
 
-Two kinds of thing go in one. What the language DOES -- `fallback` and
-`ui_language`, both below -- and what the site SAYS about itself in that
+Two kinds of thing go in one. What the language DOES -- `fallback`,
+`ui_language` and `language_name`, the first two below and the third
+above -- and what the site SAYS about itself in that
 language: the same keys `config/site.yml` has for its words, only in
 other words. The build of that language lays them over site.yml; whatever
 the file leaves out stands as site.yml has it.
@@ -391,9 +401,13 @@ title. A click anywhere on the chip moves to the next language and wraps
 around at the end -- one target, like the button, rather than a row of
 small ones to aim at.
 
-The switcher offers every language the site publishes. A language with
-nothing of the current post in it leads to that language's front page
-rather than to a page that is not there. What the `hreflang` alternates
+The switcher shows every language the site publishes, and a click leads
+to the next one the page is IN: a language with nothing of the current
+post in it is passed over (its code stays on the chip, marked
+`is-elsewhere`), so the texts a post does have reach each other however
+many languages stand between them. Only when no other language has the
+post does the click lead on, to the next language's front page rather
+than to a page that is not there. What the `hreflang` alternates
 name is narrower and on purpose: only addresses that exist. A site that
 promises a crawler an address it never wrote sends readers from a search
 result to its own 404.

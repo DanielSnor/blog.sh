@@ -473,6 +473,16 @@ goes in is still being decided; the suffix and the date both come off at the tag
   the line by the terminal, which can take back only what it took in itself -- `y` for `z` and
   Backspace did nothing. The whole line is read a key at a time; with its last letter taken
   back, the menu is there again.
+- **On a site of three languages the switch could not get from one text of a post to the
+  other.** A click led to the next language in the row whatever it had: from the page of a post
+  with no German text to the German front page, and on from there to the next front page. It
+  leads to the next language the page is in; one that has nothing of it is passed over, and
+  only when no other language has the page does the click go on to a front page. On a site of
+  two languages nothing changes.
+- **A language with a borrowed interface could not say what it is called.** The switch that led
+  to it was titled with its code -- "SK" beside "English" and "Deutsch" -- and the screens of
+  `./blog.sh` called it `sk`. `language_name:` at the top of `config/site.<lang>.yml` says it,
+  and `check` says so while the line is missing.
 - **A moved installation lost its teasers.** An export writes `//--more--//` as `<!--more-->`,
   the line Jekyll and Hugo end an excerpt at, and the import did not read it back: the post came
   home with a paragraph saying `<!--more-->` and a card showing the whole text. Read as the end

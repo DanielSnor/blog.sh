@@ -2041,7 +2041,12 @@ What it looks for, each with a line saying what to do about it:
   whose menu or footer links go to other places than site.yml's: a
   translation changes the words, not where they lead. A word for a tag no
   published post carries is worth a look rather than an error: it shows
-  nowhere, and nothing is broken.
+  nowhere, and nothing is broken. Worth a look in the same way: a name
+  for a series nobody writes, a menu item or a footer link with no word
+  of its own (shown under the site's), a title given as nothing (the
+  site's own stands), a `fallback` naming a language the site does not
+  publish, and a language with a borrowed interface that does not say
+  what it is called (`language_name`).
 
 - **A language named in `site.locales` that the engine has no locale file
   for.** A typo there is not a typo in one language: the build stops on it

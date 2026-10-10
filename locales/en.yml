@@ -1507,6 +1507,8 @@ check:
   language_item_wordless_fix: "Write the word -- label: in the menu, title: in the footer's links -- so the item reads in that language."
   language_fallback_idle: "%{file}: fallback names %{langs}, which stands in for nothing -- a language this site does not publish, or the language itself."
   language_fallback_idle_fix: "A fallback is another language this site publishes (%{known}). Correct the entry or take it out; nothing is wrong on the site meanwhile, the line simply does nothing."
+  language_name_missing: "%{file}: the language borrows its interface and has no name for itself, so the language switch calls it %{code}."
+  language_name_missing_fix: "Say what the language is called in itself -- language_name: Slovenčina, at the top of that file beside ui_language."
   language_series_unused: "%{file} gives a name to the series %{series}, which no published post is in -- nothing shows it."
   language_series_unused_fix: "Usually a key that is not the series' name letter for letter. Correct it, or take the line out."
   language_key_moved: "`site.%{key}` in config/site.yml: a language's own settings moved to its own file in 1.9, and the build refuses the old place -- no language of this site will build."

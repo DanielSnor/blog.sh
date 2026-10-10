@@ -309,12 +309,19 @@ module Languages
   # A language's name in its own language, which is the only name a reader
   # looking for it can recognise: somebody who reads German is looking for
   # "Deutsch", not for "nemecky".
+  #
+  # The site's own word for it first (`language_name` in that language's
+  # file): the only word there is for a language whose interface is
+  # borrowed, and the site's to choose for any other.
   LANGUAGE_NAMES = Hash.new do |cache, code|
     # Only for a language that has a file: `I18n.load_locale` aborts on one
     # that has none, and an abort is a SystemExit that no `rescue` here
     # would catch. SITE_LOCALES refuses those long before this runs.
     cache[code] = begin
-      I18n.locale_file?(code) ? I18n.load_locale(code.to_s)['language_name'].to_s : ''
+      said = LanguageFile.own_name(SiteConfig.language_data(code.to_s))
+      if !said.empty? then said
+      else I18n.locale_file?(code) ? I18n.load_locale(code.to_s)['language_name'].to_s : ''
+      end
     rescue StandardError
       ''
     end
@@ -343,7 +350,17 @@ module Languages
     return '' if links.length < 2
 
     here = links.index { |link| link['lang'] == SITE_LANG } || 0
-    nxt = links[(here + 1) % links.length]
+    # The next language this page is IN. The next one in the row, whatever
+    # it had, was a dead end on a site of three: from the English page of
+    # a post with no German text the click led to the German front page
+    # and from there to the Czech one -- the post's own original, one
+    # language away, could not be reached by the control that exists to
+    # reach it. A language the page is not in is passed over (its code
+    # stays on the face, marked `is-elsewhere`); only when no other
+    # language has the page does the click lead on to the next one's
+    # front page, as it does on a site of two.
+    row = (1...links.length).map { |step| links[(here + step) % links.length] }
+    nxt = row.find { |link| link['has'] } || row.first
     items = links.map do |link|
       classes = ['lang-switch__item']
       classes << 'is-current' if link['lang'] == SITE_LANG

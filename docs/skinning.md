@@ -350,8 +350,10 @@ row is wider than the button alone, and a menu that ran up to the button
 will run under the chip.
 
 The chip is ONE link, not a link per language: a click anywhere on it
-moves to the next language the site publishes and wraps around at the
-end, the way the button beside it cycles light → dark → system. The codes
+moves to the next language the page is in and wraps around at the
+end, the way the button beside it cycles light → dark → system (a
+language that has nothing of the page is passed over, and carries
+`.is-elsewhere`). The codes
 inside it are spans, so style `.lang-switch__item` for how a language
 looks and `a.lang-switch` for how the control behaves.
 

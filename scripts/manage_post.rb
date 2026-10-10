@@ -5094,7 +5094,13 @@ end
 # A language's name in its own language, which is the only name somebody
 # looking for it recognises -- and the code itself when the engine has no
 # file for it, rather than a blank where a name should be.
+#
+# The site's own word for it first, as the build reads it (`language_name`
+# in config/site.<code>.yml): a language with a borrowed interface has no
+# other, and was "sk" in every picker.
 def language_name(code)
+  said = SiteConfig.language_data(code.to_s)['language_name']
+  return said.strip if said.is_a?(String) && !said.strip.empty?
   return code.to_s unless I18n.locale_file?(code.to_s)
 
   name = I18n.load_locale(code.to_s)['language_name'].to_s

@@ -20,7 +20,7 @@
 # says the same thing about an archive without building it. One answer for
 # both, so neither can pass what the other refuses.
 module LanguageFile
-  SETTINGS = %w[fallback ui_language].freeze
+  SETTINGS = %w[fallback ui_language language_name].freeze
 
   # The chrome a language may translate: each section of site.yml and the
   # keys under it that are WORDS. Everything else in those sections -- the
@@ -141,6 +141,17 @@ end
   #                with nothing on it
   #   :mismatch -- a list with places in it that names other places than
   #                the site's own does, or the same ones in another order
+  # What a language calls itself, as its own file says it: the name a
+  # reader looking for it recognises ("Slovenčina"). The engine has one
+  # for every language it speaks (`language_name` in locales/<code>.yml);
+  # a language that borrows its interface from another has no such file,
+  # and without this line the switch that leads to it said "SK". '' when
+  # the file says none -- or says something that is not a word.
+  def own_name(lang_data)
+    name = lang_data.is_a?(Hash) ? lang_data['language_name'] : nil
+    name.is_a?(String) ? name.strip : ''
+  end
+
   # The word an entry of a placed list is shown by.
   WORD_OF = { %w[nav] => 'label', %w[footer links] => 'title' }.freeze
 

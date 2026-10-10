@@ -1533,6 +1533,13 @@ module Checker
              kind: :language_item_wordless, data: { 'file' => name, 'key' => key, 'items' => places })
       end
     end
+    # A language the engine has no words for borrows them (`ui_language`),
+    # and the one word nobody can lend it is its own name: without
+    # `language_name` the switch that leads to it says its code.
+    if !I18n.locale_file?(code) && LanguageFile.own_name(data).empty?
+      found << warn(t('language_name_missing', file: name, code: code.to_s.upcase), t('language_name_missing_fix'),
+                    kind: :language_name_missing, data: { 'file' => name, 'lang' => code })
+    end
     named = Array(data.is_a?(Hash) ? data['fallback'] : nil).map { |lang| lang.to_s.strip }.reject(&:empty?)
     idle = named.reject { |lang| published.include?(lang) && lang != code }
     unless idle.empty?

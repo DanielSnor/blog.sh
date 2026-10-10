@@ -1476,6 +1476,8 @@ check:
   language_item_wordless_fix: "Napiš to slovo — label: v menu, title: u odkazů patičky — ať se položka v tom jazyce dá číst."
   language_fallback_idle: "%{file}: fallback jmenuje %{langs}, což nezastoupí nic — jazyk, který tenhle web nepublikuje, nebo ten jazyk sám."
   language_fallback_idle_fix: "Fallback je jiný jazyk, který tenhle web publikuje (%{known}). Záznam oprav, nebo vyndej; na webu mezitím nic špatně není, řádek jen nic nedělá."
+  language_name_missing: "%{file}: jazyk si půjčuje rozhraní a nemá pro sebe jméno, takže ho přepínač jazyků nazývá %{code}."
+  language_name_missing_fix: "Napiš, jak se jazyk jmenuje sám v sobě — language_name: Slovenčina, nahoře v tom souboru vedle ui_language."
   language_series_unused: "%{file} dává jméno sérii %{series}, ve které není žádný publikovaný příspěvek — nic ho neukáže."
   language_series_unused_fix: "Obvykle klíč, který se s názvem série neshoduje do písmene. Oprav ho, nebo řádek vyndej."
   language_key_moved: "`site.%{key}` v config/site.yml: nastavení jazyka se v 1.9 přestěhovalo do jeho vlastního souboru a staré místo sestavení odmítá — nesestaví se žádný jazyk tohoto webu."

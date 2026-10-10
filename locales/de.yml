@@ -1491,6 +1491,8 @@ check:
   language_item_wordless_fix: "Schreib das Wort -- label: im Menü, title: bei den Links der Fußzeile --, damit der Eintrag in dieser Sprache lesbar ist."
   language_fallback_idle: "%{file}: fallback nennt %{langs}, was für nichts einspringt -- eine Sprache, die diese Website nicht veröffentlicht, oder die Sprache selbst."
   language_fallback_idle_fix: "Ein Fallback ist eine andere Sprache, die diese Website veröffentlicht (%{known}). Korrigiere den Eintrag oder nimm ihn heraus; auf der Website ist derweil nichts falsch, die Zeile tut nur nichts."
+  language_name_missing: "%{file}: Die Sprache leiht sich ihre Oberfläche und hat keinen Namen für sich, also nennt der Sprachumschalter sie %{code}."
+  language_name_missing_fix: "Sag, wie die Sprache in sich selbst heißt -- language_name: Slovenčina, oben in dieser Datei neben ui_language."
   language_series_unused: "%{file} gibt der Serie %{series} einen Namen, in der kein veröffentlichter Beitrag ist -- nichts zeigt ihn."
   language_series_unused_fix: "Meist ein Schlüssel, der nicht buchstabengenau der Name der Serie ist. Korrigiere ihn oder nimm die Zeile heraus."
   language_key_moved: "`site.%{key}` in config/site.yml: die Einstellungen einer Sprache sind mit 1.9 in ihre eigene Datei gezogen, und der Build lehnt den alten Ort ab -- keine Sprache dieser Website wird gebaut."

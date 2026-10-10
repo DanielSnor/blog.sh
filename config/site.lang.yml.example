@@ -30,7 +30,7 @@
 #
 # The keys it takes, and nothing else:
 #
-#   fallback, ui_language
+#   fallback, ui_language, language_name
 #   site        title, short_name, description
 #   banner      claim, alt
 #   about       heading, html
@@ -58,6 +58,14 @@
 # branch would say `ui_language: cs`.
 # ui_language: cs
 # --- end of ui_language ---
+
+# What the language is called in itself -- the name its reader looks for,
+# and the one word a borrowed interface cannot lend. The engine knows it
+# for every language it speaks, so German needs no line here; without one
+# the Slovak branch above would be "SK" in the title of the switch that
+# leads to it.
+# language_name: "Slovenčina"
+# --- end of language_name ---
 
 site:
   title: "Dein Name - persönliches Web/Log"
