@@ -359,7 +359,14 @@ fi
 # answered ok. A folder, because making one either happens or does not on
 # every system this runs on (a Mac has no flock(1)); it holds the number
 # of the process whose turn it is. A turn whose process is gone is over,
-# and so is one that never got as far as writing its number down.
+# and so is one that never got as far as writing its number down -- and
+# one older than any delivery lasts, whoever carries its number now: in a
+# container the numbers come round again within the hour, and a turn
+# left by a killed receiver then answered busy for as long as some other
+# process happened to live. Clearing a turn that is over is itself done
+# by one waiter at a time ($HELD.over), who looks again before it clears:
+# of several arriving together each used to judge the dead turn and then
+# delete whatever stood there -- which by then was another's fresh one.
 case "$TURN_SECONDS" in
   ''|*[!0-9]*) unavailable "bad_limit" "BLOGSH_TURN_SECONDS is not a whole number of seconds: $TURN_SECONDS" ;;
 esac
@@ -368,11 +375,15 @@ WAITED=0
 until mkdir "$HELD" 2>/dev/null; do
   [ -w "$INSTALL/incoming" ] || fail "write_failed" "Could not write into $INSTALL/incoming/."
   WHO=$(cat "$HELD/pid" 2>/dev/null || true)
-  if [ -n "$WHO" ]; then
-    kill -0 "$WHO" 2>/dev/null || { rm -rf "$HELD"; continue; }
-  elif [ -n "$(find "$HELD" -maxdepth 0 -mmin +1 2>/dev/null)" ]; then
-    rm -rf "$HELD"
-    continue
+  OLD=1
+  [ -z "$WHO" ] || OLD=60
+  if { [ -n "$WHO" ] && ! kill -0 "$WHO" 2>/dev/null; } || [ -n "$(find "$HELD" -maxdepth 0 -mmin +"$OLD" 2>/dev/null)" ]; then
+    if mkdir "$HELD.over" 2>/dev/null; then
+      [ "$(cat "$HELD/pid" 2>/dev/null || true)" != "$WHO" ] || rm -rf "$HELD"
+      rmdir "$HELD.over"
+      continue
+    fi
+    [ -z "$(find "$HELD.over" -maxdepth 0 -mmin +1 2>/dev/null)" ] || rmdir "$HELD.over" 2>/dev/null || true
   fi
   [ "$WAITED" -lt "$TURN_SECONDS" ] \
     || fail "busy" "Another delivery is still being taken in, so nothing of this one was stored. Send it again."

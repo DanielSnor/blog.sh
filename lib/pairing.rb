@@ -205,8 +205,13 @@ module Pairing
     line.start_with?('restrict,') && line.include?(" #{marker}") && line.include?(script_token(root, script))
   end
 
+  # Without the carriage return a file saved with CRLF leaves on the end
+  # of every line, ours included: read_lines keeps it, because a line is
+  # given back as it was found, and read as part of the name it made a
+  # device called "Telefon\r" that --revoke could not find by its name,
+  # and a waiting code no app's answer matched.
   def comment_of(line, marker)
-    line[/ #{Regexp.escape(marker)}(.*)\z/, 1].to_s
+    line[/ #{Regexp.escape(marker)}(.*?)\r?\z/, 1].to_s
   end
 
   # A name for a device, as it will stand at the end of a line of
@@ -554,11 +559,21 @@ module Pairing
       # knows what to do with: it runs the first line that has it and
       # never looks at a second. Written again here, both blogs said "ok"
       # and one of them was never reached.
+      # Asked of the line as sshd reads it. A line that is a comment holds
+      # no key -- one commented out by hand refused the same app for ever
+      # -- and a foreign line is whatever bytes its owner wrote: one old
+      # comment in Latin-2 raised here on the pattern, and pairing failed
+      # for the whole account.
       elsewhere = lines.each_index.any? do |i|
-        i != at && !taken.include?(i) && lines[i].match?(/(\A|\s)#{Regexp.escape(public_key)}(\s|\z)/)
+        next false if i == at || taken.include?(i)
+
+        line = lines[i].scrub('?')
+        !line.lstrip.start_with?('#') && line.match?(/(\A|\s)#{Regexp.escape(public_key)}(\s|\z)/)
       end
       raise Refused, :key_in_use if elsewhere
-      lines[at] = device_line(root, public_key, device)
+      # In the file's own line ending: a line that stood with a carriage
+      # return is replaced by one that has it too.
+      lines[at] = device_line(root, public_key, device) + (lines[at].end_with?("\r") ? "\r" : '')
       taken.reverse_each { |i| lines.delete_at(i) }
       write_lines(lines)
       AtomicWrite.write_json(record_path(root, id), known.merge('state' => 'paired', 'device' => device,
