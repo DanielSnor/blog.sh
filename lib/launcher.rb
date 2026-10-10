@@ -14,7 +14,7 @@ require 'tmpdir'
 # ./blog.sh there -- nothing more; it has no window of its own and knows
 # nothing blog.sh does not.
 #
-# macOS only, and built from what macOS ships: osacompile turns four lines
+# macOS only, and built from what macOS ships: osacompile turns a few lines
 # of AppleScript into an application, sips and iconutil make its icon out
 # of the site's favicon, codesign seals it again afterwards. Nothing is
 # installed and nothing is downloaded.
@@ -27,12 +27,15 @@ require 'tmpdir'
 # first double-click asks whether this application may control Terminal
 # (once; refused, the launcher does nothing until it is allowed in System
 # Settings), and Terminal keeps the window open after blog.sh ends unless
-# its own profile says to close it. The wizard says both.
+# its own profile says to close it. The wizard says both. What the
+# question says under its headline IS arranged from here: one sentence
+# about what the launcher does, in the language of the site.
 module Launcher
   module_function
 
   COMPILER = '/usr/bin/osacompile'
   SIGNER = '/usr/bin/codesign'
+  PLIST_EDITOR = '/usr/bin/plutil'
   # What iconutil wants in an iconset: each size and its double.
   ICON_SIZES = [16, 32, 128, 256, 512].freeze
   # A file inside the bundle naming the site it opens. It is how a launcher
@@ -101,17 +104,58 @@ module Launcher
     nil
   end
 
-  # The four lines. The folder is an AppleScript string, escaped as one;
+  # The script. The folder is an AppleScript string, escaped as one;
   # `quoted form of` is AppleScript's own shell quoting, so a folder with a
   # space, a quote or an apostrophe in its name reaches `cd` as one word.
   # `; exit` ends the shell when blog.sh does, whichever way it ended.
+  #
+  # A Terminal that was not running opens a window of its own as it
+  # starts, and `do script` opens another: the author this is for, who has
+  # no Terminal open, got two windows at every double-click -- an empty
+  # one and the blog. So whether Terminal runs is asked BEFORE it is
+  # brought to the front, and one that had to start is given a moment to
+  # put up its window, which is then the one blog.sh runs in. Only when
+  # there is exactly one: a Terminal that brings back several windows, or
+  # opens a window group, keeps them to itself and gets a new one, as a
+  # Terminal that was already running always does.
+  #
+  # The lines are written the way osadecompile gives them back, so that a
+  # launcher read back can be compared with them.
   def script_lines(root)
     literal = %("#{File.expand_path(root).gsub('\\') { '\\\\' }.gsub('"') { '\\"' }}")
     ["set blogDir to #{literal}",
+     'set runIt to "cd " & quoted form of blogDir & " && ./blog.sh; exit"',
+     'set wasOpen to application "Terminal" is running',
+     'tell application "Terminal" to activate',
+     'set opened to 0',
+     'if not wasOpen then',
+     'repeat 50 times',
+     'tell application "Terminal" to set opened to count of windows',
+     'if opened > 0 then exit repeat',
+     'delay 0.1',
+     'end repeat',
+     'end if',
      'tell application "Terminal"',
-     'activate',
-     'do script "cd " & quoted form of blogDir & " && ./blog.sh; exit"',
+     'if opened is 1 then',
+     'do script runIt in window 1',
+     'else',
+     'do script runIt',
+     'end if',
      'end tell']
+  end
+
+  # The sentence macOS shows under "... wants to control Terminal" on the
+  # first double-click. osacompile writes one of its own, in English and
+  # about nothing in particular ("This script needs to control other
+  # applications to run.") -- at the one moment the author is asked to
+  # trust the thing. Failing, it leaves that sentence, and a launcher
+  # that works.
+  def explain(bundle, reason)
+    plist = File.join(bundle, 'Contents', 'Info.plist')
+    _, status = Open3.capture2e(PLIST_EDITOR, '-replace', 'NSAppleEventsUsageDescription', '-string', reason.to_s, plist)
+    status.success?
+  rescue SystemCallError
+    false
   end
 
   # Makes the launcher, or makes it again. Answers [path, nil] when it
@@ -129,7 +173,7 @@ module Launcher
   # Built in a scratch folder and moved into place whole, so a failure
   # half way leaves either the launcher that was there or none, never a
   # bundle that opens and does nothing.
-  def create(root:, site_name:, icon: nil, dir: directory)
+  def create(root:, site_name:, icon: nil, dir: directory, reason: nil)
     return [nil, :unsupported] unless supported?
 
     bundle = path(site_name, dir: dir)
@@ -151,9 +195,14 @@ module Launcher
 
       File.write(File.join(staged, 'Contents', 'Resources', MARK), "#{File.expand_path(root)}\n", encoding: 'utf-8')
       dress(staged, icon, scratch) if icon && File.file?(icon)
+      explain(staged, reason) unless reason.to_s.strip.empty?
       # Writing into the bundle broke the seal osacompile put on it. An
-      # application with a broken seal still opens, but the permission to
-      # control Terminal is remembered against the seal -- so it is put back.
+      # application with a broken seal still opens, but the seal is what
+      # macOS looks at when it decides what a program may do -- so it is
+      # put back. (The permission to control Terminal itself is kept by
+      # WHERE the launcher is, since a launcher has no bundle identifier:
+      # one made again in the same place was not asked about again, seen
+      # on macOS 27.)
       Open3.capture2e(SIGNER, '--force', '--sign', '-', staged) if File.executable?(SIGNER)
       FileUtils.rm_rf(bundle)
       FileUtils.mv(staged, bundle)

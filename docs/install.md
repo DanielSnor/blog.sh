@@ -129,13 +129,16 @@ name, and the old one stays where it was until it is dragged to the Trash.
 
 Three things to know about it, all of them macOS's:
 
-- The first double-click asks whether the launcher may control Terminal.
-  Allow it. Refused, the icon does nothing, and the question is not asked
-  again -- the switch is then in System Settings → Privacy & Security →
-  Automation.
-- Terminal keeps the window open after blog.sh ends, saying the process
-  completed. Whether it closes instead is Terminal's own setting:
-  Settings → Profiles → Shell → "When the shell exits".
+- The first double-click asks whether the launcher may control Terminal,
+  and under the question stands one sentence, in the site's language,
+  saying what the launcher does. Allow it. Refused, the icon does nothing,
+  and the question is not asked again -- the switch is then in System
+  Settings → Privacy & Security → Automation.
+- blog.sh runs in the window Terminal opens as it starts, or in a new one
+  when Terminal was already running. Either way Terminal keeps the window
+  open after blog.sh ends, saying the process completed. Whether it closes
+  instead is Terminal's own setting: Settings → Profiles → Shell → "When
+  the shell exits".
 - It lands in `/Applications`, or in `~/Applications` for an account that
   may not write there. An application of the same name that blog.sh did
   not make is never replaced, and neither is the launcher of ANOTHER site

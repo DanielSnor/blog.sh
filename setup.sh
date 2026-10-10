@@ -97,7 +97,17 @@ fi
 # an AND-list it is what `set -e` sees, so the whole tool died before
 # printing a word. A screen that cannot be cleared is not a reason to
 # refuse to run.
-{ [ -t 1 ] && clear 2>/dev/null; } || true
+#
+# `./setup.sh --launcher` is not a screen: it asks nothing and says two
+# lines, and what stood in the terminal before it is the person's. It
+# wiped that all the same.
+launcher_only=no
+for word in "$@"; do
+  if [ "$word" = "--launcher" ]; then launcher_only=yes; fi
+done
+if [ "$launcher_only" = no ]; then
+  { [ -t 1 ] && clear 2>/dev/null; } || true
+fi
 
 # env.sh is read when it exists and is NOT required when it doesn't --
 # the opposite of blog.sh's guard, and the whole point: this is the

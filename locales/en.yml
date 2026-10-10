@@ -1813,6 +1813,7 @@ setup:
   q_launcher: "Put an icon in Applications that opens this blog with a double-click?"
   launcher_made: "✅ The launcher is ready: %{path}"
   launcher_first_run: "   On the first double-click macOS asks whether it may control Terminal — allow it, or the icon does nothing. Terminal keeps its window open afterwards; closing it after a clean exit is a setting in Terminal (Settings → Profiles → Shell). ./setup.sh --launcher makes it again."
+  launcher_permission: "The launcher opens Terminal in your blog's folder and runs ./blog.sh there. It does nothing else."
   launcher_failed: "⚠️  The launcher could not be made: %{error}"
   launcher_taken: "⚠️  %{path} is an application blog.sh did not make. Leaving it alone."
   launcher_other_site: "⚠️  %{path} is the launcher of another site of the same name (%{folder}). Leaving it alone -- give one of the two a different site.short_name, or drag the old launcher to the Trash, and try again."

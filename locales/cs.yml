@@ -1782,6 +1782,7 @@ setup:
   q_launcher: "Vytvořit v Aplikacích ikonu, která tenhle blog otevře poklepáním?"
   launcher_made: "✅ Spouštěč je hotový: %{path}"
   launcher_first_run: "   Při prvním poklepání se macOS zeptá, jestli smí ovládat Terminál — povol to, jinak ikona nic neudělá. Okno Terminálu po skončení zůstane otevřené; zavírat ho po čistém ukončení se nastavuje v Terminálu (Nastavení → Profily → Shell). Znovu ho vytvoří ./setup.sh --launcher."
+  launcher_permission: "Spouštěč otevře Terminál ve složce tvého blogu a spustí v něm ./blog.sh. Nic jiného nedělá."
   launcher_failed: "⚠️  Spouštěč se nepodařilo vytvořit: %{error}"
   launcher_taken: "⚠️  V %{path} už je aplikace, kterou blog.sh nevytvořil. Nechávám ji být."
   launcher_other_site: "⚠️  %{path} je spouštěč jiného webu, který se jmenuje stejně (%{folder}). Nechávám ho být — dej jednomu z těch dvou jiné site.short_name, nebo ten starý spouštěč vyhoď do Koše a zkus to znovu."

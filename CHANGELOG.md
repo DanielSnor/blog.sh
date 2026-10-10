@@ -139,8 +139,9 @@ goes in is still being decided; the suffix and the date both come off at the tag
   macOS ships (`osacompile`, `sips`, `iconutil`, `codesign`); nothing is installed. The answer to
   Enter is no, an application of the same name that blog.sh did not make is never replaced, and
   `./setup.sh --launcher` makes it later or makes it again for a site that moved. macOS asks once
-  whether it may control Terminal, and Terminal keeps its window open afterwards; the wizard says
-  both. Elsewhere the question is not asked.
+  whether it may control Terminal -- over a sentence in the site's language saying what the
+  launcher does -- and Terminal keeps its window open afterwards; the wizard says both. Elsewhere
+  the question is not asked.
 - **`/series/`: the index of series.** A line for every series that has a page -- its name, how
   many parts, the years they span -- with the one still being written first. A series could be
   reached only from a post that belongs to it, and `/series/` answered 404 with every address under
@@ -362,6 +363,14 @@ goes in is still being decided; the suffix and the date both come off at the tag
   the address alive: the build refuses it aloud and `check` names it.
 - **A launcher on a Mac was replaced by another site's.** Two sites called the same -- any two
   nobody has named yet -- wrote one icon, opening whichever was made last. The second is told so.
+- **A launcher on a Mac opened two windows.** A Terminal that is not running opens a window of its
+  own as it starts, and the launcher opened a second one beside it: an empty window and the blog,
+  at every double-click, for the author who has no Terminal open -- which is who the launcher is
+  for. blog.sh now runs in the window Terminal opened; a Terminal that was already running gets a
+  new one, as before. The question macOS asks on the first double-click came with a sentence in
+  English about nothing in particular; it now says what the launcher does, in the site's
+  language. And `./setup.sh --launcher`, which asks nothing and says two lines, wiped the terminal
+  before saying them.
 - **Pairing, on more machines and with fewer surprises.** A window too small for the code is asked
   to grow before `pair` gives up on drawing it. The line written for sshd begins `env PATH=...`,
   which a csh or tcsh login shell runs too. A key that already stands on another line of the

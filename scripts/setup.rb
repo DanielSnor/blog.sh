@@ -779,7 +779,7 @@ def launcher_icon
 end
 
 def make_launcher
-  bundle, problem = Launcher.create(root: ROOT, site_name: launcher_name, icon: launcher_icon)
+  bundle, problem = Launcher.create(root: ROOT, site_name: launcher_name, icon: launcher_icon, reason: t('launcher_permission'))
   case problem
   when nil
     puts Tui.paint(t('launcher_made', path: bundle), :green)
