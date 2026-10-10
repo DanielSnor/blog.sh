@@ -131,11 +131,16 @@ already carries, so each can be read as well as changed:
   an edit changes what was edited and nothing else. A block the text did
   change is made again from the text, and what the text could not say
   about it goes with the change -- the kind an import gave a paragraph,
-  the address a video was first at; the page shows it as it did. The one thing refused as a loss
-  (`content_lost`) is what the author never saw going -- something the
-  post holds that markdown has no words for, a link card or a mention
-  from an import; such a post is marked `editable: false` when its text
-  is handed out, and editing it is for the desk, where `edit` asks. This
+  the address a video was first at; the page shows it as it did. What is refused as a loss
+  (`content_lost`) is what the author never saw going, and it is one of
+  two things. A block the text has no line for at all -- a second link
+  card, a player from somewhere the engine does not know -- is lost by any
+  save of that text: such a post is marked `editable: false` when its
+  text is handed out, and editing it is for the desk, where `edit` asks.
+  And a block the edit rewrote may have held more than its words -- a
+  mention an import made of `@somebody`, small print: that edit is
+  refused too, naming the thing, while the same post edited anywhere
+  else is saved, with that block as it stood. This
   is how an app saves a post it opened (see
   [Writing from a phone](#editing-a-draft-from-the-phone)), and a way for
   a script to edit without the `$EDITOR` trick.

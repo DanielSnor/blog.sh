@@ -619,6 +619,7 @@ cli:
 
   no_changes: "No changes, nothing to save."
   content_loss_warning: "Careful, saving this would lose: %{summary}."
+  content_lost_from_file: "This text cannot say everything the post holds, and saving it would lose: %{summary}. Nothing was written. Such a post is edited at the desk, in the terminal, where the engine can ask before it lets that go."
   content_loss_item: "%{count}× %{kind}"
   # What the guard above names, as an author knows it. A type missing here
   # is named by its schema word rather than refused.

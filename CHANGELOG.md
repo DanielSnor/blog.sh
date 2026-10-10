@@ -307,6 +307,14 @@ goes in is still being decided; the suffix and the date both come off at the tag
   same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
   receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
   told `busy` and stores nothing.
+- **An edit from an app was refused for a loss it would not have caused.** The question was
+  asked of the post's whole text read back, which does not see that a block left alone is saved
+  as it stood: a bold range an import wrote down twice, a link of no length or an attachment the
+  text reads as a paragraph made a post uneditable -- five of the eleven posts a real archive
+  refused. What a save would really lose is asked now: a block the text has no line for at all
+  (such a post stays `editable: false`), or what a block the edit rewrote held beyond its words,
+  like a mention from an import. The refusal says nothing was written and where such a post is
+  edited.
 - **Two commands of a program writing one post at once.** Each read the post, asked its
   questions and wrote the file back whole: a `props --set` sent together with a `publish`, an
   `unpublish`, a rename or a `delete` saw both answer ok and one change gone, and a deleted post

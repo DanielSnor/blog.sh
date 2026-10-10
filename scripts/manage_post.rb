@@ -5372,10 +5372,13 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
     # author never saw going -- a link card, a player with no address to
     # write, which the text this was edited from did not show.
     lost = blocks_lost(entry['content'], blocks)
-    lost = unwritable_translation(entry, media_dir) || lost unless interactive
+    unless interactive
+      never_seen = unwritable_translation(entry, media_dir)
+      lost = larger_loss(never_seen, unchosen_loss(entry['content'], blocks, media_dir)) if never_seen
+    end
     if lost.any?
       summary = content_loss_summary(lost)
-      refuse('content_lost', t('cli.content_loss_warning', summary: summary)) unless interactive
+      refuse('content_lost', t('cli.content_lost_from_file', summary: summary)) unless interactive
       puts
       puts t('cli.content_loss_warning', summary: summary)
       print t('cli.confirm_continue_yes', word: t('cli.confirm_word'))
@@ -5639,6 +5642,42 @@ def blocks_lost(before, after)
   was.filter_map { |type, n| [type, n - now[type]] if n > now[type] }
 end
 
+# What one stored block holds that its own text cannot say: what is gone
+# once the block is written out and read back. Counted on the block
+# without what says nothing -- a span an import wrote down twice, a span
+# of no length -- or a paragraph with one bold range noted twice would be
+# "1x bold" about to be lost by an edit that loses nothing.
+def unsayable_in(block, media_dir)
+  empty = ->(span) { span.is_a?(Hash) && span['start'].is_a?(Integer) && span['end'].is_a?(Integer) && span['end'] <= span['start'] }
+  tidy = ->(spans) { spans.reject(&empty).uniq }
+  said = block.dup
+  said['formatting'] = tidy.call(said['formatting']) if said['formatting'].is_a?(Array)
+  if said['items'].is_a?(Array)
+    said['items'] = said['items'].map { |item| item.is_a?(Hash) && item['formatting'].is_a?(Array) ? item.merge('formatting' => tidy.call(item['formatting'])) : item }
+  end
+  back, = MarkdownParser.parse_body(MarkdownWriter.blocks_to_markdown([block], nil).to_s, media_dir, incoming_dir: nil, confined: true)
+  blocks_lost([said], back)
+rescue StandardError, SystemExit
+  blocks_lost([block], [])
+end
+
+# What a save takes away that its author did not choose to. A block the
+# save does not keep as it stood was removed or rewritten -- and with it
+# goes what its text never showed: a mention an import made of "@pavel",
+# small print, a card markdown has no words for. The words of such a
+# block are the author's to change; what they could not see they could
+# not have meant to lose. A block kept as stored loses nothing, and a
+# plain paragraph taken out is the edit.
+def unchosen_loss(before, stored, media_dir)
+  gone = Array(before).select { |block| block.is_a?(Hash) && Array(stored).none? { |kept| kept.equal?(block) } }
+  gone.each_with_object(Hash.new(0)) { |block, sum| unsayable_in(block, media_dir).each { |kind, n| sum[kind] += n } }.to_a
+end
+
+# Two counts of loss as one: each kind as many times as the larger says.
+def larger_loss(one, other)
+  (one + other).each_with_object(Hash.new(0)) { |(kind, n), sum| sum[kind] = [sum[kind], n].max }.to_a
+end
+
 # The same question for the words of one language: what its text cannot
 # say, and a save of that text back untouched would therefore drop. Asked
 # of the blocks as a save would STORE them -- with every block the text
@@ -5666,7 +5705,14 @@ def unwritable_content(post, media_dir)
   blocks, = MarkdownParser.parse_body(body, media_dir, incoming_dir: nil, confined: true)
   card = link_card_from_frontmatter(meta)
   blocks.unshift(card) if card
-  edit_content_loss(post, blocks, card)
+  # Asked of the blocks as a save would STORE them, with every block the
+  # text left alone kept as it stood -- as unwritable_translation asks.
+  # Asked of the text read back, this named what no save loses any more:
+  # a bold range an import wrote down twice, a link of no length, an
+  # attachment the text reads as a paragraph with a link. Five of the
+  # eleven posts a real archive refused were refused for that, and saved
+  # all the same would have been the same file (second fleet, 9. 10. 2026).
+  edit_content_loss(post, keep_untouched_blocks(blocks, post['content'], {}, media_dir), card)
 rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
   nil
 end
@@ -5746,13 +5792,19 @@ def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined:
   # picture or a rule the author took out of the text they were shown is
   # not that; it is the edit. Counting it as a loss meant a post could
   # not be made SHORTER from the app at all (fleet, 8. 10. 2026).
-  lost = unwritable_content(post, media_dir) || lost unless interactive
+  unless interactive
+    # Two things, and the larger of them: what saving the text back
+    # untouched would lose (which is why such a post was not offered for
+    # editing), and what THIS save loses in the blocks it rewrote.
+    never_seen = unwritable_content(post, media_dir)
+    lost = larger_loss(never_seen, unchosen_loss(split_link_card(post['content']).last, blocks, media_dir)) if never_seen
+  end
   if lost.any?
     summary = content_loss_summary(lost)
     # Without a keyboard there is nobody to say "yes, lose it": refused,
     # nothing written. The phone is offered no such draft in the first
     # place (`drafts --json` marks it), so this is the second line.
-    refuse('content_lost', t('cli.content_loss_warning', summary: summary)) unless interactive
+    refuse('content_lost', t('cli.content_lost_from_file', summary: summary)) unless interactive
     puts
     puts t('cli.content_loss_warning', summary: summary)
     # The word is compared against the locale's own confirm_word -- the
@@ -6443,7 +6495,9 @@ def draft_problem(post, text, media_dir)
 
   card = link_card_from_frontmatter(meta)
   blocks.unshift(card) if card
-  edit_content_loss(post, blocks, card).any? ? 'content_lost' : nil
+  # The same question the save asks (unwritable_content), so a post is
+  # marked uneditable exactly when its save would be refused.
+  edit_content_loss(post, keep_untouched_blocks(blocks, post['content'], {}, media_dir), card).any? ? 'content_lost' : nil
 rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
   'unreadable'
 end
