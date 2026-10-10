@@ -75,6 +75,12 @@ module Languages
       abort(I18n.t('build.ui_language_unknown', file: "site.#{code}.yml", value: SiteConfig.language_data(code)['ui_language'].to_s.strip,
                                                 known: Languages.lendable.join(', ')))
     end
+    # The site's OWN language among them is another sentence. It cannot
+    # borrow an interface -- its file is config/site.yml, and ui_language
+    # is read from a language's own file -- so the sentence below, the one
+    # about a file for the own language and the one about a moved key sent
+    # its author round in a circle (third fleet, 10. 10. 2026).
+    abort(I18n.t('build.own_locale_unknown', lang: SITE_OWN_LANG, known: Languages.lendable.join(', '))) if missing.include?(SITE_OWN_LANG)
     abort(I18n.t('build.unknown_locale', langs: missing.join(', '))) unless missing.empty?
 
     # What a language says about itself lives in config/site.<lang>.yml, and
@@ -180,7 +186,18 @@ module Languages
   # points at was gone.
   def fallback_chain
     named = LANG_ROOT.empty? ? [] : Array(SiteConfig.language_data(SITE_LANG)['fallback'])
-    ((named.map { |code| code.to_s.strip } & SITE_LOCALES) - [SITE_LANG]).freeze
+    chain_of(SITE_LANG, named).freeze
+  end
+
+  # A chain as written, cut to what can stand in: languages the site
+  # publishes, never the language itself -- and nothing past the site's
+  # own language, which is where every chain ends. Written after it,
+  # "first Czech, then English" on a Czech site, the rest was reached
+  # anyway: `fallback: [cs, en]` showed a German reader English (third
+  # fleet, 10. 10. 2026).
+  def chain_of(lang, named)
+    written = named.map { |code| code.to_s.strip }
+    (written.take_while { |code| code != SITE_OWN_LANG } & SITE_LOCALES) - [lang.to_s]
   end
 
   # Which language a post is SHOWN in here: its own words when it has them,
@@ -203,7 +220,11 @@ module Languages
   # words were laid over them (`__own_content`, build_blog.rb).
   def type_in(post, lang)
     entry = post['translations'].is_a?(Hash) ? post['translations'] : {}
-    chain = lang.to_s == SITE_OWN_LANG ? [] : [lang.to_s] + Array(SiteConfig.language_data(lang.to_s)['fallback']).map { |code| code.to_s.strip }
+    # The chain the run of that language builds with (fallback_chain), not
+    # the line as written: read whole, a language the site does not
+    # publish decided the type here, and the sitemap promised a listing
+    # that run never built (third fleet, 10. 10. 2026).
+    chain = lang.to_s == SITE_OWN_LANG ? [] : [lang.to_s] + chain_of(lang, Array(SiteConfig.language_data(lang.to_s)['fallback']))
     if chain.any? { |code| Translations.written?(entry[code]) }
       dominant_content_type(Translations.for_lang(post, chain.first, chain: chain.drop(1)))
     elsif post.key?('__own_content')

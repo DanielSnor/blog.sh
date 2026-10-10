@@ -173,7 +173,12 @@ end
   # What a file says that the build lives with and its author would not
   # have meant: [kind, key, detail]. Nothing here stops a build; `check`
   # says each of them once.
-  def remarks(lang_data)
+  # With the site's own data given, an item without a word is remarked on
+  # only where the site's own word IS shown in its place. An item with no
+  # word in either list is in no menu at all -- the site's own mistake,
+  # which doctor names -- and was said to be "shown under the word the
+  # site's own list has for it" (third fleet, 10. 10. 2026).
+  def remarks(lang_data, own = nil)
     return [] unless lang_data.is_a?(Hash)
 
     found = []
@@ -182,7 +187,13 @@ end
       theirs = dig(lang_data, *path)
       next unless theirs.is_a?(Array)
 
-      theirs.each_with_index { |entry, i| found << [:wordless, path.join('.'), i + 1] if entry.is_a?(Hash) && entry[key].to_s.strip.empty? }
+      mine = own.is_a?(Hash) ? dig(own, *path) : nil
+      theirs.each_with_index do |entry, i|
+        next unless entry.is_a?(Hash) && entry[key].to_s.strip.empty?
+        next if own && !(mine.is_a?(Array) && mine[i].is_a?(Hash) && !mine[i][key].to_s.strip.empty?)
+
+        found << [:wordless, path.join('.'), i + 1]
+      end
     end
     found
   end
@@ -193,7 +204,13 @@ end
     own = {} unless own.is_a?(Hash)
     found = []
     lang_data.each do |key, value|
-      if SETTINGS.include?(key) || key == 'nav'
+      if key == 'language_name' && !value.nil? && !value.is_a?(String)
+        # `language_name: no` is false to YAML and `2026` a number: the
+        # switch then said the code, and check asked for the line that was
+        # there (third fleet, 10. 10. 2026). The same mistake a label can
+        # make, said the same way.
+        found << [:not_text, key, value]
+      elsif SETTINGS.include?(key) || key == 'nav'
         next
       elsif TEXTS.key?(key)
         next found << [:unknown, key, nil] unless value.is_a?(Hash)

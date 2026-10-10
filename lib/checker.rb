@@ -788,7 +788,13 @@ module Checker
           # WITH one dead here -- and the repair then wrote the second
           # spelling down as a second entry, which the build has
           # complained about on every run since.
-          paths << origin.to_s << "#{origin.to_s.chomp('/')}/"
+          # ...as the build serves it: by its segments, whatever stood
+          # around them. An entry without a leading slash, as an import
+          # writes them, was dead here, and the repair then wrote the
+          # second spelling as a second entry the build refused on every
+          # run (third fleet, 10. 10. 2026).
+          served = "/#{origin.to_s.split('/').reject(&:empty?).join('/')}/"
+          paths << served << served.chomp('/')
         end
       end
     end
@@ -1140,8 +1146,13 @@ module Checker
       # writes to another, so the advice could be taken for none of them.
       # What answers there is the post's own old address, `former_slugs`.
       path = percent_decoded(url.split('#').first.split('?').first.to_s)
-      own = PostAddress.redirect_refusal(path, languages: languages)
-      error(t('link_dead', slug: slug, url: url), t(own ? 'link_dead_fix_own' : 'link_dead_fix'),
+      # :reserved is an address the site makes itself; :unusable one no
+      # redirect can be made from at all -- which was given the sentence
+      # about the site's own addresses and former_slugs (third fleet,
+      # 10. 10. 2026).
+      refusal = PostAddress.redirect_refusal(path, languages: languages)
+      advice = { reserved: 'link_dead_fix_own', unusable: 'link_dead_fix_unusable' }.fetch(refusal, 'link_dead_fix')
+      error(t('link_dead', slug: slug, url: url), t(advice),
             kind: :link_dead, data: { 'slug' => slug, 'url' => url, 'year' => year })
     end, cap)
   end
@@ -1357,6 +1368,16 @@ module Checker
       error(t('ui_language_unknown', file: "site.#{code}.yml", value: value), t('ui_language_unknown_fix', known: lendable.join(', ')),
             kind: :ui_language_unknown, data: { 'lang' => code, 'value' => value, 'known' => lendable })
     end
+    # The site's own language cannot borrow an interface: its file is
+    # config/site.yml and ui_language is read from a language's own file,
+    # so the advice below sent its author round in a circle (third fleet,
+    # 10. 10. 2026).
+    own = site_own_language(root)
+    if plain.include?(own)
+      found << error(t('own_locale_unknown', lang: own), t('own_locale_unknown_fix', lang: own, known: lendable.join(', ')),
+                     kind: :own_locale_unknown, data: { 'lang' => own, 'known' => lendable })
+      plain -= [own]
+    end
     unless plain.empty?
       found << error(t('unknown_locale', langs: plain.join(', ')), t('unknown_locale_fix'),
                      kind: :unknown_locale, data: { 'langs' => plain })
@@ -1389,9 +1410,11 @@ module Checker
     own = site_own_language(root)
     return [] if own.empty?
 
+    # One that holds WORDS -- a title or a body -- not one that has the
+    # keys with nothing in them (third fleet, 10. 10. 2026).
     held = posts.select do |post|
       entry = post['translations'].is_a?(Hash) ? post['translations'][own] : nil
-      entry.is_a?(Hash) && entry.slice(*Translations::TEXT_KEYS).compact.any?
+      entry.is_a?(Hash) && (!entry['title'].to_s.strip.empty? || Array(entry['content']).any?)
     end
     capped(held.map do |post|
       warn(t('translation_own_language', slug: post['slug'].to_s, lang: own), t('translation_own_language_fix', lang: own),
@@ -1509,7 +1532,7 @@ module Checker
         next
       end
       findings.concat(language_file_findings(name, own_config(root), language_file(root, code)))
-      findings.concat(language_file_remarks(name, code, language_file(root, code), published))
+      findings.concat(language_file_remarks(name, code, language_file(root, code), published, own_config(root)))
     end
     findings.concat(unused_tag_labels(posts, root))
     findings.concat(unused_series_labels(posts, root))
@@ -1522,8 +1545,8 @@ module Checker
   # own (shown under the site's own), a title given as nothing (the site's
   # own stands), and a `fallback` naming a language the site does not
   # publish, or the language itself, which stands in for nothing.
-  def language_file_remarks(name, code, data, published)
-    found = LanguageFile.remarks(data).group_by { |kind, key, _| [kind, key] }.map do |(kind, key), items|
+  def language_file_remarks(name, code, data, published, own = nil)
+    found = LanguageFile.remarks(data, own).group_by { |kind, key, _| [kind, key] }.map do |(kind, key), items|
       if kind == :blank
         warn(t('language_title_blank', file: name), t('language_title_blank_fix'),
              kind: :language_title_blank, data: { 'file' => name, 'key' => key })
@@ -1536,12 +1559,17 @@ module Checker
     # A language the engine has no words for borrows them (`ui_language`),
     # and the one word nobody can lend it is its own name: without
     # `language_name` the switch that leads to it says its code.
-    if !I18n.locale_file?(code) && LanguageFile.own_name(data).empty?
+    # ...and a name that is not text is its own error (language_label_not_text), not a missing one.
+    if !I18n.locale_file?(code) && LanguageFile.own_name(data).empty? && (!data.is_a?(Hash) || data['language_name'].nil? || data['language_name'].is_a?(String))
       found << warn(t('language_name_missing', file: name, code: code.to_s.upcase), t('language_name_missing_fix'),
                     kind: :language_name_missing, data: { 'file' => name, 'lang' => code })
     end
     named = Array(data.is_a?(Hash) ? data['fallback'] : nil).map { |lang| lang.to_s.strip }.reject(&:empty?)
-    idle = named.reject { |lang| published.include?(lang) && lang != code }
+    # Every chain ends at the site's own language (published.first), so
+    # what is written after it is never reached (build/languages.rb,
+    # chain_of): idle like a language the site does not publish.
+    reached = named.take_while { |lang| lang != published.first } + [published.first]
+    idle = named.reject { |lang| published.include?(lang) && lang != code && reached.include?(lang) }
     unless idle.empty?
       found << warn(t('language_fallback_idle', file: name, langs: idle.join(', ')),
                     t('language_fallback_idle_fix', known: (published - [code]).join(', ')),
