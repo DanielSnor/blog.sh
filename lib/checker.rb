@@ -1112,8 +1112,18 @@ module Checker
     end
     return [] if dead.empty?
 
+    languages = published_languages(root)
     capped(dead.map do |slug, url, year|
-      error(t('link_dead', slug: slug, url: url), t('link_dead_fix'),
+      # Advice somebody can take. `redirect_from` answers at an address the
+      # site does not make itself -- one left over from the web a post was
+      # imported from. Under /posts/, or under the folder of a language,
+      # the build refuses the entry (PostAddress.redirect_refusal) and
+      # the link stays dead: which is every link one post of this engine
+      # writes to another, so the advice could be taken for none of them.
+      # What answers there is the post's own old address, `former_slugs`.
+      path = percent_decoded(url.split('#').first.split('?').first.to_s)
+      own = PostAddress.redirect_refusal(path, languages: languages)
+      error(t('link_dead', slug: slug, url: url), t(own ? 'link_dead_fix_own' : 'link_dead_fix'),
             kind: :link_dead, data: { 'slug' => slug, 'url' => url, 'year' => year })
     end, cap)
   end
@@ -1353,9 +1363,14 @@ module Checker
       end
       ordered.select { |_, group| group.size > 1 }.each do |address, group|
         slugs = group.map { |post| post['slug'].to_s }.sort
-        findings << error(t('language_address_taken', lang: lang, address: "/#{lang}#{address}",
-                                                      slugs: slugs.join(', ')),
-                          t('language_address_taken_fix'),
+        # Two posts at one address stop the build; two PAGES do not -- the
+        # build warns and serves one of them (build/build_blog.rb, where
+        # the difference is argued). The sentence said "the build stops"
+        # of both, and of pages it has not been true since the two rules
+        # were told apart.
+        said = group.all? { |post| PostAddress.page?(post) } ? 'language_address_taken_pages' : 'language_address_taken'
+        findings << error(t(said, lang: lang, address: "/#{lang}#{address}", slugs: slugs.join(', ')),
+                          t('language_address_taken_fix', lang: lang),
                           kind: :language_address_taken,
                           data: { 'lang' => lang, 'address' => "/#{lang}#{address}", 'slugs' => slugs })
       end

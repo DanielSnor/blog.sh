@@ -229,9 +229,9 @@ goes in is still being decided; the suffix and the date both come off at the tag
   the card shows is marked; a match deeper in the post marks nothing.
 - **Things a skin could not select are marked.** Nothing looks different until a stylesheet
   says so (`docs/skinning.md`, "What the markup marks for you"):
-  a link in a post's text that is a mention or a hashtag -- its whole text "@somebody" or
-  "#something" -- carries `mention` or `mention hashtag`, the classes the same things have in the
-  comments and in the sidebar's toots;
+  a link in a post's text, or in a text the site says about itself (`about.html`), that is a
+  mention or a hashtag -- its whole text "@somebody" or "#something" -- carries `mention` or
+  `mention hashtag`, the classes the same things have in the comments and in the sidebar's toots;
   a reply written by the account that announced the post is `comment--author`;
   "page 12" under a listing is `pagination-word` and `pagination-number`;
   the search's "4 results" is `search-count` and `search-unit`;
@@ -242,7 +242,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
   on a tag's listing the pill of that tag is `tag-pill-own`;
   a count of zero under a post is `post-stat--zero`;
   and on the markdown cheat sheet what a source becomes stands in `md-example`.
-  Every listing of a tag, every archive year and the cheat sheet are rewritten by the next build.
+  Every listing of a tag or a type, every archive year, the cheat sheet and every post whose text
+  links a mention or a hashtag are rewritten by the next build -- on an archive that came from a
+  social network that is a quarter of its posts (1 786 of 6 585 on the one it was counted on), so
+  the first deploy after the upgrade is a long one. Where such a link stands in `about.html`,
+  every page that shows the text is rewritten too.
 
 ### On its way out
 
@@ -295,7 +299,9 @@ goes in is still being decided; the suffix and the date both come off at the tag
   Fixing a typo in one paragraph saved every other block without them -- at the desk and from an
   app alike; on one real archive 101 posts changed by being saved unchanged. A block the new text
   did not change is now saved as it was stored, whole; so is anything a translation's entry holds
-  beside its words.
+  beside its words. (A block the text did change is made again from the text, as it always was:
+  the kind an import gave a paragraph or the address a video was first at does not outlive an
+  edit of that very block, and the page shows it as before.)
 - **Two deliveries arriving together could swap pictures.** `incoming/` knows a picture by the
   name it was sent under, and every phone calls its first one the same: of two posts sent at the
   same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
@@ -371,7 +377,60 @@ goes in is still being decided; the suffix and the date both come off at the tag
   where the post has none, it offers nothing and says why.
 - **`./blog.sh pair` reads `env.sh`,** as `doctor` does. `BLOG_SH_AUTHORIZED_KEYS` written there
   names one file for `pair`, `pair --list`, `pair --revoke` and `doctor`; a device let in through
-  it used to be "no device" to `pair --list`. `env.sh.example` carries the line.
+  it used to be "no device" to `pair --list`. `env.sh.example` carries the line. A path written
+  there with a tilde inside quotes is expanded; it used to be a folder called `~` inside the blog.
+- **A key file kept with Windows line endings, or with a line of its owner's nobody expected.**
+  A device let in through such a file was listed with a carriage return in its name and could not
+  be taken out by it, and a code opened before the file was saved that way stopped being a code;
+  the app's line is written with the ending the file has. A key standing only on a line its owner
+  commented out is no key in use, and a line that is not UTF-8 no longer stops a pairing.
+- **Markdown the engine refuses is refused in the site's language -- and as an object where one
+  was promised.** The three sentences (a picture inside a paragraph, a video with no caption, a
+  picture that is a folder) and the one about an editor that cannot be started stood in the code
+  in English. `add <file> --json` at a desk answered them in prose with a status of 1, and a
+  translation sent from an app let the refusal out as a failed engine; both answer
+  `bad_markdown`. A translation sent without `base:` is told what a translation needs, where a
+  draft was told it "is published"; and `changed` no longer tells the author of a published post
+  to open "the draft" again.
+- **What a program was told about the queue.** A move (`queue --up`, `--down`, `--move`) and a
+  `--compact` listed the run's own report among `warnings`; they are empty unless something is
+  one. A move that met a held lock answered `not_moved` -- the code for "first, last, or its time
+  has passed" -- and answers `busy`; and neither `busy` nor `outside_window` points a program at
+  "the line above" or at a command by its terminal name any more.
+- **A post named in another alphabet was acted on and then reported as a failure.** With no
+  `LANG` -- which is how a forced command runs -- the engine did what it was asked and died
+  printing the answer. Every word of the command line is read as UTF-8, and the door for
+  programs takes a slug whose letters carry their marks as characters of their own.
+- **`list --tag=` answered with the whole archive.** A filter with nothing after the sign is said
+  like one with nothing after it at all.
+- **A paragraph with an unclosed `**` and backslashes after it hung the save.** A few dozen
+  characters took minutes; they are read at once.
+- **`translate` with no `--lang` offered a language the site does not publish.** It names one it
+  does, and lists them. And the usage says again what `rebuild` does -- the lines under it were
+  lost.
+- **Advice in `check` that could not be taken.** A dead link to an address under `/posts/` or
+  under a language's folder was told to "give the target a `redirect_from`", which the build
+  refuses there -- the advice is the post's `former_slugs`. Two pages translated to one address
+  were told "the build stops", which it does for two posts and not for two pages. And one piece
+  of advice printed `--lang %{lang}` as it stands.
+- **The language switch on a later page of a listing by type led to a 404** where the other
+  language has fewer pages of that type. It leads as far as the listing goes there.
+- **`check` named an old address of an unpublished language that another post answers at.** It
+  names one only when nothing answers there.
+- **A found word was marked in pieces.** In a text whose accents are characters of their own --
+  typed on a Mac, for one -- the search broke its mark at every accent.
+- **The preview of a draft named its series in the site's own language** on the page of another.
+- **What a cron wrapper refused, it said on standard output.** The line the wizard hands to cron
+  keeps that in a log and mails the rest, so a refusal by `publish-scheduled.sh` or
+  `refresh-sidebar.sh` reached nobody.
+- **`./style.sh` wrote half a sidebar card.** A card whose one necessary answer -- the account, the
+  feed's address, the user name -- was left empty was written all the same. Nothing is written,
+  and the wizard says which answer is missing.
+- **Two deliveries waiting on a dead one could both go.** Writes carrying a receipt take turns,
+  and a turn left behind by a receiver that died was cleared by every waiter at once; one clears
+  it. A turn older than any delivery can be is over whichever process now carries its number.
+- **`./setup.sh --help` said every question can be skipped.** Five cannot while they hold the
+  template's example, and the wizard's opening sentence named four of them.
 - **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
   which renders one language per run, and deployed; the second language stayed as the previous
   version built it. The recipe is `./blog.sh rebuild`.

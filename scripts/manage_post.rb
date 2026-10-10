@@ -794,8 +794,7 @@ def editor_round_trip(initial_content, hint_comment)
     # before giving up. A user's own $EDITOR gets no second-guessing.
     ok ||= ENV['EDITOR'].nil? && ENV['VISUAL'].nil? && system('nano', path)
     unless ok
-      abort("$EDITOR (#{editor}) failed -- set the EDITOR environment variable " \
-            'to an editor that exists here (e.g. export EDITOR=vim) and rerun.')
+      abort(t('cli.editor_failed', editor: editor))
     end
     strip_editor_notes(File.read(path, encoding: 'utf-8'))
   end
@@ -1415,6 +1414,9 @@ end
 # could, because a post sent from a phone has no desk to come back to.
 def add_from_file(source, json: false, confined: false)
   JSON_REFUSALS[:enabled] = json
+  # The parser's own refusals with the rest: markdown it cannot turn into
+  # blocks is `bad_markdown` whoever wrote the file.
+  MarkdownParser::ANSWERS[:catchable] = json
   file = IncomingPath.resolve(source, INCOMING_DIR)
   refuse('not_found', t('cli.add_file_not_found', file: source)) if file.nil?
   # Said apart from "there is nothing there", because they send the
@@ -1662,7 +1664,7 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
   # an answer. An empty code is no language this site has, and is refused
   # as one (translate_language!).
   if meta.key?('lang')
-    refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty?
+    refuse('base_required', t('cli.translate_base_required', slug: slug)) if base.empty?
     return translation_from_file(file, raw, meta, path, original_raw, post, json: json, confined: confined)
   end
   # A file that edits a post and carries no text is not an edit. Making a
@@ -5321,8 +5323,13 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
   entry = post.dig('translations', lang)
   entry = {} unless entry.is_a?(Hash)
   meta, body = MarkdownParser.parse_frontmatter(raw)
-  blocks, media_files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: confined ? nil : INCOMING_DIR,
-                                                                              confined: confined)
+  blocks, media_files, missing = begin
+    MarkdownParser.parse_body(body, media_dir, incoming_dir: confined ? nil : INCOMING_DIR, confined: confined)
+  rescue MarkdownParser::Rejected => e
+    # As for the post's own text (apply_post_edit): a refusal the caller
+    # can read, where this let the exception out as a failed engine.
+    refuse('bad_markdown', e.message)
+  end
   if confined
     refuse('media_unsupported', t('cli.translate_media_unsupported')) if missing.any?
   else
@@ -8735,6 +8742,10 @@ begin
           abort t('cli.list_needs_value', option: word) if words.empty? || words.first.start_with?('--')
           word = "#{word}=#{words.shift}"
         end
+        # ...and `--tag=` is a filter with nothing after it too, written
+        # the other way: it answered with the whole archive, as `--tag`
+        # alone once did.
+        abort t('cli.list_needs_value', option: word.chomp('=')) if %w[--type= --tag= --search=].include?(word)
         abort t('cli.list_unknown_option', option: utf8(word)) unless word.match?(/\A--(type|tag|search)=/m) || %w[--drafts --json].include?(word)
         ARGV << word
       end

@@ -128,7 +128,10 @@ already carries, so each can be read as well as changed:
   text. What the text leaves as it was is saved
   as it was stored -- the very block, with whatever an import put on it
   that markdown cannot say (a paragraph's kind, a video's provider) -- so
-  an edit changes what was edited and nothing else. The one thing refused as a loss
+  an edit changes what was edited and nothing else. A block the text did
+  change is made again from the text, and what the text could not say
+  about it goes with the change -- the kind an import gave a paragraph,
+  the address a video was first at; the page shows it as it did. The one thing refused as a loss
   (`content_lost`) is what the author never saw going -- something the
   post holds that markdown has no words for, a link card or a mention
   from an import; such a post is marked `editable: false` when its text
@@ -387,7 +390,9 @@ the languages too. With one other language it names it (`[l] language:
 Deutsch`); with several it opens a picker that says what is already
 written, what is only started, and what has nothing yet -- the same three
 states `check --languages` prints. The properties screen carries a
-`languages` row for the same reason.
+`languages` row for the same reason. (As data the two say them in
+different words: `props --json` has `written`, `started` and `none`,
+`check --languages --json` has `written`, `title_only` and `missing`.)
 
 The editor that opens holds a title and a body, and nothing else. That is
 the whole of what a translation may carry: the date, the tags, the series,
@@ -442,6 +447,18 @@ translated one:
 ```
 
 `/posts/2019/the-old-slug/` then redirects to `/en/posts/2019/the-old-slug/`.
+
+The merge has two more steps, and `check` between them speaks of
+neither. The English post is still in the archive, at the very address
+the list now names -- so `check` says the address is taken by a live post
+and offers to drop the entry or rename that post. Neither: the English
+post is what goes, `./blog.sh delete the-old-slug`, and the entry is
+served from then on. Before it goes, copy any picture only it had into
+the media folder of the post that stays (`media.nosync/<year>/<slug>/`),
+under a name the translation's blocks then use: `delete` takes a post's
+media to the trash with it, and a translation shows files from the
+folder of the post it belongs to. Deleting a published post also takes
+its announcement down where the network allows it, as any `delete` does.
 The same list covers a translation whose `slug:` you change by hand: the
 old address in that language's tree redirects to the new one. Nothing
 writes this list for you -- it is for the merge, which is done by hand --
@@ -1128,8 +1145,12 @@ Three rules follow from "nobody is at the keyboard":
 - **A question the dialog asks is a flag.** The slug typed back to
   confirm a delete is `--yes`; the date the schedule dialog asks for is
   `--at`; "shift the rest of the queue forward?" is `--compact`;
-  "rebuild and deploy now?" is `--rebuild`. Without the flag the answer
-  is no -- a program that did not say it did not mean it.
+  "rebuild and deploy now?" is `--rebuild`; "publish it though one of the
+  site's languages has no text for it yet?" is `--allow-partial`. Without
+  the flag the answer is no -- a program that did not say it did not mean
+  it. (On a site of more than one language that last one decides whether
+  anything can be scheduled or published at all before it is translated:
+  without it both answer `partial_translation`.)
 - **Those flags are for `--json` only.** `delete <slug> --yes` without
   `--json` is refused: at the terminal the dialog is there to ask, and
   a flag that silently skips a confirmation is how a shell history
@@ -1137,35 +1158,37 @@ Three rules follow from "nobody is at the keyboard":
 - **A post is named by its slug, and never guessed.** The same slug in
   two years is refused as `ambiguous_slug` where the terminal would show
   both and ask; `list --json` carries the year so a program can tell
-  them apart, and will be able to name one.
+  them apart, and will be able to name one. A slug no post has is
+  `not_found`.
 
 | command | what it answers | refusals |
 |---|---|---|
 | `version --json` | `engine`, `site`: name, claim, url, lang, locales, accent (`light`, `dark`: the palette's accent as colors.css resolves it), palette (`light`, `dark`, each `bg`, `text`, `meta_text`, `border`, resolved the same way) -- the identity block as data; answers on a broken config with what it can | -- |
-| `list [filters] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned, match), `count`, `drafts`, `search`; `--search="words"` is the search `browse` runs behind [/] -- the same query language, over the whole text -- and `match` is the line that says why a row is there (null when the hit is in the title or a tag); `search` says the query back, null when there was none. A filter's value is written after `=` or as the next word (`--tag=cats`, `--tag cats`); a filter with nothing after it, or a word the command has no use for, is an abort | -- |
-| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back | `not_found`, `ambiguous_slug` |
-| `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property` |
-| `props <slug> --drop-address <address> --json` | the screen after the drop. The address is one `addresses` lists -- each with its `kind`: `former_slugs`, `redirect_from`, or `translations.<lang>.former_slugs` for an old address of the post's text in another language | `address_unknown`, `busy` |
-| `props <slug> --rename <slug> --yes --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable` |
-| `props <slug> --versions --json` | `versions`: name, date, label, newest first | -- |
-| `props <slug> --restore-version <name> --yes --json` | the screen after the restore, the preview rebuilt | `version_unknown`, `version_unreadable` |
+| `list [--type=<type>] [--tag=<tag>] [--search=<words>] [--drafts] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned, match), `count`, `drafts`, `search`; `--search="words"` is the search `browse` runs behind [/] -- the same query language, over the whole text -- and `match` is the line that says why a row is there (null when the hit is in the title or a tag); `search` says the query back, null when there was none. A filter's value is written after `=` or as the next word (`--tag=cats`, `--tag cats`); a filter with nothing after it (`--tag`, or `--tag=`), or a word the command has no use for, is an abort | -- |
+| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back, and so is `series_part` -- a string or null, though the post's file holds a number; `languages` names the site's own (`own`) and says of each other one (`others`) `none`, `started` or `written` -- the three states `check --languages --json` calls `missing`, `title_only` and `written` | `not_found`, `ambiguous_slug` |
+| `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property`, `busy`, `not_found`, `ambiguous_slug` |
+| `props <slug> --drop-address <address> --json` | the screen after the drop. The address is one `addresses` lists -- each with its `kind`: `former_slugs`, `redirect_from`, or `translations.<lang>.former_slugs` for an old address of the post's text in another language | `address_unknown`, `busy`, `not_found`, `ambiguous_slug` |
+| `props <slug> --rename <slug> --yes [--rebuild] --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable`, `not_found`, `ambiguous_slug` |
+| `props <slug> --versions --json` | `versions`: name, date, label, newest first | `not_found`, `ambiguous_slug` |
+| `props <slug> --restore-version <name> --yes --json` | the screen after the restore, the preview rebuilt | `version_unknown`, `version_unreadable`, `not_found`, `ambiguous_slug` |
 | `queue --json` | `queue`: position, date, slug, year, title, overdue; `scheduler`: `last_run`, when something last ran the queue, null where nothing ever has | -- |
-| `queue --up <slug> --json`, `--down <slug>`, `--move <slug> --to <n>` | the queue afterwards, `warnings`; nothing is rebuilt -- the screen rebuilds once on the way out, a program calls `rebuild --json` when it is done | `not_scheduled`, `ambiguous_slug`, `not_moved` (first, last, or its time has passed), `bad_position`, `overdue` |
-| `toot <slug> [--force] --json`, `bluesky <slug> [--force] --json` | `url`, `recovered` (Bluesky found the announcement on the account instead of sending one) | `wrong_network`, `no_network`, `still_draft`, `already_announced`, `unlisted`, `outside_window` (unless `--force`), `failed`, `not_sent` |
+| `queue --up <slug> --json`, `--down <slug>`, `--move <slug> --to <n>` | the queue afterwards, `warnings`; nothing is rebuilt -- the screen rebuilds once on the way out, a program calls `rebuild --json` when it is done | `not_scheduled`, `ambiguous_slug`, `not_moved` (first, last, or its time has passed), `bad_position`, `overdue`, `busy` |
+| `toot <slug> [--force] --json`, `bluesky <slug> [--force] --json` | `url`, `recovered` (Bluesky found the announcement on the account instead of sending one) | `wrong_network`, `no_network`, `still_draft`, `already_announced`, `unlisted`, `outside_window` (unless `--force`), `failed`, `not_sent`, `not_found`, `ambiguous_slug` |
 | `drafts --json [<slug>]` | the drafts with their text, as the phone opens them; every entry says `omitted` -- true where its text was left out of a long answer and has to be asked for by name | `not_found` |
-| `translate <slug> --lang <code> --json` | the post's text in that language as the editor opens it (empty when there is none yet), the original beside it, the post's media by name, `base:`, and `editable` with `problem` as `edit --json` says them; the words come back through `add` of a file saying `edits:`, `base:` and `lang:` -- a title and a body both empty take the language off the post, and what the text could not carry is refused (`content_lost`) | `no_locales`, `own_language`, `unknown_language`, `not_found` |
+| `translate <slug> --lang <code> --json` | the post's text in that language as the editor opens it (empty when there is none yet), the original beside it, the post's media by name, `preview` (the address of the post's own page -- not of its page in that language), `base:`, and `editable` with `problem` as `edit --json` says them; the words come back through `add` of a file saying `edits:`, `base:` and `lang:` -- a title and a body both empty take the language off the post, and what the text could not carry is refused (`content_lost`) | `no_locales`, `own_language`, `unknown_language`, `not_found`, `ambiguous_slug` |
 | `edit <slug> --json` | one post, any state, with its text as the editor opens it, its media, its address and the digest `base:` hands back; the text comes back through `add` of a file saying `edits:` -- for a published post `base:` is required, and the save rebuilds and deploys | `not_found`, `ambiguous_slug` |
-| `schedule <slug> --at <time> --json` | the post, `position` in the queue, `compacted` (0). The time may be said in any zone (`...Z`, `+02:00`); it is written down, and the post filed, in the site's own. A day the calendar does not have is `bad_date` | `schedule_needs_at`, `bad_date`, `not_future`, `already_published`, `partial_translation`, `busy` |
-| `schedule <slug> --cancel [--compact] --json` | the post back among the drafts, `compacted`: how many moved forward | `not_scheduled`, `busy` |
-| `publish <slug> --yes [--compact] --json` | the published post (`add --json`'s shape), `compacted` | `already_published`, `partial_translation`, `publish_refused` |
-| `unpublish <slug> --yes --json` | the post as a draft, `announcement_kept`: addresses that could not be deleted | `already_draft` |
+| `schedule <slug> --at <time> [--allow-partial] --json` | the post, `position` in the queue, `compacted` (0). The time may be said in any zone (`...Z`, `+02:00`); it is written down, and the post filed, in the site's own. A day the calendar does not have is `bad_date` | `schedule_needs_at`, `bad_date`, `not_future`, `already_published`, `partial_translation` (unless `--allow-partial`), `busy`, `not_found`, `ambiguous_slug` |
+| `schedule <slug> --cancel [--compact] --json` | the post back among the drafts, `compacted`: how many moved forward | `not_scheduled`, `already_published`, `busy`, `not_found`, `ambiguous_slug` |
+| `publish <slug> --yes [--no-announce] [--allow-partial] [--compact] --json` | the published post (`add --json`'s shape), `compacted`; `--no-announce` puts it on the site and tells no network | `already_published`, `partial_translation` (unless `--allow-partial`), `publish_refused`, `not_found`, `ambiguous_slug` |
+| `unpublish <slug> --yes --json` | the post as a draft, `announcement_kept`: addresses that could not be deleted | `already_draft`, `not_found`, `ambiguous_slug` |
 | `delete <slug> --yes [--rebuild] --json` | `trash`: where it went, `announcement_kept`, `deploy` | `not_found`, `ambiguous_slug` |
 | `restore --json` | `trash`: what is in it (slug, year, date, title, type, tags, state, media_only) | -- |
 | `restore <slug> [--rebuild] --json` | the post back in place | `not_found`, `ambiguous_slug`, `media_only` |
 | `rebuild [--full] [--force] --json` | `deploy: done`, `warnings` | `busy`, `rebuild_failed` |
 | `empty trash\|versions [--yes] --json` | `count`, `bytes`, `size`, `emptied` -- without `--yes` only the count, which is the question the terminal asks | `empty_what` |
-| `check --json`, `stats --json`, `on-this-day --json` | the findings, the figures, the day -- see their own sections | -- |
-| `check --languages --json` | the table of languages alone: `languages` (the site's own first) and `rows` (slug, title, `cells`: per language `written`, `title_only` or `missing`); empty on a site that publishes one language. Over a `config/site.yml` that cannot be read it refuses and exits 1 | `config_missing`, `config_empty`, `config_syntax`, `config_unreadable` |
+| `check --json`, `stats --json` | the findings, the figures -- see their own sections | -- |
+| `on-this-day [--date <day>] --json` | the day -- see its own section; `--date` is `MM-DD`, or `YYYY-MM-DD` to count the ages from another year | `bad_date` |
+| `check --languages --json` | the table of languages alone: `languages` (the site's own first) and `rows` (slug, year, title, `cells`: per language `written`, `title_only` or `missing`); empty on a site that publishes one language. Over a `config/site.yml` that cannot be read it refuses and exits 1 | `config_missing`, `config_empty`, `config_syntax`, `config_unreadable` |
 | `doctor --json` | the installation's diagnosis: `errors`, `warnings`, `oks` and `findings` (`level`: error, warn or ok; `kind`: the check it came from, such as `trash`, `scheduler`, `deploy` or `banner`; `text`; `fix`, null where there is no advice), problems first; no `ok` key, and the status is 1 when there is an error | refused with `--strip-location` (status 2, in prose) |
 
 `deploy` in an answer is `done` when the site was rebuilt and deployed,
@@ -1180,6 +1203,11 @@ What a refusal's `message` says is the sentence the terminal would have
 printed, in the site's language; the `error` code is the same in every
 language and is what a program should switch on. A new code may appear
 in a later version; an existing one does not change meaning.
+
+One thing about types, for a consumer written in a language that has
+them: a post's `year` is a string wherever a post is named -- it is the
+folder the post is kept in, and what tells two posts of one slug apart --
+and a number only in `on-this-day`, which counts with it.
 
 ### Over SSH, from an app
 
@@ -1197,7 +1225,10 @@ person, and that build nothing -- are said in that language, if the
 engine ships it. Every other command answers in the blog's language as
 before, because a command that may rebuild the site must not be handed
 another one. A language the engine does not have is not an error: the
-answer is then in the blog's own.
+answer is then in the blog's own. The code is the bare one a locale file
+is named by, in lower case -- `cs`; what a phone calls its language
+(`cs-CZ`, `cs_CZ`, `CS`) is cut down to that by the sender, or it counts
+as a language the engine does not have.
 
 `scripts/remote.sh` allows three words as the SSH command and nothing
 else. **`run`** runs one engine command: its argv arrives on standard
@@ -1212,7 +1243,7 @@ program may run (`version`, `list`, `drafts`, `edit`, `translate`,
 `restore`, `rebuild`, `empty`, `toot`, `bluesky`, `stats`,
 `on-this-day`, `check`, `doctor`), each flag one that command has in its
 `--json` form, every positional word a slug, and no word may hold a
-control character. A slug here is a name as a file may have it and a
+control character or be longer than 4000 bytes. A slug here is a name as a file may have it and a
 reader would read it -- letters and digits of any alphabet, `_`, `.` and
 `-`, not starting with `.` or `-` -- which is wider than what the engine
 itself makes (lowercase, digits, hyphens) because an import keeps the
@@ -1235,10 +1266,19 @@ receiver's ceiling is dropped on the wire (`too_large`) before the
 receiver measures it exactly. `version --json` says the ceiling
 (`max_mb`), so a sender can weigh a delivery first.
 
-Every answer is one object and the status is 0, for the reason the
-receiver gives; a request that is not JSON, holds a word the whitelist
+Every answer to `run` is one object and the status is 0, for the reason
+the receiver gives. A delivery -- `receive` or `deliver` -- is answered
+as the receiver answers, with an object for each file, one after
+another: a line for every picture stored or refused, then each post that
+was written, printed over several lines. That is neither one JSON
+document nor a line apiece; a reader takes it object by object, by its
+braces.
+
+A request that is not JSON, holds a word the whitelist
 refuses or is over 64 kB is refused as one (`bad_json`, `bad_args`,
-`unknown_command`, `too_large`), and the engine answering in prose --
+`unknown_command`, `too_large`), one that never arrives as `empty_input`,
+a connection that says none of the three words as `no_command`,
+and the engine answering in prose --
 no `env.sh`, a configuration that will not parse -- is wrapped as
 `engine_failed` with its words: the end of what it said, or, where it
 died of an exception, the line that names the error. Two clocks answer
@@ -1248,6 +1288,35 @@ once it has begun, and an engine still running after
 Unlike the shortcut's key this one may
 be ed25519; the forced command runs in the same environment
 `receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.
+
+**Sending again.** A connection can break after the request has gone
+and before its answer is back, and the sender cannot tell which side of
+the engine that was. What a second send does:
+
+- A question -- `version`, `list`, `props`, `queue`, `drafts`, `edit`,
+  `translate`, `check`, `doctor`, `stats` -- changes nothing and can be
+  asked as often as it takes.
+- `publish`, `unpublish`, `delete`, `restore` and `schedule --cancel`
+  are answered the second time by the state the first one left:
+  `already_published`, `already_draft`, `not_found`, `not_scheduled`.
+  That refusal is the news that the first one arrived.
+- A new post delivered twice is two posts -- unless its file carries
+  `receipt:`, a name the sender makes up once for the post (sixteen
+  hexadecimal characters), and then the second delivery is the first one
+  arriving again and updates the post it wrote ([A delivery that arrives
+  twice is one post](#a-post-sent-from-the-phone-itself)).
+- An edit or a translation -- a file saying `edits:` and `base:` --
+  delivered twice is `changed` the second time: `base:` is the digest of
+  the post's file, and the first delivery changed it. The answer to a
+  save does not carry the new digest, so `edit --json` (or `translate
+  --json`) is asked again before the next save, and after a `changed`
+  whose cause may have been the sender's own first try.
+- After `timeout` on an action the engine was stopped where it stood,
+  and the action may be half done: a `publish` written to the archive
+  and not yet on the site answers `already_published` from then on,
+  while its address is a 404 until the site is built -- by the next
+  scheduled run, which owes it, or by `rebuild --json`. Ask `props` what
+  state the post is in, and `rebuild` if it is out.
 
 The forced command runs in the account's non-interactive shell, which
 reads none of the files a terminal session reads -- so a Ruby that lives
@@ -1969,7 +2038,12 @@ that finding allows -- nothing is applied without a key press. A dead link
 to an old address is repaired on the **target** post, by writing that
 address into its `redirect_from`: one added line, your own text untouched,
 and every link to the old address answered at once, including the ones
-from outside the site that no check can see. A link written relative to the
+from outside the site that no check can see. That holds for an address of
+the web a post came from. One the site makes itself -- under `/posts/`, or
+under the folder of a language -- is an address no `redirect_from` may
+answer at: `check` says so in its advice, no repair is offered, and what
+answers there is the post's own old address, `former_slugs` (the wrong
+year in a link to `/posts/2025/a-post/` is fixed in the link). A link written relative to the
 post is rewritten to the address it means. A media directory or file no
 post references is moved to the trash the engine already uses --
 `trash/<year>/<slug>/media/` -- and `./blog.sh restore <slug>` puts it
@@ -2506,7 +2580,7 @@ whole), but restoring from the archive itself is exact.
 | `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |
 | `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. |
 | `HEIC displays only in Safari` when attaching a photo | The iPhone default format. Convert it with the command the message prints, set `media.convert_heic: true` to have the engine do it, or set the phone to Settings → Camera → Formats → Most Compatible. |
-| A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
+| A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `bad_markdown` is markdown no blocks can be made of -- a picture inside a sentence, a video with no caption -- and the message says where; `unknown_frontmatter_key` names a header line the engine does not know, `not_text` a file that is not UTF-8 text, `empty` one with nothing under its header. A file is read as the post when its name ends in `.md` (or `.md.txt`); under any other name, `.markdown` included, it is kept as an attachment. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
 | `name_taken` from the receiver | Something in `incoming/` under that name is not a plain file -- a directory, or a symlink. Nothing was replaced; clear the name on the server. |
 | `busy` from the receiver | Another delivery was still being taken in when this one had waited as long as it waits (`BLOGSH_TURN_SECONDS`, 300). Nothing of this one was stored; send it again. |
 | `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the shortcut's command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. Every one of them answers with its code and leaves with a zero status, the same as any other refusal: the phone discards the output of a command that failed, and these are the answers a first delivery to a new install most needs to read. |

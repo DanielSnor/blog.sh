@@ -89,8 +89,13 @@ module Pairing
   def keys_file
     return @keys_file if @keys_file
 
+    # Expanded, because the variable is usually written in env.sh, and
+    # there it is usually written in quotes: "~/.ssh/keys" reaches this
+    # line with its tilde in it. Taken as it stood, that was a folder
+    # called `~` inside the blog -- the keys went into it, and the record
+    # of the code, which did expand the path, named a different file.
     chosen = ENV['BLOG_SH_AUTHORIZED_KEYS'].to_s
-    chosen.empty? ? File.join(Dir.home, '.ssh', 'authorized_keys') : chosen
+    chosen.empty? ? File.join(Dir.home, '.ssh', 'authorized_keys') : File.expand_path(chosen)
   end
 
   # The file a code was opened in is the file it is closed in. The app

@@ -56,7 +56,9 @@ What it asks about:
   deploy target     one of the six backends, each asking only for its own
                     values, or "not yet" for a site that has nowhere to go
 
-Every question can be skipped with Enter, which keeps the current value.
+Most questions can be skipped with Enter, which keeps the current value.
+Five cannot while they still hold the template's example: the site's
+title, its short name, its description, its author and its address.
 Nothing is written until you have seen the diff and confirmed it; the
 result is verified by reading it back, and restored from a backup if it
 does not read back the way it was asked for.

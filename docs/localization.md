@@ -358,6 +358,15 @@ Write one with `./blog.sh translate <slug> --lang de` (see
 [operations.md](operations.md#writing-a-post-in-another-language)); the
 editor shows the title and the body, because that is all there is to it.
 
+A link in a translation leads where it is written. The lines of the
+original the editor shows carry the original's links, and a link to
+another post of the site copied from there -- `/posts/2026/muj-post/` --
+takes the German reader to the Czech page, though that post may have a
+German one. Nothing rewrites it and `check` has nothing to say, since
+the address is a sound one: write the address of the page in the
+translation's own language, `/de/posts/2026/mein-post/`. (An item of the
+menu is different -- it follows the piece, not the spelling.)
+
 ### What happens to a post nobody has translated
 
 It is shown, not hidden. It stays in the other language's listing, and the
@@ -491,7 +500,14 @@ in several languages usually means to publish in all of them at once, and
 the exceptions are worth saying out loud rather than discovering later.
 
 The cron that publishes the queue never asks: a post got there through
-`schedule`, where somebody already answered this.
+`schedule`, where somebody already answered this. That holds for a post
+scheduled while the site had its languages. One that was already in the
+queue when a language was added was never asked about it -- it goes out
+on its day in the languages it has, and rescheduling it does not ask
+either. `check --languages` shows which languages every post has, the
+queued ones among them;
+`schedule <slug> --cancel` and scheduling it again is how the question
+is put to it.
 
 ### Pages
 

@@ -234,8 +234,10 @@ across a new year do not fit beside each other.
 **How many a listing holds.** The number after a heading's name is
 `<sup class="listing-heading__count">` -- on the first page of a tag's or
 a type's listing, on every page of a series, on an archive year and on
-the map of years. It is not on `/page/N/` of a tag, so do not build a
-layout that needs it there.
+the map of years, and on the two lists of lists: `/tag/` (how many tags)
+and `/series/` (how many series). It is not on `/page/N/` of a tag, so do
+not build a layout that needs it there -- and a skin that hides it has
+those two pages to hide it on as well.
 
 **The archive's cells, three times.** A month is `.archive-month` with one
 of `.is-l1` to `.is-l4` or `.is-empty`, and it is drawn in three places
