@@ -116,8 +116,10 @@ WORD = /\A[a-z0-9-]{1,200}\z/
 # a way up (`..`) and anything the engine would read as a switch. Still
 # no space, no separator and nothing a shell has a use for: none of them
 # is in a name any writer of slugs produces, and the door stays narrower
-# than the engine behind it on purpose.
-SLUG = /\A[\p{L}\p{N}_][\p{L}\p{N}._-]*\z/
+# than the engine behind it on purpose. A mark counts as part of the
+# letter it stands on once the name has begun: some alphabets write their
+# vowels that way, and a volume may keep an accent apart from its letter.
+SLUG = /\A[\p{L}\p{N}_][\p{L}\p{M}\p{N}._-]*\z/
 SLUG_BYTES = 255
 
 def slug?(word)

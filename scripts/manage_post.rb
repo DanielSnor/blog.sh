@@ -2563,7 +2563,9 @@ def publish_as_json(slug, announce: true, allow_partial: false, compact: false)
   compacted = 0
   if freed
     compacted, more = quietly(true, keep_stdout: true) { compact_queue(freed, rest) }
-    warnings += more
+    # `compacted` says how many moved; the screen's sentence about it is
+    # not a warning (without_own_report).
+    warnings += without_own_report(more, 'cli.queue_compacted')
   end
   puts JSON.pretty_generate(post_answer(moved || path, warnings).merge('compacted' => compacted))
 rescue Refused => e
@@ -3262,6 +3264,10 @@ rescue StandardError
   false
 end
 
+# Says false both when a move was not made and when the lock was somebody
+# else's; QUEUE_MOVE[:busy] is how a caller with no screen tells the two.
+QUEUE_MOVE = { busy: false }
+
 def apply_queue_moves(moves)
   held = RunLock.hold(ROOT, label: 'queue') do
     # Checked here rather than in the three callers that used to each keep
@@ -3529,6 +3535,7 @@ def apply_queue_moves(moves)
   # queue is re-read on the next frame anyway, so trying again costs a
   # keypress. (RunLock says the same thing on stderr, naming the holder;
   # this line is the one the queue screen can put on its status row.)
+  QUEUE_MOVE[:busy] = true
   puts t('cli.queue_busy')
   puts
   false
@@ -6706,12 +6713,12 @@ def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
       rest = index ? entries[(index + 1)..] : []
       freed = post_time!(post)
       done, warnings = quietly(true, keep_stdout: true) { unschedule_post(path, post, slug, raw: raw) }
-      refuse('busy', t('cli.queue_busy')) unless done
+      refuse('busy', t('cli.busy_for_program')) unless done
       warnings = without_own_report(warnings, 'cli.unscheduled_label')
       moved = 0
       if compact
         moved, more = quietly(true, keep_stdout: true) { compact_queue(freed, rest) }
-        warnings.concat(more)
+        warnings.concat(without_own_report(more, 'cli.queue_compacted'))
       end
       acted_answer(find_post_path(slug, ask: false) || path, warnings).merge('position' => nil, 'compacted' => moved)
     else
@@ -6733,7 +6740,7 @@ def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
       refuse_partial!(post, slug, allow_partial, json: true) unless post['scheduled']
       others = scheduled_entries(except_slug: slug)
       new_path, warnings = quietly(true, keep_stdout: true) { write_scheduled_date(path, post, time, raw: raw) }
-      refuse('busy', t('cli.queue_busy')) if new_path.nil?
+      refuse('busy', t('cli.busy_for_program')) if new_path.nil?
       acted_answer(new_path, warnings).merge('position' => others.count { |entry| entry.first <= time } + 1,
                                              'compacted' => 0)
     end
@@ -6816,7 +6823,7 @@ def rebuild_as_json(full:, force:)
   answer_json do
     ok, warnings = quietly(true) { rebuild_and_deploy(nil, full: full, force: force) }
     unless ok
-      refuse('busy', t('cli.queue_busy')) if Publishing.stopped_on_busy_lock?
+      refuse('busy', t('cli.busy_for_program')) if Publishing.stopped_on_busy_lock?
       refuse('rebuild_failed', warnings.last(6).join(' '))
     end
     { 'ok' => true, 'deploy' => 'done', 'warnings' => warnings }
@@ -6866,7 +6873,7 @@ def announce_as_json(slug, wanted, force:)
     date = post_time!(post)
     year = PostAddress.date_year(post)
     unless force || Publishing.within_recency_window?(date)
-      refuse('outside_window', t('cli.toot_skipped_old', date: date.strftime(t('date_format'))))
+      refuse('outside_window', t('cli.toot_outside_window_for_program', date: date.strftime(t('date_format'))))
     end
     if network == :bluesky
       # The same recovery cmd_bluesky runs first: an announcement whose
@@ -6971,7 +6978,7 @@ def with_post_for_write(slug)
       :written
     end
   end
-  refuse('busy', t('cli.queue_busy')) if held == RunLock::BUSY
+  refuse('busy', t('cli.busy_for_program')) if held == RunLock::BUSY
 end
 
 def props_set_as_json(slug, sets:, rebuild:)
@@ -7078,6 +7085,7 @@ def queue_move_as_json(which, slug, to)
     index = matches.first
     first_future = entries.index { |entry| entry[:time] > Time.now }
     overdue = ->(i) { first_future.nil? || i < first_future }
+    QUEUE_MOVE[:busy] = false
     moved, warnings = quietly(true, keep_stdout: true) do
       case which
       when :up then queue_swap(entries, index, index - 1)
@@ -7090,8 +7098,16 @@ def queue_move_as_json(which, slug, to)
         target == index ? true : queue_carry_apply(entries, index, target)
       end
     end
+    # A lock somebody else holds is not "first, last, or its time has
+    # passed": a program told not_moved stops offering the move, and one
+    # told busy tries again -- which is the right thing to do when a
+    # build happened to be running.
+    refuse('busy', t('cli.busy_for_program')) if !moved && QUEUE_MOVE[:busy]
     refuse('not_moved', warnings.join(' ')) unless moved
-    { 'ok' => true, 'queue' => queue_rows, 'scheduler' => queue_scheduler, 'warnings' => warnings }
+    # The queue in the answer IS the report of the move; the sentence the
+    # screen says about it is not a warning.
+    { 'ok' => true, 'queue' => queue_rows, 'scheduler' => queue_scheduler,
+      'warnings' => without_own_report(warnings, 'cli.queue_swapped', 'cli.queue_carried') }
   end
 end
 
@@ -8328,6 +8344,15 @@ def option_values!(name)
   end
   values
 end
+
+# Every word of the command line, labelled as what it is (utf8 above says
+# why the label is wrong with no LANG). Done once, here, because it was
+# being done value by value -- the values of options got it, and a slug
+# given as a bare word did not. Since the door for programs lets a slug in
+# any alphabet through, that was a post named `žába` deleted and the
+# answer a crash about encodings, and a draft named `čaj` that could be
+# neither scheduled nor published from an app.
+ARGV.map! { |word| utf8(word) }
 
 command = ARGV.shift
 
