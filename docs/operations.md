@@ -2026,7 +2026,9 @@ What it looks for, each with a line saying what to do about it:
   `&amp;` in their text.
 - **Two posts asking for one address in one language** -- a translation
   and another post that both claim `/de/…`, which the build would resolve
-  by serving one of them and dropping the other.
+  by serving one of them and dropping the other. And a text filed under
+  the site's OWN language in `translations`, which nothing reads: in that
+  language the post is its own title and text.
 
 - **A `config/site.<lang>.yml` that nothing reads** -- written for a
   language the site does not publish, carrying a key the engine does not

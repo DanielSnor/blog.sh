@@ -237,7 +237,6 @@ module Checker
     findings.concat(guard(:duplicate_addresses) { check_duplicate_addresses(posts, cap) })
     findings.concat(guard(:duplicate_posts) { check_duplicate_posts(posts, cap) })
     findings.concat(guard(:language_addresses) { check_language_addresses(posts, root, cap) })
-    findings.concat(guard(:own_language_entries) { check_own_language_entries(posts, root, cap) })
     findings.concat(guard(:unknown_locales) { check_unknown_locales(root) })
     findings.concat(guard(:language_key_moved) { check_language_key_moved(root) })
     findings.concat(guard(:language_files) { check_language_files(root, posts) })
@@ -1386,7 +1385,7 @@ module Checker
   # who wrote one, or changed `site.lang` over an archive of translations,
   # has words in the archive that the site shows nowhere. Said, with the
   # one place those words can go.
-  def check_own_language_entries(posts, root, cap = CAP)
+  def own_language_entries(posts, root, cap = CAP)
     own = site_own_language(root)
     return [] if own.empty?
 
@@ -1401,10 +1400,13 @@ module Checker
   end
 
   def check_language_addresses(posts, root, cap = CAP)
+    # A text under the site's own language is asked about here too -- the
+    # other way a post can be wrong about which language it is in -- and on
+    # a site of one language as well, where it is as unread as anywhere.
+    findings = own_language_entries(posts, root, cap)
     langs = published_languages(root)
-    return [] if langs.empty?
+    return findings if langs.empty?
 
-    findings = []
     langs.each do |lang|
       ordered = {}
       posts.each do |post|
