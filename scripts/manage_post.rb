@@ -2328,7 +2328,9 @@ def find_post_path(slug, ask: true, sentence: 'cli.slug_ambiguous')
   # every command that resolves a post by slug ("foto[1]", which a hand
   # edit or an import can mint) answered "post not found" over a post the
   # build was publishing.
-  matches = PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").sort
+  # ...and a name to the letter, whatever the volume makes of letters
+  # (PathGlob.named?).
+  matches = PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").select { |found| PathGlob.named?(found, "#{slug}.json") }.sort
   return matches.first if matches.size <= 1
 
   # A caller that cannot be asked is told which years exist and stopped.
@@ -6225,7 +6227,7 @@ end
 # somebody's undo.
 def trashed_paths(slug)
   (PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'post.json') +
-   [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) }.uniq.sort
+   [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) && PathGlob.named?(File.dirname(f), slug) }.uniq.sort
 end
 
 # Mirrors pick_among_years, over what is in the trash rather than what is
@@ -6268,7 +6270,7 @@ end
 # post.json to bring back, only files. `check --repair` promises the trash
 # is somewhere restore can reach, and this is the half that makes it true.
 def trashed_media_dirs(slug)
-  PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) }.sort
+  PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) && PathGlob.named?(File.dirname(d), slug) }.sort
 end
 
 # Files a filesystem leaves behind rather than files anybody wrote. Kept out
@@ -8874,8 +8876,9 @@ begin
         end
         # ...and `--tag=` is a filter with nothing after it too, written
         # the other way: it answered with the whole archive, as `--tag`
-        # alone once did.
-        abort t('cli.list_needs_value', option: word.chomp('=')) if %w[--type= --tag= --search=].include?(word)
+        # alone once did. (`--search=` is not among them: an empty query
+        # matches nothing and is said back, which is an answer.)
+        abort t('cli.list_needs_value', option: word.chomp('=')) if %w[--type= --tag=].include?(word)
         abort t('cli.list_unknown_option', option: utf8(word)) unless word.match?(/\A--(type|tag|search)=/m) || %w[--drafts --json].include?(word)
         ARGV << word
       end

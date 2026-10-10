@@ -436,8 +436,8 @@ goes in is still being decided; the suffix and the date both come off at the tag
   `LANG` -- which is how a forced command runs -- the engine did what it was asked and died
   printing the answer. Every word of the command line is read as UTF-8, and the door for
   programs takes a slug whose letters carry their marks as characters of their own.
-- **`list --tag=` answered with the whole archive.** A filter with nothing after the sign is said
-  like one with nothing after it at all.
+- **`list --tag=` answered with the whole archive,** and so did `--type=`. A filter with nothing
+  after the sign is said like one with nothing after it at all.
 - **A paragraph with an unclosed `**` and backslashes after it hung the save.** A few dozen
   characters took minutes; they are read at once.
 - **`translate` with no `--lang` offered a language the site does not publish.** It names one it
