@@ -66,6 +66,15 @@ module Languages
     missing = all.reject do |code|
       I18n.locale_file?(code) || I18n.locale_file?(SiteConfig.language_data(code)['ui_language'].to_s)
     end
+    # One that DID say where to borrow from, and named a language the
+    # engine cannot lend: the sentence above then told its author to write
+    # the very line they had just written. Said about the value.
+    borrowing = missing.select { |code| !SiteConfig.language_data(code)['ui_language'].to_s.strip.empty? }
+    unless borrowing.empty?
+      code = borrowing.first
+      abort(I18n.t('build.ui_language_unknown', file: "site.#{code}.yml", value: SiteConfig.language_data(code)['ui_language'].to_s.strip,
+                                                known: Languages.lendable.join(', ')))
+    end
     abort(I18n.t('build.unknown_locale', langs: missing.join(', '))) unless missing.empty?
 
     # What a language says about itself lives in config/site.<lang>.yml, and
@@ -82,6 +91,12 @@ module Languages
     # A file for a language nothing publishes -- a typo in the name, or a
     # language taken out of site.locales and its file left behind. Nothing
     # would ever read it, and a file that does nothing looks like work done.
+    # The site's own language is not one of those: it IS published, and
+    # what it says about itself is config/site.yml. Told to "name the
+    # language in site.locales", its author found it named there.
+    if SiteConfig.language_files.key?(SITE_OWN_LANG)
+      abort(I18n.t('build.language_file_own', file: "site.#{SITE_OWN_LANG}.yml"))
+    end
     stray = SiteConfig.language_files.keys - (all - [SITE_OWN_LANG])
     unless stray.empty?
       abort(I18n.t('build.language_file_stray', files: stray.map { |code| "site.#{code}.yml" }.join(', ')))
@@ -111,6 +126,8 @@ module Languages
           found.map { |f| f[1] }.group_by { |key| LanguageFile.series_key?(key) }.map do |series, keys|
             I18n.t(series ? 'build.language_series_empty' : 'build.language_label_empty', file: file, keys: keys.join(', '))
           end
+        when :not_text
+          [I18n.t('build.language_label_not_text', file: file, keys: found.map { |_, key, value| "#{key} (#{value.inspect})" }.join(', '))]
         else
           found.map do |_, key, detail|
             I18n.t('build.language_list_mismatch', file: file, key: key,
@@ -121,6 +138,12 @@ module Languages
     end
     abort(sentences.join("\n")) unless sentences.empty?
     all.freeze
+  end
+
+  # The languages the engine has words for, by the names of its locale
+  # files: what `ui_language` may name.
+  def lendable
+    Dir.children(I18n::LOCALES_DIR).filter_map { |name| name[/\A([a-z]{2,3})\.yml\z/, 1] }.sort
   end
 
   # Which part of the tree this run's sweep owns.

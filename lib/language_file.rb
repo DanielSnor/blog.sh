@@ -105,9 +105,19 @@ end
       next unless given.is_a?(Hash)
 
       merged[section] = {} unless merged[section].is_a?(Hash)
-      keys.each { |key| merged[section][key] = given[key] if given.key?(key) }
+      keys.each do |key|
+        next unless given.key?(key)
+        # A title given as nothing is not a title: the pages of that
+        # language came out with an empty <title> and an empty heading.
+        # The site's own stands, and `check` says the line is empty.
+        next if section == 'site' && key == 'title' && given[key].to_s.strip.empty?
+
+        merged[section][key] = given[key]
+      end
     end
-    merged['nav'] = lang_data['nav'] if lang_data.key?('nav')
+    merged['nav'] = worded(lang_data['nav'], own.is_a?(Hash) ? own['nav'] : nil, 'label') if lang_data.key?('nav')
+    links = dig(lang_data, 'footer', 'links')
+    merged['footer']['links'] = worded(links, dig(own, 'footer', 'links'), 'title') if links.is_a?(Array) && merged['footer'].is_a?(Hash)
     LABEL_TABLES.each { |table| merged[table] = lang_data[table] if lang_data[table].is_a?(Hash) }
     widgets = lang_data['widgets'].is_a?(Hash) ? lang_data['widgets'] : {}
     widgets.each do |name, conf|
@@ -131,6 +141,41 @@ end
   #                with nothing on it
   #   :mismatch -- a list with places in it that names other places than
   #                the site's own does, or the same ones in another order
+  # The word an entry of a placed list is shown by.
+  WORD_OF = { %w[nav] => 'label', %w[footer links] => 'title' }.freeze
+
+  # A list of a language with the site's own word wherever the language
+  # gave none. The lists go to the same places item by item (PLACED_LISTS),
+  # "only the label changes" -- so an item with no label of its own is the
+  # same item under the label the site has for it. Left wordless it fell
+  # out of that language's menu, and the build blamed config/site.yml.
+  def worded(theirs, mine, key)
+    return theirs unless theirs.is_a?(Array) && mine.is_a?(Array)
+
+    theirs.each_with_index.map do |entry, i|
+      next entry unless entry.is_a?(Hash) && entry[key].to_s.strip.empty? && mine[i].is_a?(Hash) && !mine[i][key].to_s.strip.empty?
+
+      entry.merge(key => mine[i][key])
+    end
+  end
+
+  # What a file says that the build lives with and its author would not
+  # have meant: [kind, key, detail]. Nothing here stops a build; `check`
+  # says each of them once.
+  def remarks(lang_data)
+    return [] unless lang_data.is_a?(Hash)
+
+    found = []
+    found << [:blank, 'site.title', nil] if written?(lang_data, %w[site title]) && dig(lang_data, 'site', 'title').to_s.strip.empty?
+    WORD_OF.each do |path, key|
+      theirs = dig(lang_data, *path)
+      next unless theirs.is_a?(Array)
+
+      theirs.each_with_index { |entry, i| found << [:wordless, path.join('.'), i + 1] if entry.is_a?(Hash) && entry[key].to_s.strip.empty? }
+    end
+    found
+  end
+
   def problems(own, lang_data)
     return [] unless lang_data.is_a?(Hash)
 
@@ -155,7 +200,11 @@ end
         value.each do |tag, label|
           next if label.is_a?(String) && !label.strip.empty?
 
-          found << [label.nil? || label.is_a?(String) ? :empty : :unknown, "#{key}.#{tag}", nil]
+          # A word YAML did not read as text -- `ne: no` is false, `palm:
+          # 2019` a number -- is its own mistake: called an unknown key it
+          # was blamed on `tags`, which the same sentence then listed among
+          # the keys the engine knows.
+          found << (label.nil? || label.is_a?(String) ? [:empty, "#{key}.#{tag}", nil] : [:not_text, "#{key}.#{tag}", label])
         end
       elsif key == 'widgets'
         next found << [:unknown, key, nil] unless value.is_a?(Hash)

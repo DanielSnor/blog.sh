@@ -325,6 +325,10 @@ module Doctor
     files.filter_map do |path|
       code = File.basename(path)[/\Asite\.(.+)\.yml\z/, 1]
       next if published.include?(code)
+      # The site's own language is published; its file is config/site.yml.
+      if code == own
+        next error(I18n.t('check.language_file_own', file: "config/#{File.basename(path)}"), I18n.t('check.language_file_own_fix'))
+      end
 
       error(I18n.t('check.language_file_stray', file: "config/#{File.basename(path)}"), I18n.t('check.language_file_stray_fix'))
     end

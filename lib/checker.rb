@@ -223,7 +223,7 @@ module Checker
     # dead, and a wall of false reds is worse than the one finding that
     # says this question could not be asked.
     findings.concat(guard(:internal_links) { known ? check_internal_links(posts, known, cap, root: root) : [] })
-    findings.concat(guard(:relative_links) { check_relative_links(posts, cap) })
+    findings.concat(guard(:relative_links) { check_relative_links(posts, cap, root: root) })
     findings.concat(guard(:orphan_media) { check_orphan_media(root, posts, cap) })
     findings.concat(guard(:stray_media) { check_stray_media(root, posts, cap) })
     findings.concat(guard(:redirects) { check_redirects(posts, cap, root: root) })
@@ -1106,12 +1106,13 @@ module Checker
   # of a slug that was renamed before renaming kept a redirect.
   def check_internal_links(posts, known, cap = CAP, root: nil)
     dead = []
+    served = published_languages(root)
     # The one exception below holds in every language the site publishes:
     # `/de/type/photo/` is the same address `/type/photo/` is, written for
     # the other language's reader.
     type_roots = ['/type/'] + published_languages(root).map { |lang| "/#{lang}/type/" }
     posts.each do |post|
-      internal_links(post).each do |url|
+      internal_links(post, served).each do |url|
         path = url.split('#').first.split('?').first.to_s
         next if path.empty? || path.start_with?('/assets/') || type_roots.any? { |at| path.start_with?(at) }
         # Both spellings: a browser writes an accented address with percent
@@ -1160,9 +1161,11 @@ module Checker
   # answers 200 with the post the reader is already on. Nothing fails,
   # nothing is logged, and the reader simply never arrives -- which is why
   # 73 of them sat in one archive through every audit it ever had.
-  def check_relative_links(posts, cap = CAP)
+  def check_relative_links(posts, cap = CAP, root: nil)
+    # Of the texts the site serves, as the dead links are (all_links).
+    served = root ? published_languages(root) : nil
     found = posts.flat_map do |post|
-      all_links(post).select { |url| relative_link?(url) }.map { |url| [post['slug'], url, post['__year']] }
+      all_links(post, served).select { |url| relative_link?(url) }.map { |url| [post['slug'], url, post['__year']] }
     end
     return [] if found.empty?
 
@@ -1346,8 +1349,20 @@ module Checker
     end
     return [] if missing.empty?
 
-    [error(t('unknown_locale', langs: missing.join(', ')), t('unknown_locale_fix'),
-           kind: :unknown_locale, data: { 'langs' => missing })]
+    # One that did say where to borrow from, and named a language the
+    # engine cannot lend: told to write the line it had just written.
+    lendable = Dir.children(I18n::LOCALES_DIR).filter_map { |name| name[/\A([a-z]{2,3})\.yml\z/, 1] }.sort
+    borrowing, plain = missing.partition { |code| !language_file(root, code)['ui_language'].to_s.strip.empty? }
+    found = borrowing.map do |code|
+      value = language_file(root, code)['ui_language'].to_s.strip
+      error(t('ui_language_unknown', file: "site.#{code}.yml", value: value), t('ui_language_unknown_fix', known: lendable.join(', ')),
+            kind: :ui_language_unknown, data: { 'lang' => code, 'value' => value, 'known' => lendable })
+    end
+    unless plain.empty?
+      found << error(t('unknown_locale', langs: plain.join(', ')), t('unknown_locale_fix'),
+                     kind: :unknown_locale, data: { 'langs' => plain })
+    end
+    found
   end
 
   # `site.fallback` and `site.ui_language` in config/site.yml: where a
@@ -1474,7 +1489,14 @@ module Checker
     Dir.glob(File.join(root, 'config', 'site.*.yml')).sort.each do |path|
       code = File.basename(path).sub(/\Asite\./, '').sub(/\.yml\z/, '')
       name = File.basename(path)
-      unless published.include?(code) && code != site_own_language(root)
+      if code == site_own_language(root)
+        # Not a language the site "does not publish": it is the one the
+        # site is written in, and config/site.yml is where it speaks.
+        findings << error(t('language_file_own', file: name), t('language_file_own_fix'),
+                          kind: :language_file_stray, data: { 'file' => name, 'lang' => code })
+        next
+      end
+      unless published.include?(code)
         findings << error(t('language_file_stray', file: name), t('language_file_stray_fix'),
                           kind: :language_file_stray, data: { 'file' => name, 'lang' => code })
         next
@@ -1485,9 +1507,57 @@ module Checker
         next
       end
       findings.concat(language_file_findings(name, own_config(root), language_file(root, code)))
+      findings.concat(language_file_remarks(name, code, language_file(root, code), published))
     end
     findings.concat(unused_tag_labels(posts, root))
+    findings.concat(unused_series_labels(posts, root))
     findings
+  end
+
+  # What a language's file says that the build lives with and its author
+  # would not have meant -- warnings, each said once here instead of on
+  # every build or never: a menu item or a footer link with no word of its
+  # own (shown under the site's own), a title given as nothing (the site's
+  # own stands), and a `fallback` naming a language the site does not
+  # publish, or the language itself, which stands in for nothing.
+  def language_file_remarks(name, code, data, published)
+    found = LanguageFile.remarks(data).group_by { |kind, key, _| [kind, key] }.map do |(kind, key), items|
+      if kind == :blank
+        warn(t('language_title_blank', file: name), t('language_title_blank_fix'),
+             kind: :language_title_blank, data: { 'file' => name, 'key' => key })
+      else
+        places = items.map { |_, _, n| n }
+        warn(t('language_item_wordless', file: name, key: key, items: places.join(', ')), t('language_item_wordless_fix'),
+             kind: :language_item_wordless, data: { 'file' => name, 'key' => key, 'items' => places })
+      end
+    end
+    named = Array(data.is_a?(Hash) ? data['fallback'] : nil).map { |lang| lang.to_s.strip }.reject(&:empty?)
+    idle = named.reject { |lang| published.include?(lang) && lang != code }
+    unless idle.empty?
+      found << warn(t('language_fallback_idle', file: name, langs: idle.join(', ')),
+                    t('language_fallback_idle_fix', known: (published - [code]).join(', ')),
+                    kind: :language_fallback_idle, data: { 'file' => name, 'langs' => idle })
+    end
+    found
+  end
+
+  # A name for a series nobody writes: the sibling of a word for a tag no
+  # post carries, which has had its warning since the table arrived -- a
+  # typo in the key, and the series goes on under its own name in that
+  # language with nothing said.
+  def unused_series_labels(posts, root)
+    return [] unless root
+
+    written = posts.reject { |post| draft?(post) || PostAddress.page?(post) || PostAddress.unlisted?(post) }
+                   .map { |post| Slug.slugify(post['series'].to_s) }.reject(&:empty?).to_set
+    published_languages(root).flat_map do |code|
+      name = "site.#{code}.yml"
+      unused = LanguageFile.series_labels(language_file(root, code)) { |series| Slug.slugify(series) }.keys.reject { |slug| written.include?(slug) }
+      next [] if unused.empty?
+
+      [warn(t('language_series_unused', file: name, series: unused.join(', ')), t('language_series_unused_fix'),
+            kind: :language_series_unused, data: { 'file' => name, 'series' => unused })]
+    end
   end
 
   # A language file that will not parse stops the build of EVERY language
@@ -1516,6 +1586,10 @@ module Checker
       when :orphan
         [error(t('language_key_orphan', file: name, keys: keys.join(', ')), t('language_key_orphan_fix'),
                kind: :language_key_orphan, data: { 'file' => name, 'keys' => keys })]
+      when :not_text
+        said = found.map { |_, key, value| "#{key} (#{value.inspect})" }
+        [error(t('language_label_not_text', file: name, keys: said.join(', ')), t('language_label_not_text_fix'),
+               kind: :language_label_not_text, data: { 'file' => name, 'keys' => keys })]
       when :empty
         # One kind for a caller that reads it, and a sentence per table: the
         # one about a tag speaks of a pill and of `tags:`, and a series is
@@ -2183,8 +2257,8 @@ module Checker
     end
   end
 
-  def internal_links(post)
-    all_links(post).select { |url| url.start_with?('/') }
+  def internal_links(post, languages = nil)
+    all_links(post, languages).select { |url| url.start_with?('/') }
   end
 
   # A scheme is anything up to the first colon that looks like one, so this
@@ -2210,10 +2284,19 @@ module Checker
   # translation is text the site serves, so a dead link in it is dead on a
   # page a reader opens. Reading only `content` left the second language
   # as the one place a renamed slug could rot unseen.
-  def all_links(post)
+  #
+  # languages: the ones the site publishes, when the question is about what
+  # a reader can open. The text of a language taken out of `site.locales`
+  # is on no page: a link in it leads nowhere a reader will be, and check
+  # called it an error -- exit 1, on a cron -- with `translate` unable to
+  # open the text ("this site publishes one language") and nothing to
+  # repair it with. nil reads every text, as before.
+  def all_links(post, languages = nil)
     bodies = [post['content']]
     translations = post['translations']
-    translations.each_value { |one| bodies << one['content'] if one.is_a?(Hash) } if translations.is_a?(Hash)
+    if translations.is_a?(Hash)
+      translations.each { |lang, one| bodies << one['content'] if one.is_a?(Hash) && (languages.nil? || languages.include?(lang.to_s)) }
+    end
     bodies.flat_map { |body| links_in(body) }
   end
 
