@@ -649,14 +649,25 @@ module Tui
           waiting = pending_input
           typed, newline, = waiting.partition(/[\r\n]/)
           typed = "#{key}#{typed}"
-          print "\r\n\e[?25h#{text_prompt}#{typed}"
-          rest = newline.empty? ? $stdin.gets.to_s.strip : (puts; '')
-          # Esc in the typed line backs out, as it does everywhere: the
-          # cooked read hands it over as a character, and "abc^[" came
-          # back as the slug to open (second trial, 25. 9. 2026).
-          return nil if "#{typed}#{rest}".include?("\e")
+          print "\r\n\e[?25h#{typed_row(text_prompt, typed)}"
+          if newline.empty?
+            # The rest of the line is read here, key by key, and not by the
+            # terminal. A cooked read can take back only what it took in
+            # itself, and the first letter was the menu's: one mistyped
+            # key -- y for z, on a keyboard that had just been switched --
+            # and Backspace did nothing at all (issue 57). With the last
+            # letter taken back there is no line any more: the menu again.
+            typed = typed_line(text_prompt, typed)
+            return nil if typed.nil?
+            next if typed.empty?
+          else
+            puts
+          end
+          # Esc in a pasted line backs out, as it does everywhere: "abc^["
+          # came back as the slug to open (second trial, 25. 9. 2026).
+          return nil if typed.include?("\e")
 
-          line = "#{typed}#{rest}".gsub(/[[:cntrl:]]+/, ' ').strip
+          line = typed.gsub(/[[:cntrl:]]+/, ' ').strip
           # numeric_pick: false for menus whose rows carry no numbers and
           # whose VALUES can be numbers (tag names like "365") -- there a
           # typed number must mean the text, not a row.
@@ -679,6 +690,43 @@ module Tui
     # and with the row closed that `puts` finally produces the blank it was
     # always meant to be instead of the line break nobody got.
     puts
+  end
+
+  # A line typed under a menu, read a key at a time: letters are added,
+  # Backspace takes the last one back -- whole, as edit_query takes it --
+  # Enter ends the line and Esc gives it up (nil). An empty answer means
+  # every letter was taken back. Arrows and the like say nothing here.
+  def typed_line(prompt, typed)
+    loop do
+      key = read_key
+      case key
+      when :enter
+        print "\r\n"
+        return typed
+      when :escape then return nil
+      when String
+        typed = edit_query(typed, key)
+        print "\r\e[2K#{typed_row(prompt, typed)}"
+        return typed if typed.empty?
+      end
+    end
+  end
+
+  # The prompt and what was typed after it, on ONE row of the terminal: a
+  # line that wraps cannot be redrawn by clearing a row, so when the two do
+  # not fit, the end of what was typed is shown -- where the typing is.
+  def typed_row(prompt, typed)
+    room = term_width - 1
+    whole = "#{prompt}#{typed}"
+    return whole if display_width(whole) <= room
+
+    tail = +''
+    typed.each_char.reverse_each do |char|
+      break if display_width("…#{char}#{tail}") > room
+
+      tail.prepend(char)
+    end
+    "…#{tail}"
   end
 
   # Two strings on one line, the second flush right -- the status line of

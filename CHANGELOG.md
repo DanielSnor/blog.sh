@@ -466,6 +466,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
   it. A turn older than any delivery can be is over whichever process now carries its number.
 - **`./setup.sh --help` said every question can be skipped.** Five cannot while they hold the
   template's example, and the wizard's opening sentence named four of them.
+- **A slug typed into a picker could not be corrected past its first letter.** In the trash, or
+  wherever a list takes a number or a slug: the first key was read by the menu and the rest of
+  the line by the terminal, which can take back only what it took in itself -- `y` for `z` and
+  Backspace did nothing. The whole line is read a key at a time; with its last letter taken
+  back, the menu is there again.
 - **A moved installation lost its teasers.** An export writes `//--more--//` as `<!--more-->`,
   the line Jekyll and Hugo end an excerpt at, and the import did not read it back: the post came
   home with a paragraph saying `<!--more-->` and a card showing the whole text. Read as the end
