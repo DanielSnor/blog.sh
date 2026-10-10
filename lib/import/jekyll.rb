@@ -994,12 +994,14 @@ module Import
       # not countable any more.
       body = body.gsub(MarkdownParser::IMAGE_RE) do
         m = Regexp.last_match
-        image_sentinel(m[:target], m[:alt], m[:title])
+        image_sentinel(m[:target], m[:alt], MarkdownParser.unescape_title(m[:title]))
       end
       # Line-anchored form ([ \t], NOT \s -- \s eats the newlines and
-      # with them the paragraph break after the image).
-      body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"([^"]*)")?\)[ \t]*$/) do
-        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
+      # with them the paragraph break after the image). The title as the
+      # writer writes it: a quote inside it escaped, which lost the whole
+      # caption here (third fleet, 10. 10. 2026).
+      body.gsub(/^!\[([^\]]*)\]\(((?:[^()"]|\([^()"]*\))+?)(?:[ \t]+"((?:\\.|[^"\\])*)")?\)[ \t]*$/) do
+        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), MarkdownParser.unescape_title(Regexp.last_match(3)))
       end
     end
 
@@ -1277,7 +1279,12 @@ module Import
     # a silent rewrite of somebody's archive is exactly what an import
     # must not do.
     LINKED_IMAGE = /\[!\[([^\]]*)\]\(([^)\s]+)[^)]*\)\]\(([^)\s]+)[^)]*\)/
-    INLINE_IMAGE = /(?<!\\)!\[[^\]]*\]\([^)\s]+[^)]*\)/
+    # The target may hold one level of parentheses and the title anything
+    # between its quotes, an escaped quote included: read up to the first
+    # ")", an image whose caption held one was cut there, and the rest of
+    # the caption -- with the paragraph break after the picture -- came
+    # back inside it (third fleet, 10. 10. 2026).
+    INLINE_IMAGE = /(?<!\\)!\[[^\]]*\]\((?:[^()"\s]|\([^()"]*\))+(?:\s+"(?:\\.|[^"\\])*")?\s*\)/
 
     def free_inline_images(body)
       body = body.gsub(LINKED_IMAGE) do
@@ -1331,7 +1338,7 @@ module Import
     TRAILING_CAPTION = /\A[ \t]*(?:\*([^*\n]+)\*|_([^_\n]+)_)[ \t]*(?=\n|\z)/
 
     def fold_caption(image, rest)
-      return [image, rest] if image.match?(/\s"[^"]*"\)\z/)
+      return [image, rest] if image.match?(/\s"(?:\\.|[^"\\])*"\)\z/)
       return [image, rest] unless (m = TRAILING_CAPTION.match(rest))
 
       caption = (m[1] || m[2]).strip
