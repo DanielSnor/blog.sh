@@ -371,6 +371,42 @@ goes in is still being decided; the suffix and the date both come off at the tag
   the address alive: the build refuses it aloud and `check` names it.
 - **A launcher on a Mac was replaced by another site's.** Two sites called the same -- any two
   nobody has named yet -- wrote one icon, opening whichever was made last. The second is told so.
+- **What a third fleet found in the fixes of the second** (34 findings over the 35 commits above,
+  one serious). Saving the text of another language took the address the text stands at out of
+  its list of old addresses, "so a text renamed back does not redirect to itself" -- and at the
+  root of the site that entry is the old address of a post merged into this one, which every
+  merged post of sean.cz carries: the first save of such a text deleted its redirect, unasked.
+  Nothing is taken out of that list now. A block the text REWROTE kept only what markdown can
+  say: a paragraph an import marked indented, as a line of chat or as a list item became a plain
+  paragraph, and a video forgot where it came from; it is paired with the block it rewrote and
+  keeps what the text could not have changed. A stored paragraph beginning `//` was handed out as
+  a note to the editor and dropped by being saved back; it is written `\//` and read back. A post
+  with nothing under its header -- a title and its tags, a link card -- could not be changed from
+  a file, every save being "empty"; empty is refused only of a post that had a body. Taking a
+  language off a post owes the address its text stood at, not only the older ones. A move in the
+  queue reads the queue under the archive's lock, so a cancel landing beside it is `busy`, not a
+  sentence about the editor. `schedule --at` with a day and no time was midnight; it is `bad_date`,
+  as the documentation said. `publishing:` that is not a map, and `allow_partial:` with nothing
+  after it, are named by doctor. `check` reads a `redirect_from` without its leading slash as the
+  build serves it, instead of calling a link to it dead and having `--repair` write a second entry.
+  A fallback chain runs only through languages the site publishes and ends at the site's own
+  language: `fallback: [cs, en]` on a Czech site's German file showed English, and a language the
+  site does not publish decided the type of a post for the sitemap. A site whose own language the
+  engine has no words for is told to add the locale file or choose another `site.lang`, not sent
+  round three sentences. Four sentences of `check` said more than was true (a text with no words
+  under the site's own language, an item no list has a word for, advice about `former_slugs` for
+  an address no redirect can be made from, a `language_name` that is not text). The door for
+  programs: a clock above eight digits is `bad_limit` rather than a backtrace, KILL goes to the
+  whole group after TERM, an engine ended by a signal is named to a delivery too, the answer is
+  always valid UTF-8, and the receiver reads its clock as the door does. `props --drop-address`
+  takes an address written twice in one list out whole, and `--kind` alone, twice or naming no
+  list is a refusal with a code. A Backspace that arrived in the same read as the first letter of
+  a slug became a space in it. `pair` with a key file under a user the machine does not have
+  said so in a backtrace. The Jekyll importer read an inline image up to the first `)`, so a
+  caption with one came back with the paragraph break inside it, and a caption with a straight
+  quote was lost. The example config switches `allow_partial` on by itself only, and the
+  documentation names `--kind`, `busy` where it is answered, the shape of `delete`'s answer, and
+  what 1.9 does with `language_name` and `publishing.allow_partial` on the way back.
 - **A launcher on a Mac opened two windows.** A Terminal that is not running opens a window of its
   own as it starts, and the launcher opened a second one beside it: an empty window and the blog,
   at every double-click, for the author who has no Terminal open -- which is who the launcher is

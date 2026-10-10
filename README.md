@@ -242,7 +242,7 @@ says what you are running.
                                # a post's state and its actions; [e] changes what the post IS --
                                # its series and part, tags, type, and the unlisted/hero/toc flags;
                                # --json prints it all as data, with the actions that apply, and takes
-                               # the screen's keys as flags: --set k=v, --drop-address, --rename --yes,
+                               # the screen's keys as flags: --set k=v, --drop-address [--kind], --rename --yes,
                                # --versions, --restore-version --yes, --rebuild
 ./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
                                # shows the draft's preview, asks what's next;

@@ -930,14 +930,15 @@ every load.
 **Going back a version** is `git checkout <tag>` and a rebuild, and what
 the newer version was given to work with is looked at first, because the
 older one does not treat all of it alike. From 1.10 back to 1.9: take
-`series:` out of every `config/site.<lang>.yml`, or the build stops on it
-and nothing is deployed -- a language's file is where 1.9 refuses a key
-it does not know. `on_this_day` under `widgets:` it does not refuse: the
+`series:` and `language_name:` out of every `config/site.<lang>.yml`, or
+the build stops on them and nothing is deployed -- a language's file is
+where 1.9 refuses a key it does not know. `on_this_day` under `widgets:` it does not refuse: the
 build says one line about it, `doctor` marks it, and the card is simply
-not drawn. And `site.author_name`, `banner.show_image` and
-`layout.lead_card` it passes over without a word, so the pages go back
-to what 1.9 makes without them -- the banner's picture is shown again,
-for one. Old addresses a translation was given
+not drawn. And `site.author_name`, `banner.show_image`,
+`layout.lead_card` and `publishing.allow_partial` it passes over without
+a word, so the pages go back to what 1.9 makes without them -- the
+banner's picture is shown again, for one, and a site of several
+languages is asked about every post again. Old addresses a translation was given
 (`translations.<lang>.former_slugs`) stop being answered -- 1.9 does not
 read them, and a translation saved there is written without the list, so
 those addresses are not in the post on the way forward again either.

@@ -488,7 +488,12 @@ what every site does today.
 
 The site's own language has no file of its own -- `config/site.yml` is
 its file -- and that is also why it cannot be given a chain: it is where
-every chain ends.
+every chain ends. Written INTO a chain it ends the chain there too:
+`fallback: [cs, de]` on a site whose own language is Czech is "Czech",
+and German after it is never reached. A chain runs only through
+languages the site publishes; one that names another, or the language
+itself, or a language after the site's own, has an entry that stands in
+for nothing, and `./blog.sh check` names it.
 
 The words and the address come from the same answer, always: Czech words
 under a link to the English page would be worse than either on its own.

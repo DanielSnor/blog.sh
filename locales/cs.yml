@@ -32,6 +32,7 @@ build:
   unreadable_posts: "❌ V content.nosync/posts/ jsou soubory, které nejdou přečíst — sestavení zastaveno:"
   duplicate_address: "❌ Dva příspěvky na jedné adrese v content.nosync/posts/ — sestavení zastaveno:"
   unknown_locale: "❌ V site.locales je jazyk, ke kterému engine nemá soubor s překlady: %{langs} — přidej locales/<kód>.yml, vyndej kód z config/site.yml, nebo řekni, odkud vzít slova rozhraní: `ui_language: <kód>` nahoře v config/site.<kód>.yml."
+  own_locale_unknown: "❌ site.lang je %{lang} a engine pro něj nemá soubor locales. Vlastní jazyk webu si rozhraní půjčit neumí: přidej locales/%{lang}.yml (zkopíruj locales/en.yml a přelož ho), nebo zvol site.lang, kterým engine mluví — %{known}."
   ui_language_unknown: "❌ %{file}: ui_language říká %{value}, a z toho jazyka engine slova půjčit neumí — má %{known}. Uveď jeden z nich."
   language_file_own: "❌ %{file}: soubor pro vlastní jazyk webu. Co web říká ve vlastním jazyce, je config/site.yml — přesuň obsah souboru tam, nebo soubor přesuň mimo config/; takhle ho nic nečte."
   language_label_not_text: "❌ %{file}: slovo pro %{keys} není text — YAML ho přečetl jako něco jiného (no, yes, on a off jsou pro něj pravda a nepravda, holé číslo je číslo). Dej slovo do uvozovek."
@@ -405,15 +406,18 @@ cli:
   drafts_problem_missing_media: "z telefonu ne: chybí obrázek, který jmenuje"
   drafts_problem_unreadable: "z telefonu ne: text nejde přečíst zpět"
   drafts_unknown_option: "Neznámá volba: %{option}. drafts bere --json a slug, nic jiného."
-  props_unknown_option: "Neznámá volba: %{option}. props bere slug a --json, a s --json také --set, --drop-address, --rename, --versions, --restore-version, --yes a --rebuild."
+  props_unknown_option: "Neznámá volba: %{option}. props bere slug a --json, a s --json také --set, --drop-address (s --kind), --rename, --versions, --restore-version, --yes a --rebuild."
   props_json_needs_slug: "--json musí pojmenovat příspěvek: `props <slug> --json`. Bez slugu nabídne props příspěvky na výběr — a odpověď jako objekt znamená, že u toho nikdo nesedí."
   queue_unknown_option: "Neznámá volba: %{option}. queue bere --json a s ním --up, --down, --move a --to."
   option_needs_value: "%{option} potřebuje za sebou hodnotu."
-  props_flags_need_json: "--set, --drop-address, --rename, --versions, --restore-version, --yes a --rebuild jsou klávesy obrazovky zodpovězené za program a jsou jen pro --json; bez něj props otevře obrazovku."
+  props_flags_need_json: "--set, --drop-address (s --kind), --rename, --versions, --restore-version, --yes a --rebuild jsou klávesy obrazovky zodpovězené za program a jsou jen pro --json; bez něj props otevře obrazovku."
   props_one_action: "Jedna akce na volání: --set (třeba vícekrát), --drop-address, --rename, --versions nebo --restore-version, ne dvě najednou."
   props_bad_property: "%{key} nejde nastavit na \"%{value}\". Klíče jsou %{keys}; series_part je číslo nebo -, tags řádek oddělený čárkami nebo -, type jeden z osmi typů enginu nebo -, unlisted a pinned yes nebo no, hero a toc yes, no nebo default."
   props_address_unknown: "Tenhle příspěvek nemá starou adresu %{address}."
   props_address_ambiguous: "%{address} stojí ve víc než jednom seznamu tohohle příspěvku (%{kinds}). Řekni, který se myslí: --kind a jedno z těch jmen."
+  props_kind_once: "--kind se říká jednou."
+  props_kind_needs_drop: "--kind říká, ze kterého seznamu se adresa ruší, a patří k --drop-address."
+  props_kind_unknown: "%{address} nestojí v žádném seznamu jménem %{kind}; stojí v: %{kinds}."
   edit_incoming_name_taken: "%{file} přišel i do incoming/ a nepoužil se: příspěvek soubor toho jména už má a obsazené jméno znamená ten soubor, který ho má. Obrázek vyměníš tak, že nový pošleš pod jiným jménem."
   props_version_unknown: "Tenhle příspěvek nemá verzi jménem %{name} — props --versions --json vypíše ty, které má."
   props_rename_needs_yes: "--rename potřebuje vedle sebe --yes: obrazovka přejmenování potvrzuje klávesou, program ho potvrzuje přepínačem."
@@ -707,7 +711,7 @@ cli:
       ./blog.sh translate <slug> --lang <kód> [--json]
                                      napíše text toho příspěvku v dalším jazyce, který web publikuje;
                                      --json vydá text jako data místo otevření editoru
-      ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <jméno> --yes] [--rebuild]
+      ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a> [--kind <kind>]] [--rename <slug> --yes] [--versions] [--restore-version <jméno> --yes] [--rebuild]
                                      stav příspěvku, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním;
                                      --json je vypíše jako data, včetně akcí, které na něj platí
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
@@ -1174,6 +1178,7 @@ pair:
   q_address: "Adresa tohohle počítače, jak se k němu připojí telefon (IP adresa nebo jméno) [%{address}]: "
   bad_address: "❌ „%{address}“ není adresa, na kterou se dá připojit: čekám jméno nebo číslo bez mezer."
   no_sshd: "❌ Na portu %{port} tady neodpovídá SSH, takže by se aplikace neměla kam připojit."
+  keys_path_bad: "BLOG_SH_AUTHORIZED_KEYS říká %{path} a tu cestu nejde rozvinout — ~uživatel, kterého tenhle stroj nemá. Oprav ji v env.sh."
   no_sshd_mac: "   Zapni ho v Nastavení systému → Obecné → Sdílení → Vzdálené přihlášení a pusť ./blog.sh pair znovu."
   no_sshd_other: "   Spusť na tomhle stroji sshd (nebo řekni port přes --port), případně aplikaci nastav ručně podle docs/operations.md."
   container: "   Blog běží v kontejneru: klíče pro přihlášení drží hostitel, ne kontejner. Aplikaci nastav ručně podle docs/operations.md."
@@ -1360,6 +1365,8 @@ doctor:
   slots_shape: "publishing.slots musí být seznam."
   slots_bad: "Publikační sloty, které se budou ignorovat: %{values}."
   slots_bad_fix: "Formát je \"<den> HH:MM\" — mon, tue, wed, thu, fri, sat, sun nebo daily, pak čas ve 24hodinovém formátu. Plné názvy dnů nefungují."
+  publishing_shape: "publishing je %{value}, ne mapa klíčů — nečtou se ani sloty, ani allow_partial."
+  publishing_shape_fix: "Napiš sekci tak, jak ji ukazuje příklad: publishing:, pod ním odsazené slots: a allow_partial:."
   allow_partial_shape: "publishing.allow_partial je %{value}, což není ani true, ani false — čte se jako vypnuto."
   allow_partial_shape_fix: "Napiš publishing.allow_partial: true (bez uvozovek), nebo řádek smaž."
   scheduler_ok: "Ve frontě čeká příspěvků: %{count}, a naposledy ji něco spustilo před %{ago}."
@@ -1466,6 +1473,8 @@ check:
   translation_own_language_fix: "Jestli má příspěvek mít právě tahle slova, dej je do příspěvku samotného (./blog.sh edit) a translations.%{lang} ze souboru příspěvku vyndej. Jestli se změnil jazyk webu, vlastní texty příspěvků jsou pořád v tom starém: site.lang říká, v jakém jazyce jsou příspěvky napsané."
   unknown_locale: "%{langs}: `site.locales` ten jazyk jmenuje, ale engine k němu nemá soubor s překlady — nesestaví se žádný jazyk tohoto webu."
   unknown_locale_fix: "Přidej pro něj locales/<kód>.yml, vyndej kód ze `site.locales`, nebo řekni, z jakého jazyka vzít slova rozhraní: `ui_language: <kód>` nahoře ve vlastním souboru toho jazyka, config/site.<kód>.yml."
+  own_locale_unknown: "%{lang} je vlastní jazyk webu (site.lang) a engine pro něj nemá soubor locales — žádný jazyk tohohle webu se nesestaví."
+  own_locale_unknown_fix: "Vlastní jazyk webu si rozhraní půjčit neumí (ui_language je pro ostatní jazyky, v jejich vlastních souborech). Přidej locales/%{lang}.yml — zkopíruj locales/en.yml a přelož ho — nebo zvol site.lang, kterým engine mluví: %{known}."
   ui_language_unknown: "%{file}: `ui_language` říká %{value}, a z toho jazyka engine slova půjčit neumí — nesestaví se žádný jazyk tohohle webu."
   ui_language_unknown_fix: "Engine mluví %{known}. Uveď jeden z nich — jazyk, ze kterého si tenhle půjčí slova rozhraní — nebo přidej locales/<kód>.yml pro ten, který jsi uvedl."
   language_file_own: "%{file} je soubor pro vlastní jazyk webu — nic ho nečte a nesestaví se žádný jazyk tohohle webu."
@@ -1476,8 +1485,8 @@ check:
   language_title_blank_fix: "Napiš titulek, nebo řádek vyndej."
   language_item_wordless: "%{file}: %{key} nemá vlastní slovo pro položku %{items}; ukazuje se pod slovem, které pro ni má vlastní seznam webu."
   language_item_wordless_fix: "Napiš to slovo — label: v menu, title: u odkazů patičky — ať se položka v tom jazyce dá číst."
-  language_fallback_idle: "%{file}: fallback jmenuje %{langs}, což nezastoupí nic — jazyk, který tenhle web nepublikuje, nebo ten jazyk sám."
-  language_fallback_idle_fix: "Fallback je jiný jazyk, který tenhle web publikuje (%{known}). Záznam oprav, nebo vyndej; na webu mezitím nic špatně není, řádek jen nic nedělá."
+  language_fallback_idle: "%{file}: fallback jmenuje %{langs}, což nic nezastoupí — jazyk, který tenhle web nepublikuje, jazyk sám, nebo jazyk zapsaný až za vlastním jazykem webu, kde každý řetěz končí."
+  language_fallback_idle_fix: "Fallback je jiný jazyk, který tenhle web publikuje (%{known}), zapsaný před vlastním jazykem webu. Oprav položku nebo ji vyhoď; na webu mezitím nic špatně není, řádek jen nic nedělá."
   language_name_missing: "%{file}: jazyk si půjčuje rozhraní a nemá pro sebe jméno, takže ho přepínač jazyků nazývá %{code}."
   language_name_missing_fix: "Napiš, jak se jazyk jmenuje sám v sobě — language_name: Slovenčina, nahoře v tom souboru vedle ui_language."
   language_series_unused: "%{file} dává jméno sérii %{series}, ve které není žádný publikovaný příspěvek — nic ho neukáže."
@@ -1525,6 +1534,7 @@ check:
   link_dead: "%{slug}: odkazuje na %{url}, kde na tomhle webu nic není."
   link_dead_fix: "Obvykle permalink zbylý po importu, nebo slug přejmenovaný dřív, než si přejmenování začalo držet přesměrování. Oprav odkaz, nebo cílovému příspěvku přidej redirect_from."
   link_dead_fix_own: "Oprav odkaz. Adresu toho tvaru si web dělá sám, takže na ní redirect_from odpovídat nemůže. Jestli tam příspěvek, na který míří, dřív opravdu byl, patří ta stará adresa do jeho former_slugs jako <rok>/<slug> (u textu v jiném jazyce do former_slugs toho jazyka) a od té chvíle se obsluhuje."
+  link_dead_fix_unusable: "Oprav odkaz. Na adrese toho tvaru nemůže odpovídat žádné přesměrování — segment z pouhé tečky, otazník nebo křížek, znak, který cesta neunese, nebo segment delší, než složka smí mít — takže ji nezastoupí ani redirect_from, ani former_slugs."
   link_relative: "%{slug}: odkazuje na %{url}, což se čte vůči příspěvku samotnému, ne vůči webu."
   link_relative_fix: "Tři tvary, tři různé opravy: odkaz na jiný příspěvek tohohle webu (přepiš na /posts/<rok>/<slug>/), holý název hostu, kterému chybí jen protokol (adresa je napsaná správně — doplň https://), a absolutní adresa se zbloudilým znakem vepředu (\" nebo :). Všechny tři se vyhodnotí uvnitř URL toho příspěvku, a dotaz za otazníkem statický hosting ignoruje — vrátí 200 a tutéž stránku, na které čtenář stojí. Nic se nerozbije a nikdo nikam nedojde. Jestli cíl ještě odpovídá, je otázka pro check --online."
   media_orphan: "K adresáři médií %{dir} nepatří žádný příspěvek."

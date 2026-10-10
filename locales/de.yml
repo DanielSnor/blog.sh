@@ -33,6 +33,7 @@ build:
   unreadable_posts: "❌ Nicht lesbare Beitragsdateien in content.nosync/posts/ -- Build angehalten:"
   duplicate_address: "❌ Zwei Beiträge unter einer Adresse in content.nosync/posts/ -- Build angehalten:"
   unknown_locale: "❌ site.locales nennt eine Sprache, für die die Engine keine Sprachdatei hat: %{langs} -- lege locales/<Code>.yml an, nimm den Code aus config/site.yml heraus, oder sage, woher ihre Oberflächenwörter kommen: `ui_language: <Code>` oben in config/site.<Code>.yml."
+  own_locale_unknown: "❌ site.lang ist %{lang}, und die Engine hat keine Locale-Datei dafür. Die eigene Sprache der Website kann sich ihre Oberfläche nicht leihen: leg locales/%{lang}.yml an (kopier locales/en.yml und übersetz sie), oder wähl ein site.lang, das die Engine spricht -- %{known}."
   ui_language_unknown: "❌ %{file}: ui_language nennt %{value}, und in dieser Sprache hat die Engine keine Worte zu verleihen -- sie hat %{known}. Nenne eine davon."
   language_file_own: "❌ %{file}: eine Datei für die eigene Sprache der Website. Was die Website in ihrer eigenen Sprache sagt, ist config/site.yml -- verschiebe den Inhalt der Datei dorthin oder die Datei aus config/ heraus; so liest sie nichts."
   language_label_not_text: "❌ %{file}: das Wort für %{keys} ist kein Text -- YAML hat es als etwas anderes gelesen (no, yes, on und off sind für YAML wahr und falsch, eine bloße Zahl ist eine Zahl). Setze das Wort in Anführungszeichen."
@@ -418,15 +419,18 @@ cli:
   drafts_problem_missing_media: "nicht vom Telefon: ein genanntes Bild fehlt"
   drafts_problem_unreadable: "nicht vom Telefon: der Text lässt sich nicht zurücklesen"
   drafts_unknown_option: "Unbekannte Option: %{option}. drafts kennt --json und einen Slug, sonst nichts."
-  props_unknown_option: "Unbekannte Option: %{option}. props kennt einen Slug und --json, und mit --json auch --set, --drop-address, --rename, --versions, --restore-version, --yes und --rebuild."
+  props_unknown_option: "Unbekannte Option: %{option}. props kennt einen Slug und --json, und mit --json auch --set, --drop-address (mit --kind), --rename, --versions, --restore-version, --yes und --rebuild."
   props_json_needs_slug: "--json muss den Beitrag benennen: `props <slug> --json`. Ohne Slug bietet props die Beiträge zur Auswahl an, und eine Antwort als Objekt heißt, dass niemand da ist, der wählt."
   queue_unknown_option: "Unbekannte Option: %{option}. queue kennt --json und damit --up, --down, --move und --to."
   option_needs_value: "%{option} braucht dahinter einen Wert."
-  props_flags_need_json: "--set, --drop-address, --rename, --versions, --restore-version, --yes und --rebuild sind die Tasten des Bildschirms, für ein Programm beantwortet, und gelten nur mit --json; ohne öffnet props den Bildschirm."
+  props_flags_need_json: "--set, --drop-address (mit --kind), --rename, --versions, --restore-version, --yes und --rebuild sind die Tasten des Bildschirms, für ein Programm beantwortet, und gelten nur mit --json; ohne öffnet props den Bildschirm."
   props_one_action: "Eine Aktion pro Aufruf: --set (beliebig oft), --drop-address, --rename, --versions oder --restore-version, nicht zwei davon."
   props_bad_property: "%{key} lässt sich nicht auf \"%{value}\" setzen. Die Schlüssel sind %{keys}; series_part ist eine Zahl oder -, tags eine kommagetrennte Zeile oder -, type einer der acht Typen der Engine oder -, unlisted und pinned yes oder no, hero und toc yes, no oder default."
   props_address_unknown: "Dieser Beitrag hat keine alte Adresse %{address}."
   props_address_ambiguous: "%{address} steht in mehr als einer Liste dieses Beitrags (%{kinds}). Sag, welche gemeint ist: --kind mit einem dieser Namen."
+  props_kind_once: "--kind wird einmal gesagt."
+  props_kind_needs_drop: "--kind sagt, aus welcher Liste eine Adresse gestrichen wird, und gehört zu --drop-address."
+  props_kind_unknown: "%{address} steht in keiner Liste namens %{kind}; sie steht in %{kinds}."
   edit_incoming_name_taken: "%{file} kam auch in incoming/ an und wurde nicht verwendet: Der Beitrag hat bereits eine Datei dieses Namens, und ein vergebener Name meint die Datei, die ihn trägt. Um ein Bild zu ersetzen, schicke das neue unter einem anderen Namen."
   props_version_unknown: "Dieser Beitrag hat keine Version namens %{name} -- props --versions --json listet die vorhandenen."
   props_rename_needs_yes: "--rename braucht --yes daneben: der Bildschirm bestätigt eine Umbenennung mit einer Taste, ein Programm mit dem Schalter."
@@ -720,7 +724,7 @@ cli:
       ./blog.sh translate <slug> --lang <code> [--json]
                                      schreibt den Text des Beitrags in einer weiteren Sprache der Website;
                                      --json gibt den Text als Daten aus, statt einen Editor zu öffnen
-      ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a>] [--rename <slug> --yes] [--versions] [--restore-version <Name> --yes] [--rebuild]
+      ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a> [--kind <kind>]] [--rename <slug> --yes] [--versions] [--restore-version <Name> --yes] [--rebuild]
                                      Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen;
                                      --json gibt sie als Daten aus, mit den Aktionen, die auf ihn zutreffen
       ./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
@@ -1187,6 +1191,7 @@ pair:
   q_address: "Die Adresse dieses Rechners, wie das Telefon ihn erreicht (IP-Adresse oder Name) [%{address}]: "
   bad_address: "❌ „%{address}“ ist keine Adresse, zu der man sich verbinden kann: ein Name oder eine Nummer, ohne Leerzeichen."
   no_sshd: "❌ Auf Port %{port} antwortet hier kein SSH, die App hätte also nichts, womit sie sich verbinden könnte."
+  keys_path_bad: "BLOG_SH_AUTHORIZED_KEYS sagt %{path}, und dieser Pfad lässt sich nicht auflösen -- ein ~Benutzer, den diese Maschine nicht hat. Korrigier ihn in env.sh."
   no_sshd_mac: "   In den Systemeinstellungen → Allgemein → Teilen → Entfernte Anmeldung einschalten und ./blog.sh pair erneut starten."
   no_sshd_other: "   sshd auf diesem Rechner starten (oder den Port mit --port nennen), oder die App von Hand einrichten, wie docs/operations.md es beschreibt."
   container: "   Der Blog läuft in einem Container: die Schlüssel für die Anmeldung gehören dem Host, nicht dem Container. Die App von Hand einrichten, wie docs/operations.md es beschreibt."
@@ -1373,6 +1378,8 @@ doctor:
   slots_shape: "publishing.slots muss eine Liste sein."
   slots_bad: "Veröffentlichungszeiten, die ignoriert werden: %{values}."
   slots_bad_fix: "Das Format ist \"<Tag> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun oder daily, dann eine Uhrzeit im 24-Stunden-Format. Ausgeschriebene Tagesnamen funktionieren nicht."
+  publishing_shape: "publishing ist %{value}, keine Zuordnung von Schlüsseln -- weder die Zeiten noch allow_partial werden gelesen."
+  publishing_shape_fix: "Schreib den Abschnitt wie im Beispiel: publishing:, darunter eingerückt slots: und allow_partial:."
   allow_partial_shape: "publishing.allow_partial ist %{value}, also weder true noch false -- es wird als aus gelesen."
   allow_partial_shape_fix: "Schreib publishing.allow_partial: true (ohne Anführungszeichen) oder lösch die Zeile."
   scheduler_ok: "In der Warteschlange warten %{count} Beitrag/Beiträge, und zuletzt hat sie vor %{ago} etwas ausgeführt."
@@ -1481,6 +1488,8 @@ check:
   translation_own_language_fix: "Wenn der Beitrag genau diese Worte haben soll, setze sie in den Beitrag selbst (./blog.sh edit) und nimm translations.%{lang} aus der Datei des Beitrags. Wenn die Sprache der Website geändert wurde, stehen die eigenen Texte der Beiträge noch in der alten: site.lang sagt, in welcher Sprache die Beiträge geschrieben sind."
   unknown_locale: "%{langs}: `site.locales` nennt die Sprache, und die Engine hat keine Sprachdatei dafür -- keine Sprache dieser Website wird gebaut."
   unknown_locale_fix: "Lege locales/<Code>.yml dafür an, nimm den Code aus `site.locales` heraus, oder nenne die Sprache, aus der die Oberflächenwörter kommen: `ui_language: <Code>` oben in der eigenen Datei dieser Sprache, config/site.<Code>.yml."
+  own_locale_unknown: "%{lang} ist die eigene Sprache der Website (site.lang), und die Engine hat keine Locale-Datei dafür -- keine Sprache dieser Website wird gebaut."
+  own_locale_unknown_fix: "Die eigene Sprache der Website kann sich ihre Oberfläche nicht leihen (ui_language ist für die anderen Sprachen, in deren eigenen Dateien). Leg locales/%{lang}.yml an -- kopier locales/en.yml und übersetz sie -- oder wähl ein site.lang, das die Engine spricht: %{known}."
   ui_language_unknown: "%{file}: `ui_language` nennt %{value}, und in dieser Sprache hat die Engine keine Worte zu verleihen -- keine Sprache dieser Website wird gebaut."
   ui_language_unknown_fix: "Die Engine spricht %{known}. Nenne eine davon -- die Sprache, von der diese ihre Oberflächenworte leiht -- oder füge locales/<Code>.yml für die genannte hinzu."
   language_file_own: "%{file} ist eine Datei für die eigene Sprache der Website -- nichts liest sie, und keine Sprache dieser Website wird gebaut."
@@ -1491,8 +1500,8 @@ check:
   language_title_blank_fix: "Schreib den Titel oder nimm die Zeile heraus."
   language_item_wordless: "%{file}: %{key} hat für den Eintrag %{items} kein eigenes Wort; er erscheint unter dem Wort, das die eigene Liste der Website dafür hat."
   language_item_wordless_fix: "Schreib das Wort -- label: im Menü, title: bei den Links der Fußzeile --, damit der Eintrag in dieser Sprache lesbar ist."
-  language_fallback_idle: "%{file}: fallback nennt %{langs}, was für nichts einspringt -- eine Sprache, die diese Website nicht veröffentlicht, oder die Sprache selbst."
-  language_fallback_idle_fix: "Ein Fallback ist eine andere Sprache, die diese Website veröffentlicht (%{known}). Korrigiere den Eintrag oder nimm ihn heraus; auf der Website ist derweil nichts falsch, die Zeile tut nur nichts."
+  language_fallback_idle: "%{file}: fallback nennt %{langs}, was für nichts einspringt -- eine Sprache, die diese Website nicht veröffentlicht, die Sprache selbst, oder eine, die erst nach der eigenen Sprache der Website steht, wo jede Kette endet."
+  language_fallback_idle_fix: "Ein Fallback ist eine andere Sprache, die diese Website veröffentlicht (%{known}), vor der eigenen Sprache der Website geschrieben. Korrigier den Eintrag oder nimm ihn heraus; an der Website ist unterdessen nichts falsch, die Zeile tut nur nichts."
   language_name_missing: "%{file}: Die Sprache leiht sich ihre Oberfläche und hat keinen Namen für sich, also nennt der Sprachumschalter sie %{code}."
   language_name_missing_fix: "Sag, wie die Sprache in sich selbst heißt -- language_name: Slovenčina, oben in dieser Datei neben ui_language."
   language_series_unused: "%{file} gibt der Serie %{series} einen Namen, in der kein veröffentlichter Beitrag ist -- nichts zeigt ihn."
@@ -1540,6 +1549,7 @@ check:
   link_dead: "%{slug}: verweist auf %{url}, wo diese Website nichts ausliefert."
   link_dead_fix: "Meist ein Permalink aus einem Import oder ein Slug, der umbenannt wurde, bevor Umbenennungen eine Weiterleitung behielten. Korrigiere den Link oder gib dem Zielbeitrag einen redirect_from-Eintrag."
   link_dead_fix_own: "Korrigiere den Link. Die Adresse ist eine, die die Website selbst erzeugt, also kann kein redirect_from-Eintrag dort antworten. Wenn der gemeinte Beitrag früher dort lag, gehört die alte Adresse als <Jahr>/<Slug> in seine former_slugs (beim Text einer anderen Sprache in die former_slugs dieser Sprache) und wird von da an beantwortet."
+  link_dead_fix_unusable: "Korrigier den Link. Unter einer Adresse dieser Form kann keine Weiterleitung antworten -- ein Segment aus einem bloßen Punkt, ein Fragezeichen oder eine Raute, ein Zeichen, das ein Pfad nicht trägt, oder ein Segment, das für einen Ordner zu lang ist -- also hilft weder redirect_from noch former_slugs."
   link_relative: "%{slug}: verweist auf %{url}, was relativ zum Beitrag selbst gelesen wird, nicht zur Website."
   link_relative_fix: "Drei Formen, drei verschiedene Korrekturen: ein Link auf einen anderen Beitrag dieser Website (schreibe ihn als /posts/<Jahr>/<Slug>/), ein blanker Hostname, dem nichts als das Protokoll fehlt (die Adresse stimmt -- ergänze https://), und eine absolute URL mit einem verirrten Zeichen davor (\" oder :). Alle drei werden innerhalb der URL des Beitrags aufgelöst, und einen Query-String ignoriert ein statischer Host -- er antwortet mit 200 und genau der Seite, auf der die Leserin bereits steht. Nichts geht kaputt, und niemand kommt an. Ob das Ziel noch antwortet, ist eine Frage für check --online."
   media_orphan: "Zum Medienverzeichnis %{dir} gehört kein Beitrag."
