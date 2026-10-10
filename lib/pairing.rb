@@ -95,7 +95,15 @@ module Pairing
     # called `~` inside the blog -- the keys went into it, and the record
     # of the code, which did expand the path, named a different file.
     chosen = ENV['BLOG_SH_AUTHORIZED_KEYS'].to_s
-    chosen.empty? ? File.join(Dir.home, '.ssh', 'authorized_keys') : File.expand_path(chosen)
+    return File.join(Dir.home, '.ssh', 'authorized_keys') if chosen.empty?
+
+    begin
+      File.expand_path(chosen)
+    rescue ArgumentError
+      # "~nobody/..." for a user the machine does not have: a refusal with
+      # the path, where it was a backtrace (third fleet, 10. 10. 2026).
+      raise Refused.new(:keys_path, chosen)
+    end
   end
 
   # The file a code was opened in is the file it is closed in. The app

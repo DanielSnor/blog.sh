@@ -83,7 +83,10 @@ def whole_seconds(name, default)
   raw = ENV[name].to_s.strip
   return default if raw.empty?
 
-  refuse('bad_limit', "#{name} is not a whole number of seconds: #{raw[0, 40]}") unless raw.match?(/\A[1-9]\d{0,8}\z/)
+  # Eight digits at most: select() on a Mac takes no wait past a hundred
+  # million seconds, and a value the rule let through brought the door
+  # down with a backtrace instead of an answer (third fleet, 10. 10. 2026).
+  refuse('bad_limit', "#{name} is not a whole number of seconds (up to 99999999): #{raw[0, 40]}") unless raw.match?(/\A[1-9]\d{0,7}\z/)
   raw.to_i
 end
 
@@ -191,11 +194,17 @@ def run_engine(env, command, args, input: nil)
     end
     said = [Thread.new { stdout.read }, Thread.new { stderr.read }]
     if runner.join(RUN_SECONDS).nil?
-      %w[TERM KILL].each do |signal|
-        Process.kill(signal, -runner.pid)
-        break if runner.join(5)
+      # TERM first, so the engine can leave its note; then KILL to the whole
+      # group whatever the leader did -- the receiver dies on TERM at once,
+      # and the engine it had run lived on under it (third fleet,
+      # 10. 10. 2026). A group nothing is left in answers ESRCH, which is
+      # the one outcome wanted.
+      begin
+        Process.kill('TERM', -runner.pid)
+        runner.join(5)
+        Process.kill('KILL', -runner.pid)
       rescue SystemCallError
-        break
+        nil
       end
       feeder.kill
       refuse('timeout', "The engine was still running after #{RUN_SECONDS} seconds and was stopped.")
@@ -335,7 +344,7 @@ def deliver
   # Mac has one (the iCloud documents folder). The first delivery from the app
   # died with the shell complaining that half the path did not exist.
   receiver = File.join(ROOT, 'scripts', 'receive.sh')
-  out, err, = begin
+  out, err, status = begin
     run_engine({}, [receiver, 'receive.sh'], [], input: collected)
   rescue SystemCallError => e
     refuse('engine_failed', "Could not run the receiver: #{e.message}")
@@ -343,11 +352,23 @@ def deliver
   out = out.dup.force_encoding(Encoding::UTF_8)
   err = err.dup.force_encoding(Encoding::UTF_8)
   if out.lstrip.start_with?('{')
-    print out
+    # Always valid UTF-8, as a request's answer is: an engine's prose in
+    # another encoding went out inside the object as it was (third fleet).
+    print out.scrub('')
     exit 0
   end
   reason = "#{out}\n#{err}".scrub('').gsub(/[\u0000-\u0008\u000b-\u001f\u007f]/, '').strip.tr("\n", ' ')
-  refuse('engine_failed', failure_words(reason))
+  refuse('engine_failed', "#{failure_words(reason)} (#{left_how(status)})".strip)
+end
+
+# How a run left: its status, or the signal that ended it -- which is what
+# a build killed for memory on a small server looks like, and used to read
+# "(status )" to a request and nothing at all to a delivery.
+def left_how(status)
+  return "status #{status.exitstatus}" unless status.signaled?
+
+  name = Signal.signame(status.termsig.to_i)
+  "ended by signal #{status.termsig}#{name ? " (#{name})" : ''}"
 end
 
 deliver if ARGV.first == '--deliver'
@@ -367,17 +388,8 @@ out = out.force_encoding(Encoding::UTF_8)
 err = err.force_encoding(Encoding::UTF_8)
 
 if out.lstrip.start_with?('{')
-  print out
+  print out.scrub('')
   exit 0
 end
 reason = failure_words("#{out}\n#{err}".scrub('').gsub(/[\u0000-\u0008\u000b-\u001f\u007f]/, '').strip)
-# How it left: its status, or the signal that ended it -- which is what a
-# build killed for memory on a small server looks like, and used to read
-# "(status )".
-left = if status.signaled?
-         name = Signal.signame(status.termsig.to_i)
-         "ended by signal #{status.termsig}#{name ? " (#{name})" : ''}"
-       else
-         "status #{status.exitstatus}"
-       end
-refuse('engine_failed', "#{reason.tr("\n", ' ')} (#{left})".strip)
+refuse('engine_failed', "#{reason.tr("\n", ' ')} (#{left_how(status)})".strip)

@@ -30,7 +30,11 @@ MAX_MB="${BLOGSH_MAX_MB:-24}"
 # How long the body may take to arrive, in seconds. The first line has
 # thirty; the rest had none, and ten bytes bought a process held open
 # for as long as the sender cared to hold it.
-BODY_SECONDS="${BLOGSH_BODY_SECONDS:-600}"
+# Spaces around the number are nothing, as the door reads it (remote.rb):
+# the door took " 600" and this refused it (third fleet, 10. 10. 2026).
+BODY_SECONDS="${BLOGSH_BODY_SECONDS:-}"
+BODY_SECONDS="${BODY_SECONDS// /}"
+BODY_SECONDS="${BODY_SECONDS:-600}"
 # How long a delivery waits for the one ahead of it, which may be
 # rebuilding a site, before it gives up and says so.
 TURN_SECONDS="${BLOGSH_TURN_SECONDS:-300}"
@@ -105,10 +109,13 @@ unavailable() { fail "$1" "$2"; }
 # phone every picture's receipt before it. An answer is an object, always.
 answer_from_engine() {
   OUT=$(./blog.sh "$@" 2>"$WORK/engine-err")
+  STATUS=$?
   case "$OUT" in
     \{*) printf '%s\n' "$OUT" ;;
     *)
       REASON=$(printf '%s\n%s' "$OUT" "$(cat "$WORK/engine-err" 2>/dev/null)" | LC_ALL=C tr -d '\000-\011\013-\037\177' | LC_ALL=C awk 'function whole(s, n, i, ch, need) { while (length(s) && substr(s, 1, 1) >= "\200" && substr(s, 1, 1) < "\300") s = substr(s, 2); n = length(s); for (i = n; i > 0 && i > n - 4; i--) { ch = substr(s, i, 1); if (ch < "\200") break; if (ch >= "\300") { need = (ch >= "\360") ? 4 : (ch >= "\340") ? 3 : 2; if (n - i + 1 < need) s = substr(s, 1, i - 1); break } } return s } !c && /\.rb:[0-9]+:in .*\([A-Z][A-Za-z0-9_:]*\)$/ { c = $0 } { a = a $0 "\n" } END { if (c != "") print whole(substr(c, 1, 600)); else printf "%s", whole(substr(a, length(a) - 599)) }')
+      # An engine a signal ended said nothing: the signal is said for it.
+      [ "$STATUS" -gt 128 ] && REASON="$REASON (ended by signal $((STATUS - 128)) $(kill -l $((STATUS - 128)) 2>/dev/null))"
       printf '{"ok":false,"error":"engine_failed","message":"%s"}\n' "$(json_escape "$(printf '%s' "$REASON" | LC_ALL=C tr '\n' ' ')")"
       ;;
   esac

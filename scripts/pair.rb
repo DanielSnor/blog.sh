@@ -81,6 +81,13 @@ unknown = ARGV.each_with_index.reject do |arg, i|
 end.map(&:first)
 abort t('unknown_option', option: unknown.join(' ')) unless unknown.empty?
 with_value.each { |flag| abort t('needs_value', option: flag) if ARGV.include?(flag) && value_of(flag).to_s.empty? }
+# The file every road below reads or writes, asked for once here: a path
+# that cannot be expanded is said in a sentence, not in a backtrace.
+begin
+  Pairing.keys_file
+rescue Pairing::Refused => e
+  abort t('keys_path_bad', path: e.message)
+end
 
 def site_name
   data = begin
