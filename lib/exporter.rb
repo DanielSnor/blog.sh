@@ -322,9 +322,13 @@ module Exporter
   end
 
   # The file names a post's blocks refer to -- the set a re-import brings
-  # back.
+  # back. Its translations' blocks with the rest: a picture only the
+  # English text shows is a named file, and counted as one nobody refers
+  # to it read as something safe to leave behind.
   def named_media(post)
-    Array(post['content']).flat_map do |block|
+    translations = post['translations'].is_a?(Hash) ? post['translations'].values : []
+    bodies = [post['content'], *translations.map { |one| one['content'] if one.is_a?(Hash) }]
+    bodies.flat_map { |body| body.is_a?(Array) ? body : [] }.flat_map do |block|
       next [] unless block.is_a?(Hash)
 
       %w[media poster].flat_map do |key|
@@ -638,6 +642,7 @@ module Exporter
        state page translations].each do |key|
       keys[key] = post[key] unless post[key].nil?
     end
+    keys['translations'] = translations_in_the_tree(post) if keys['translations'].is_a?(Hash)
     # Recorded because it CANNOT be, which is the whole point. The outer
     # `title:` is flattened to '' for engines that have no concept of a post
     # without one, and an importer then cannot tell "this post has no title"
@@ -650,6 +655,25 @@ module Exporter
     sources = media_sources(post)
     keys['media_src'] = sources unless sources.empty?
     keys
+  end
+
+  # A translation's blocks name the post's files by the bare name they
+  # have in the archive, and in this tree the files sit under assets/ --
+  # so they are written with the path they really have here, exactly as a
+  # block riding in a comment is (with_export_paths). The words came home
+  # with the first version of this key and the pictures did not: an
+  # import numbers the files again from 01, in the order the body names
+  # them, and a translation that went on saying `06.png` pointed at
+  # nothing -- eight of the 62 real translations with media, counted on
+  # the archive this was measured against (fleet, 10. 10. 2026). A path
+  # is something the importer can follow to the same file the body got.
+  def translations_in_the_tree(post)
+    media_rel = "/#{ASSETS}/#{post['__year']}/#{post['slug']}"
+    post['translations'].transform_values do |one|
+      next one unless one.is_a?(Hash) && one['content'].is_a?(Array)
+
+      one.merge('content' => one['content'].map { |block| block.is_a?(Hash) ? with_export_paths(block, media_rel) : block })
+    end
   end
 
   # Exported filename -> the address the file was fetched from. The one

@@ -415,7 +415,7 @@ module Import
           post['former_slugs'] = (Array(post['former_slugs']) + [former]).uniq
         end
       end
-      apply_own_keys(post, meta)
+      apply_own_keys(post, meta, media)
       # After apply_own_keys on purpose: `type: page` in the front matter
       # and a returning export's own `state` both land there, and either
       # can change the answer. Only a published page goes on the list --
@@ -457,7 +457,7 @@ module Import
     # understands them too -- Hugo has series, most engines have a pinned.
     OWN_FLAT_KEYS = %w[series series_part pinned hero toc unlisted].freeze
 
-    def apply_own_keys(post, meta)
+    def apply_own_keys(post, meta, media)
       own = meta['blogsh']
       # Read per post rather than per tree: a folder can hold both an
       # export and something somebody wrote by hand, and only the posts
@@ -505,8 +505,57 @@ module Import
         # because that source has a key and wins here.
         next if key == 'source' && PostWriter.source_key(value).nil?
 
-        post[key] = value
+        post[key] = key == 'translations' ? own_translations(value, media) : value
       end
+    end
+
+    # The post's words in its other languages, with their files brought
+    # along. The export names each file where it sits in the tree
+    # (/assets/<year>/<slug>/06.png) and from_file copies it into this
+    # archive under the number it gets here -- the path own_block takes,
+    # and through the same ledger, so a picture the body already brought
+    # comes back under the one name both texts then use, and a picture
+    # only a translation shows is brought for it. Called after the body
+    # is read, on purpose: the body's files are numbered first, in the
+    # order the page shows them, as they are in a post that has no
+    # translation.
+    #
+    # Restored as it stood, a translation went on naming the file by the
+    # number it had in the archive it left, while the import had numbered
+    # the files again from 01 -- so the English page of a post whose
+    # pictures had once been replaced showed none of them, and a picture
+    # of its own stayed behind in the tree (fleet, 10. 10. 2026).
+    def own_translations(translations, media)
+      return translations unless translations.is_a?(Hash)
+
+      translations.transform_values do |one|
+        next one unless one.is_a?(Hash) && one['content'].is_a?(Array)
+
+        one.merge('content' => one['content'].map { |block| block.is_a?(Hash) ? with_own_media(block, media) : block })
+      end
+    end
+
+    # A bare name is left as it is: that is a tree written before the
+    # export said where a translation's files are, or one somebody edited,
+    # and there is no path in it to follow. A file the tree names and does
+    # not hold keeps its block, under the name the tree used -- the rule
+    # image_block states, for the reason it states it.
+    def with_own_media(block, media)
+      copy = block.dup
+      %w[media poster].each do |key|
+        entries = copy[key]
+        next unless entries.is_a?(Array)
+
+        copy[key] = entries.map do |entry|
+          next entry unless entry.is_a?(Hash) && entry['url'].to_s.start_with?('/')
+
+          local = root_relative(entry['url'].to_s)
+          name = media.from_file(local, src: entry['src'] || own_media_src(local))
+          @missing_media[local] = true unless name
+          entry.merge('url' => name || File.basename(local))
+        end
+      end
+      copy
     end
 
     # Not writing: _site/ is what Jekyll BUILT (every page a second

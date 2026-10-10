@@ -1603,7 +1603,9 @@ Three things are worth knowing before you rely on the result:
   keep their series, their redirects, their announcement URLs and their
   other languages -- a post's translations ride under `blogsh:` whole,
   with the address and the old addresses each language has, since no
-  other engine has a word for them (the body of the file is the post's
+  other engine has a word for them, and with each file their blocks show
+  named by the path it has in the tree, so the import brings it and gives
+  both texts the one name it has afterwards (the body of the file is the post's
   own language; what the site says about itself in the other ones is
   `config/site.<lang>.yml`, which is configuration and travels with the
   backup, not with the export). That is

@@ -271,7 +271,9 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **An export left a post's other languages behind.** `translations` was not among the keys an
   export writes, so the documented way to move an installation carried a site of two languages
   out as a site of one, and said "posts: N". They ride under `blogsh:` now, and an import of the
-  tree brings them home -- words, address and old addresses of each language.
+  tree brings them home -- words, address and old addresses of each language, and its pictures
+  under the names the import gave them: a picture only a translation shows is exported and
+  brought with it.
 - **Three pages of a second language named the first language's as their own.** `/en/search/`,
   `/en/markdown/` and `/en/404.html` carried the canonical address and `og:url` of the pages
   without `/en/`, beside an hreflang that said otherwise. Each says its own address.
