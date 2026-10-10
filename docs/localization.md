@@ -295,7 +295,9 @@ name for a series nobody writes is shown nowhere.
 **A list with places in it names the same places.** The menu and the
 footer links are written out in full, the way site.yml has them, but
 every item goes where the same item goes in site.yml, in the same order;
-only the label changes. A menu that drifts apart between languages is a
+only the label changes. An item left without a label of its own -- or a
+footer link without a title -- is shown under the word the site's own
+list has for it, and `check` says which one. A menu that drifts apart between languages is a
 second site, and a reader who switches language would lose the item they
 were reaching for. The address is still the one the site's own language
 writes -- `/posts/2026/blog-sh/` above -- and the Czech build takes it to
@@ -326,7 +328,11 @@ author writes in.
 
 Metadata once, words per language. A post with no `translations` key is a
 post in the site's own language -- which is every post in every archive
-today, so nothing has to be migrated:
+today, so nothing has to be migrated. (It follows that `translations`
+never holds the site's own language: the post is its own text there. An
+entry filed under that code is not read, and `check` names it -- which is
+also what changing `site.lang` over an archive of translations leaves
+behind: `site.lang` says what language the posts are written in.)
 
 ```json
 {

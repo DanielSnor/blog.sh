@@ -969,6 +969,13 @@ module Import
       body = outside_fences(body) { |prose| join_lazy_list_lines(prose) }
       body = outside_fences(body) { |prose| free_inline_images(prose) }
       body = outside_fences(body) { |prose| images_to_sentinels(prose) }
+      # The line a teaser ends at. `<!--more-->` is how Jekyll and Hugo
+      # spell it and how `./blog.sh export` writes this engine's own
+      # `//--more--//` for them -- and nothing read it back: a moved
+      # installation came home with a paragraph that says <!--more-->, on
+      # the post's page and in every card, and with no teaser. On a line
+      # of its own, as both generators want it; a fence keeps its lines.
+      body = outside_fences(body) { |prose| prose.gsub(/^[ \t]*<!--[ \t]*more[ \t]*-->[ \t]*$/i) { "\n//--more--//\n" } }
       blocks, = MarkdownParser.parse_body(body, nil)
       blocks
     end

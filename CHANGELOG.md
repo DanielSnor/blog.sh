@@ -466,6 +466,56 @@ goes in is still being decided; the suffix and the date both come off at the tag
   it. A turn older than any delivery can be is over whichever process now carries its number.
 - **`./setup.sh --help` said every question can be skipped.** Five cannot while they hold the
   template's example, and the wizard's opening sentence named four of them.
+- **A moved installation lost its teasers.** An export writes `//--more--//` as `<!--more-->`,
+  the line Jekyll and Hugo end an excerpt at, and the import did not read it back: the post came
+  home with a paragraph saying `<!--more-->` and a card showing the whole text. Read as the end
+  of the teaser, from an export of this engine and from a tree of either generator.
+- **A file named with parentheses was no picture.** `![x](IMG (1).jpg)` -- what a phone calls
+  the second download -- was refused as a picture inside a paragraph, alone on its line as it
+  was, and a post that already held such a file could not be saved from its own text. A name
+  may hold a pair of them, in a picture's, a clip's and an attachment's line alike.
+- **`schedule --at` read the thirtieth of February as the second of March** in every spelling
+  but one, and a year of five digits founded `posts/12027/`. A program says the moment as
+  `YYYY-MM-DD HH:MM` (a `T`, seconds and a zone if wanted) or as a time alone; anything else,
+  and any day the calendar does not have, is `bad_date`.
+- **On a volume that folds case, a post asked for as `Venku` was found as `venku` -- and then
+  handled under the name asked for.** Deleted that way it went to `trash/2026/Venku` and came
+  back as `Venku.json` with the slug `venku` inside, which the same archive on Linux cannot
+  read. A post is found by its name to the letter, in the archive and in the trash.
+- **The door's clocks read anything as a number.** `BLOGSH_RUN_SECONDS` or
+  `BLOGSH_LINE_SECONDS` set to a word, to nothing or to `0` made every request a `timeout` after
+  no time at all, and `30m` was thirty seconds; each is a whole number of seconds or
+  `bad_limit`. An engine ended by a signal -- a build killed for memory -- says which one, where
+  the answer read "(status )". And a reason cut to its last 600 bytes is cut where a character
+  ends: cut inside one, the answer was not UTF-8, or was empty.
+- **`props --drop-address` took an address two lists hold out of the first of them,** which
+  was the one `check` had just advised keeping. `--kind` says which list; without it such an
+  address is `address_ambiguous`.
+- **A new file sent under a name the post already has was ignored without a word.** The post
+  kept its picture, which is the rule, and the file lay in `incoming/`. The answer says so in
+  `warnings`, and the file is tidied.
+- **`translations.<lang>.excerpt` was dropped by every save of that translation.** And a
+  translation that was only a title so far opened without the original in front of it.
+- **`check --repair` sent the English reader to the Czech page.** A relative link in the text
+  of another language was rewritten to the post's own address; it is rewritten to the target's
+  page in that language where there is one, and the offer shows both.
+- **Addresses `check` counted and the build does not write, or the other way round.** An old
+  address written with a slash in front of it, a `redirect_from` linked to with a slash after
+  it (the repair then wrote the second spelling down as a second entry), `/en/robots.txt` and
+  `/en/sitemap.xml`. A text filed under the site's own language in `translations` is not read
+  by the build any more -- the post is its own text there -- and `check` names it. The run of a
+  language no longer warns, on every build, about a `redirect_from` whose words a page of that
+  language happens to stand at.
+- **What a language's file says without meaning to.** A menu item or a footer link with no
+  word of its own fell out of that language's menu, with the build blaming `config/site.yml`:
+  it is shown under the site's own word, and `check` says which item. An empty `site.title`
+  left that language's pages untitled: the site's own stands. A tag word YAML read as true,
+  false or a number was called an unknown key. A `fallback` naming a language the site does not
+  publish, a name for a series nobody writes, a file for the site's own language and a
+  `ui_language` the engine cannot lend from each have a sentence of their own. And a dead link
+  in the text of a language taken out of `site.locales` -- on no page -- is no error.
+- **"On this day" in a language with a borrowed interface showed only on the day of a full
+  deploy.** The midnight run rewrote that language's file and did not send it.
 - **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
   which renders one language per run, and deployed; the second language stayed as the previous
   version built it. The recipe is `./blog.sh rebuild`.
