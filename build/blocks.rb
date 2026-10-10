@@ -274,6 +274,11 @@ module Blocks
     children['type'] ? children : children.merge('type' => 'list')
   end
 
+  # 🪤 Every call that hands `seen` over names the keyword as well. Ruby
+  # 2.7 reads a hash in the last place of a call as the KEYWORDS of a
+  # method that takes any: an empty `seen` then never arrives, and with
+  # deprecation warnings on, the line about it lands in every answer's
+  # `warnings`.
   def render_block(block, media_prefix, seen = {}, title_lifted: false)
     case block['type']
     when 'text'
@@ -302,7 +307,7 @@ module Blocks
       tag = block['style'] == 'ol' ? 'ol' : 'ul'
       items = (block['items'] || []).map do |it|
         child = nested_list(it['children'])
-        nested = child ? render_block(child, media_prefix, seen) : ''
+        nested = child ? render_block(child, media_prefix, seen, title_lifted: false) : ''
         # A task item gets a real (disabled) checkbox and drops the bullet via
         # the class -- the checkbox is the bullet.
         if it.key?('checked')
@@ -442,7 +447,7 @@ module Blocks
   end
 
   def render_photo_grid(images, media_prefix, seen = {})
-    items = images.map { |b| render_block(b, media_prefix, seen) }
+    items = images.map { |b| render_block(b, media_prefix, seen, title_lifted: false) }
     items[-1] = items[-1].sub('<figure>', '<figure class="span-2">') if items.length.odd?
     %(<div class="photo-grid">#{items.join}</div>)
   end
@@ -504,7 +509,7 @@ module Blocks
           group << blocks[i]
           i += 1
         end
-        html << (group.length > 1 ? render_photo_grid(group, media_prefix, seen) : render_block(group.first, media_prefix, seen))
+        html << (group.length > 1 ? render_photo_grid(group, media_prefix, seen) : render_block(group.first, media_prefix, seen, title_lifted: false))
       else
         html << render_block(blocks[i], media_prefix, seen, title_lifted: blocks[i].equal?(lifted))
         i += 1
