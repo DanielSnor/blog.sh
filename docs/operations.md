@@ -122,7 +122,10 @@ already carries, so each can be read as well as changed:
   (`base_required`), and saving one rebuilds and deploys. What the new
   text leaves out is taken out: a paragraph, a picture or a rule its
   author removed is the edit, and a picture the text stops naming is
-  deleted from the post's media. What the text leaves as it was is saved
+  deleted from the post's media. Taking everything out is not an edit: a
+  file with no text under its header is refused (`empty`), as a new one
+  is, because that is also what a program sends when it never had the
+  text. What the text leaves as it was is saved
   as it was stored -- the very block, with whatever an import put on it
   that markdown cannot say (a paragraph's kind, a video's provider) -- so
   an edit changes what was edited and nothing else. The one thing refused as a loss

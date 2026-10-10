@@ -75,7 +75,8 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **`edits: <slug>` in a file for `add`.** Saves it over that draft, as `edit` would, with every
   question a refusal; `base:` refuses a draft that changed after its text was handed out. What
   the new text leaves out is taken out -- a post can be made shorter this way; refused as a loss
-  is only what markdown has no words for, which the text never showed.
+  is only what markdown has no words for, which the text never showed. A file with no text at all
+  is refused as `empty`, like a new one: that is not an edit.
 - **The sidebar cron turns the day over.** A site with the card wants `refresh-sidebar.sh` in
   cron even with no other widget; it rewrites the card's file once a day, per language. The
   script leaves the moment it ran, and `doctor` says when the card is switched on and nothing

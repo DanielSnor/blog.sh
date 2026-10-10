@@ -1660,6 +1660,19 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
     refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty?
     return translation_from_file(file, raw, meta, path, original_raw, post, json: json, confined: confined)
   end
+  # A file that edits a post and carries no text is not an edit. Making a
+  # post shorter is one -- the app showed the text and a person took a
+  # paragraph out. But a file with nothing under its header is what an app
+  # sends when the editor was saved empty, and what one that never loaded
+  # the text would send, and neither is somebody deciding that a post
+  # should have no title, no words and no pictures. It was taken for
+  # exactly that: the post written empty, its pictures deleted past the
+  # trash, the site deployed, and a success for an answer. The refusal is
+  # the one `add` of a new file has always given an empty body, and
+  # nothing is written. (A translation is another matter: an empty one
+  # takes the language off the post, which is said where that is done.)
+  _, body = MarkdownParser.parse_frontmatter(raw)
+  refuse('empty', t('cli.add_file_empty', file: file)) if body.to_s.strip.empty?
   # `edits:` and `base:` stay in the text: they belong to the delivery, and
   # the save reads them as file-only keys, like `publish:` and `receipt:`.
   (new_path, _updated), warnings = quietly(json, keep_stdout: true) do
