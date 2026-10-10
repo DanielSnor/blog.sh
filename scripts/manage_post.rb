@@ -5452,8 +5452,11 @@ def apply_translation(slug, lang, path, original_raw, post, raw, confined: false
     # WAS served at, asked the way the build asks; and never its own new
     # one, so a text renamed back does not redirect to itself. A page has
     # no year in its address and this list has no way to say one: there
-    # the old address is still the author's to keep (redirect_from).
-    if !draft?(post) && !PostAddress.page?(post) && Translations.written?(entry)
+    # the old address is still the author's to keep (redirect_from). A
+    # text that had no page yet -- a title and nothing under it -- had no
+    # address either: for_lang answers with the post itself for it, which
+    # carries none.
+    if !draft?(post) && !PostAddress.page?(post)
       year = PostAddress.date_year(post)
       was = Translations.for_lang(post, lang)['address_slug'].to_s
       owed |= ["#{year}/#{was}"] unless was.empty? || was == address
