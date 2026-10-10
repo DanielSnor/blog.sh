@@ -1204,6 +1204,14 @@ printed, in the site's language; the `error` code is the same in every
 language and is what a program should switch on. A new code may appear
 in a later version; an existing one does not change meaning.
 
+A command that writes a post -- `props --set`, `--drop-address`,
+`--rename` and `--restore-version`, `schedule`, `publish`, `unpublish`,
+`delete`, `restore`, `toot`, `bluesky`, a move in the queue -- answers
+`busy` while another run holds the archive: a build, the scheduler,
+another of these. Nothing was written, and the same request a moment
+later is the way through. (A text sent as a file is not among them: it
+says which version it edited and is refused as `changed`.)
+
 One thing about types, for a consumer written in a language that has
 them: a post's `year` is a string wherever a post is named -- it is the
 folder the post is kept in, and what tells two posts of one slug apart --

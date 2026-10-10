@@ -2534,6 +2534,13 @@ end
 # step forward into its slot -- the question the queue screen asks after
 # [p], answered in advance.
 def publish_as_json(slug, announce: true, allow_partial: false, compact: false)
+  as_the_one_writer('publish') { publish_and_answer(slug, announce: announce, allow_partial: allow_partial, compact: compact) }
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
+end
+
+def publish_and_answer(slug, announce:, allow_partial:, compact:)
   path = find_post_path(slug, ask: false, sentence: 'cli.publish_yes_ambiguous')
   refuse('not_found', t('cli.post_not_found', slug: slug)) unless path
 
@@ -2570,9 +2577,6 @@ def publish_as_json(slug, announce: true, allow_partial: false, compact: false)
     warnings += without_own_report(more, 'cli.queue_compacted')
   end
   puts JSON.pretty_generate(post_answer(moved || path, warnings).merge('compacted' => compacted))
-rescue Refused => e
-  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
-  exit 0
 end
 
 def publish_interactively(slug, yes: false, announce: true, allow_partial: false)
@@ -6631,9 +6635,14 @@ end
 # printed as one too, under the code the caller names, so the promise of
 # an object and a zero exit holds whichever guard spoke. (abort's message
 # has already gone to stderr by then, which the receiver throws away.)
-def answer_json(abort_code = 'refused')
+#
+# writes: the command changes a post, and then all of it -- the reading of
+# the post, the questions asked of it, the write and the rebuild that may
+# follow -- is one turn under the lock every writer of the archive takes
+# (as_the_one_writer). The label is what a held lock says it is held for.
+def answer_json(abort_code = 'refused', writes: nil)
   JSON_REFUSALS[:enabled] = true
-  puts JSON.pretty_generate(yield)
+  puts JSON.pretty_generate(writes ? as_the_one_writer(writes) { yield } : yield)
 rescue Refused => e
   puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
   exit 0
@@ -6646,6 +6655,23 @@ end
 
 def cmd_props_json(slug)
   answer_json { props_as_json(slug) }
+end
+
+# One writer of a post at a time, whichever command it came by. Each of
+# them read the post, asked its questions and wrote the whole file back,
+# and only `props --set` did so under a lock -- so a `--set` sent together
+# with an unpublish, a rename, a publish or a delete saw both answer ok
+# and its change gone with the other one's write, and with a delete the
+# post ended up in the trash AND in the archive, written back by the
+# `--set` that had read it first (second fleet, 9. 10. 2026). The lock is
+# the archive's own, so a build in progress is `busy` to all of them as it
+# has been to `--set` and `schedule`; a text sent as a file is not among
+# them -- it carries the digest of what it edited and is refused as
+# `changed` instead.
+def as_the_one_writer(label)
+  answer = RunLock.hold(ROOT, label: label, quiet: true) { yield }
+  refuse('busy', t('cli.busy_for_program')) if answer == RunLock::BUSY
+  answer
 end
 
 # The post a program resolves by slug, or the refusal: the two answers
@@ -6710,7 +6736,7 @@ end
 # --cancel is the "shift the posts behind it forward?" question answered
 # yes, the way the queue screen asks it.
 def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
-  answer_json do
+  answer_json(writes: 'schedule') do
     path, raw, post = post_for_json(slug)
     refuse('already_published', t('cli.schedule_only_drafts', slug: slug)) unless draft?(post)
     if cancel
@@ -6756,7 +6782,7 @@ end
 
 # `unpublish <slug> --yes --json`: the typed slug replaced by the flag.
 def unpublish_as_json(slug)
-  answer_json do
+  answer_json(writes: 'unpublish') do
     path, _raw, post = post_for_json(slug)
     refuse('already_draft', t('cli.already_draft', slug: slug, url: draft_url(post))) if draft?(post)
     (_, kept), warnings = quietly(true, keep_stdout: true) { unpublish_post(path, post, slug) }
@@ -6780,7 +6806,7 @@ def without_own_report(lines, *keys)
 end
 
 def delete_as_json(slug, rebuild:)
-  answer_json do
+  answer_json(writes: 'delete') do
     path, _raw, = post_for_json(slug)
     year = File.basename(File.dirname(path))
     trash_dir, warnings = quietly(true, keep_stdout: true) { delete_post(slug, path: path, confirmed: true) }
@@ -6810,7 +6836,7 @@ end
 
 # `restore <slug> --json`: back from the trash, as a program would.
 def restore_as_json(slug, rebuild:)
-  answer_json do
+  answer_json(writes: 'restore') do
     found = trashed_paths(slug)
     if found.empty?
       refuse('media_only', t('cli.restore_media_json', slug: slug)) unless trashed_media_dirs(slug).empty?
@@ -6865,7 +6891,7 @@ end
 # hand, with every reason it would not be as a code. --force answers the
 # "this post is old -- announce it anyway?" question the terminal asks.
 def announce_as_json(slug, wanted, force:)
-  answer_json do
+  answer_json(writes: 'announce') do
     network = SiteConfig.comment_network
     if wanted == :mastodon
       refuse('wrong_network', t('cli.use_bluesky_command')) if network == :bluesky
@@ -7023,7 +7049,7 @@ end
 # rebuilds it; a published post's rename waits for --rebuild like the
 # screen waits for the answer to its question.
 def rename_as_json(slug, input, rebuild:)
-  answer_json do
+  answer_json(writes: 'rename') do
     path, _raw, post = post_for_json(slug)
     new_slug, problem = rename_check(post, path, input)
     refuse(problem.first, problem.last) if problem
@@ -7060,7 +7086,7 @@ end
 # `props <slug> --restore-version <name> --yes --json`: one of them chosen.
 # The preview is rebuilt as the screen rebuilds it, without asking.
 def restore_version_as_json(slug, name)
-  answer_json do
+  answer_json(writes: 'restore-version') do
     path, = post_for_json(slug)
     year = File.basename(File.dirname(path))
     file = PostVersions.list(slug, year, content_dir: CONTENT_DIR).find { |f| File.basename(f, '.json') == name }

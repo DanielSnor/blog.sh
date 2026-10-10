@@ -307,6 +307,13 @@ goes in is still being decided; the suffix and the date both come off at the tag
   same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
   receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
   told `busy` and stores nothing.
+- **Two commands of a program writing one post at once.** Each read the post, asked its
+  questions and wrote the file back whole: a `props --set` sent together with a `publish`, an
+  `unpublish`, a rename or a `delete` saw both answer ok and one change gone, and a deleted post
+  stood in the trash and in the archive at once. Every command that writes a post for a program
+  -- those, `restore`, `schedule`, a restored version, `toot` and `bluesky` -- takes the
+  archive's own lock for the whole of it; the one that comes second, or meets a build, is told
+  `busy` and writes nothing.
 - **A listing by type was promised in a language that has none.** A photo post translated in
   words alone is a text post in that language; where every photo post is, `/en/type/image/` is
   never written -- and the sitemap, the hreflang of `/type/image/` and its language switcher all

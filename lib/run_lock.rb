@@ -66,7 +66,7 @@ module RunLock
   # A filesystem that cannot do flock (a network mount, mostly) must not
   # stop a site from publishing: the lock degrades to "no lock", which is
   # exactly where every installation was before this file existed.
-  def hold(root, label: nil)
+  def hold(root, label: nil, quiet: false)
     return yield if ENV[ENV_MARKER] == '1'
 
     file = open_lock(root)
@@ -74,7 +74,9 @@ module RunLock
 
     begin
       unless file.flock(File::LOCK_EX | File::LOCK_NB)
-        warn(busy_message(file, label))
+        # quiet: the caller answers a program and says `busy` in the
+        # object; the line for a terminal has nobody to read it.
+        warn(busy_message(file, label)) unless quiet
         return BUSY
       end
     rescue NotImplementedError, SystemCallError
