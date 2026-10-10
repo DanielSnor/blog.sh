@@ -5321,7 +5321,12 @@ def cmd_translate(slug, lang)
   # from a second window -- and because the lines are dropped, a
   # translation left half-done cannot save the original text as if it
   # were this language's.
-  opened_with = restored || (entry.empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
+  # The original comes along for as long as there is no text to work from:
+  # the first time, and every time after a save that got as far as a
+  # title. It used to come the first time only -- and the first time was
+  # the title -- so the body was then written with the original in
+  # another window, which is what these lines are there to spare.
+  opened_with = restored || (Array(entry['content']).empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
                        { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" }, untouched: [skeleton])
   # 🪤 Against the buffer WITHOUT the notes as well: the editor strips

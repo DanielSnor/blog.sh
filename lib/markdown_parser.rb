@@ -258,6 +258,14 @@ module MarkdownParser
   # a moment later, and the page then shows the author's absolute disk path
   # as text. VIDEO_RE has always been written this way; this one was not.
   #
+  # The name of the file may hold a pair of parentheses -- "IMG (1).jpg" is
+  # what a phone calls the second download of a picture. The target ended
+  # at the first `)`, so such a line was no image at all: refused as "a
+  # picture inside a paragraph", about a picture alone on its line, and a
+  # post that already held one could not be read back from its own text.
+  # One level, as a link's address has; the video's and the attachment's
+  # lines read their names the same way.
+  #
   # 🪤 The title may be in straight quotes or in typographic ones -- \u201E\u201C as
   # Czech and German write them, \u201C\u201D as English does. Only straight ones
   # were read, and the failure was silent in the worst way: the quotes and
@@ -267,7 +275,7 @@ module MarkdownParser
   # keyboard produces the typographic pair, so refusing to read it is a
   # trap rather than a rule (Daniel, 21. 9. 2026, on a translated post
   # whose two pictures vanished).
-  IMAGE_RE = /\A!\[(?<alt>.*?)\]\((?<target>[^)"\u201E\u201C\u201D]+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
+  IMAGE_RE = /\A!\[(?<alt>.*?)\]\((?<target>(?:[^()"\u201E\u201C\u201D]|\([^()"\u201E\u201C\u201D]*\))+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
   # Two exclamation marks = video, whether a local file or YouTube.
   # Deliberately explicit: a bare address on its own line stays a plain
   # paragraph, so a video can also just be linked to instead of every link
@@ -276,7 +284,7 @@ module MarkdownParser
   # brackets -- imported videos can have captions like [Video] or [YT Video].
   # The greedy match stops at the last "](" before the address, so the
   # caption doesn't get cut short.
-  VIDEO_RE = /\A!!\[(.*)\]\(([^)"]+?)\)\z/
+  VIDEO_RE = /\A!!\[(.*)\]\(((?:[^()"]|\([^()"]*\))+?)\)\z/
   HEADING_RE = /\A(\#{1,6})\s+(.+)\z/
   HR_RE = /\A(?:-{3,}|_{3,}|\*[ \t]*\*[ \t]*\*[ \t*]*)\z/
   # Where the teaser ends: everything above this line is the post's own
@@ -323,7 +331,7 @@ module MarkdownParser
   # one into an upload would both discard the title and demand a file
   # the author never meant to publish.
   # Typographic quotes here too, for the reason IMAGE_RE gives.
-  LINK_LINE_RE = /\A\[(?<label>[^\]]*)\]\((?<target>[^)"\u201E\u201C\u201D]+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
+  LINK_LINE_RE = /\A\[(?<label>[^\]]*)\]\((?<target>(?:[^()"\u201E\u201C\u201D]|\([^()"\u201E\u201C\u201D]*\))+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
 
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
