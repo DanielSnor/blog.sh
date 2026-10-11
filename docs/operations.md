@@ -677,7 +677,9 @@ and Android are in preparation; they reach the engine over the same SSH
 removes `/write/` -- the page and everything published under that
 address -- the `SendPost` shortcut and the `publish.txt` and `drafts.txt`
 requests described below. In 1.10 everything in this section works as
-written, and nothing is being added to it. Two things stay, because the
+written -- but for the link that opens a draft
+([Editing a draft from the phone](#editing-a-draft-from-the-phone)) --
+and nothing is being added to it. Two things stay, because the
 apps use them as the page does: the receiver itself,
 `scripts/receive.sh`, and the `receipt:` line of a delivery, which is
 what makes a delivery that arrives twice one post.
@@ -927,46 +929,17 @@ page then asks the same receipt again until it says published.
 
 ### Editing a draft from the phone
 
-*Open a draft from the blog* at the top of `/write/` asks the blog for
-its drafts the way Publish asks it to publish: one file, `drafts.txt`,
-holding `all`, through the same shortcut. The receiver runs
-`./blog.sh drafts --json`, and the answer comes back in the address
-like any other -- a list of the drafts, newest first, each with:
+This is what an app does: it asks the blog for its drafts
+(`drafts --json`) and sends the text back with `edits: <slug>` and
+`base: <digest>` in its header -- see
+[Over SSH, from an app](#over-ssh-from-an-app), and the
+[header keys](#writing-and-publishing) for what such a save keeps and
+what it refuses.
 
-- its text as `edit` would open it, except that a picture is named by
-  its bare file name, which is all the phone needs and all the
-  untrusted parser takes back;
-- the pictures it has, which the page shows from the draft's hidden
-  preview address (the build copies a draft's media next to that page),
-  so they are never sent to the phone or back;
-- the digest of the draft as it was, which goes back as `base:`;
-- whether the phone can edit it at all. A draft with something markdown
-  cannot hold -- an imported mention, a colour, an embed with no form --
-  is listed with the reason and cannot be chosen: at the desk `edit`
-  asks before losing it, and a phone cannot answer.
-
-The texts travel inside an address, so they are handed out up to about
-48 kB, newest first; a draft past that is listed without its text and
-asks for it by name when tapped (`drafts.txt` with its slug).
-
-Choosing a draft puts it in the form, with a band above it saying which
-draft is being edited. Header keys the form has no field for (a series,
-`unlisted:`, a link card...) are carried back untouched. Sending sends
-the new pictures and the text, whose header says `edits: <slug>` and
-`base: <digest>`; `add` saves it over the draft (see the
-[header keys](#writing-and-publishing)). Two things to know:
-
-- **A picture the text stops naming is deleted from the server** -- that
-  is what `edit` does at a desk too, and `versions/` keeps texts, not
-  media. The page says which ones before it sends, and the second tap
-  means it.
-- **A draft that changed in the meantime is not overwritten.** Edited
-  at the desk, or published by the scheduler, after its text was handed
-  out: the save is refused with `changed`, and the draft is opened again
-  from what it says now.
-
-A scheduled draft keeps its time: the page hides "publish now" while one
-is open.
+The page was given a link for it too, *Open a draft from the blog*,
+which sends one file, `drafts.txt`, through the shortcut and waits for
+the list of drafts in the address. Tried on a tablet it loaded nothing,
+and it is not being repaired: the page is frozen and leaves in 1.11.
 
 **A delivery that arrives twice is one post.** The receipt is minted once
 per send, immediately before the files it names are built, so two
