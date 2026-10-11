@@ -395,9 +395,18 @@ engine = File.join(ROOT, 'blog.sh')
 # command's own environment says is not what this caller asked for.
 # BLOG_SH_DEVICE likewise, and it is what scripts/remote.sh read off the
 # key's own line -- a fingerprint, or nothing.
+#
+# BLOG_SH_AUTHORIZED_KEYS is taken away. Which file holds the keys is
+# said in env.sh, which the engine reads for itself, or is the account's
+# own; a session may arrive with variables of the caller's choosing (an
+# sshd set to accept them), and with this one a device pointed its own
+# way out at another file -- which was then rewritten, its copy and its
+# lock made beside it, and answered about as if it were the file sshd
+# reads (found by a reviewer, 11. 10. 2026).
 device = ENV['BLOG_SH_DEVICE'].to_s[%r{\A[A-Za-z0-9+/]{43}\z}]
+from_here = { 'BLOG_SH_REMOTE' => '1', 'BLOG_SH_SPEAK' => speak, 'BLOG_SH_DEVICE' => device, 'BLOG_SH_AUTHORIZED_KEYS' => nil }
 out, err, status = begin
-  run_engine({ 'BLOG_SH_REMOTE' => '1', 'BLOG_SH_SPEAK' => speak, 'BLOG_SH_DEVICE' => device }, [engine, 'blog.sh'], args)
+  run_engine(from_here, [engine, 'blog.sh'], args)
 rescue SystemCallError => e
   refuse('engine_failed', "Could not run the engine: #{e.message}")
 end

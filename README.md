@@ -285,10 +285,10 @@ says what you are running.
                                # --json prints the findings as data instead of a screenful
 ./blog.sh pair [--list] [--revoke [<device>]] [--json] [--host <address>] [--port <n>] [--no-wait]
                                # shows a code an app reads to connect, with no key or address typed;
-                               # --list names the devices let in this way, --revoke takes one out;
+                               # --list names the devices let in this way, --revoke takes one out
+                               # (by its number, name or fingerprint, or asked which);
                                # --list --json and --revoke --json are what an app asks through its key:
                                # the list, and its own way out
-                               # (by its number, name or fingerprint, or asked which)
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
 ./blog.sh check [--online] [--json] [--repair] [--languages]

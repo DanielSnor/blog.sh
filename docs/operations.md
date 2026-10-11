@@ -1243,7 +1243,9 @@ A request may also say which language its reader reads, `{"args":
 Czech showing an English blog's diagnosis would show English; with
 `lang`, `check` and `doctor` -- the two answers that are sentences for a
 person, and that build nothing -- are said in that language, if the
-engine ships it, and so is a refusal of `pair`'s. Every other command answers in the blog's language as
+engine ships it, and so is what `pair` itself refuses (`device_unknown`,
+`busy`). What the door refuses before the engine is run it says in
+English, as it always has. Every other command answers in the blog's language as
 before, because a command that may rebuild the site must not be handed
 another one. A language the engine does not have is not an error: the
 answer is then in the blog's own. The code is the bare one a locale file
@@ -1379,7 +1381,10 @@ Hand it over as the script's argument, which it takes the same way:
 
 `-i` is what carries the request in; the account needs to run that one
 command without a password. The app writes this line too, from the
-blog's place and the command it is reached through.
+blog's place and the command it is reached through. Keep the quotes
+around `$SSH_ORIGINAL_COMMAND`: the word is handed on as one argument,
+and split into several, what the caller sent would be read as more than
+the command -- as the word a device's line says of itself, below.
 
 ### Letting an app in by a code
 
@@ -1422,7 +1427,9 @@ device is told from another -- and the only thing it is told by: not by
 anything a request says, and not by the environment a session arrives
 with. A device let in before lines said this gets the word the next
 time `./blog.sh pair` is run at a terminal -- `--list` is enough -- and
-nothing else on its line moves.
+nothing else on its line moves. (By the account itself: under `sudo`
+the lines are left as they are, because a file replaced by root is
+root's, and sshd reads it as the account.)
 
 What `pair` does to `authorized_keys`, since that is the file that
 decides who may log in:
@@ -1520,21 +1527,30 @@ are `run` requests like any other:
 
 `devices` are in the order `pair --list` numbers them at the terminal,
 and a fingerprint is written as `ssh-keygen -l` writes it: `SHA256:` and
-43 characters of base64 with no padding. `self` -- on each device, and
-once beside the list -- says which of them is asking; it is `null`, and
-every device's is `false`, for a key whose line does not say whose it is:
-one written by hand, or one of a pairing older than the word, until
-`./blog.sh pair` has been run at the terminal once. An app shows the
-list all the same and offers no way out.
+43 characters of base64 with no padding (an empty string for a line
+whose key somebody's hand has left unreadable). `self` -- on each
+device, and once beside the list -- says which of them is asking; it is
+`null`, and every device's is `false`, for a key whose line does not say
+whose it is: one written by hand, or one of a pairing older than the
+word, until `./blog.sh pair` has been run at the terminal once -- and
+where the engine reads another key file than sshd does
+(`BLOG_SH_AUTHORIZED_KEYS` belongs in `env.sh`; one a session arrives
+with is not listened to). An app shows the list all the same and offers
+no way out.
 
 `--revoke` takes out the device that is asking and no other; nothing
 may follow it. The request is answered -- sshd does not end a session
 because the key's line has gone -- and the next connection with that
 key is refused by sshd itself, so an app forgets the blog when it reads
-`ok: true`. The refusals: `device_unknown` when the blog cannot tell who
-is asking (`self` was `null`), `busy` when somebody else is changing the
-file at that moment (nothing was taken out; ask again), `write_failed`
-when the file could not be written, and `bad_args` for anything else
+`ok: true`. (Every line of this blog that holds the key goes, should
+there be more than one. A line that is not this blog's -- one written
+by hand, another blog's -- stays, and a key that stands on one still
+opens what that line opens.) The refusals: `device_unknown` when the
+blog cannot tell who is asking (`self` was `null`), `busy` when somebody
+else is changing the file at that moment (nothing was taken out; ask
+again), `write_failed` and `read_failed` when the file could not be
+written or read, `keys_path` when `BLOG_SH_AUTHORIZED_KEYS` names a path
+that cannot be expanded, and `bad_args` for anything else
 after `pair` -- a code, an address, a name. Taking out ANOTHER device is
 done at the terminal, by whoever can sit at it: `./blog.sh pair
 --revoke`. A blog whose app was set up by hand answers `--list` with no

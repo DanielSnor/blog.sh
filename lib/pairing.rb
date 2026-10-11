@@ -224,7 +224,7 @@ module Pairing
   # nothing, the hash answers with the fingerprint of nothing, and that
   # was shown for such a line as if it were its key's.
   def print_of(line)
-    key = line[/ (ssh-ed25519 [A-Za-z0-9+\/]{68}) #{Regexp.escape(DEVICE)}/, 1]
+    key = line.scrub('?')[/ (ssh-ed25519 [A-Za-z0-9+\/]{68}) #{Regexp.escape(DEVICE)}/, 1]
     key && fingerprint(key.split.last)
   end
 
@@ -233,14 +233,20 @@ module Pairing
   # it and nothing else on the line moves -- the PATH it was given on the
   # day it was written stays the PATH it runs with. Every other line, and
   # one whose key cannot be read, comes back as it was.
+  #
+  # Asked of the first place the script stands on the line, which is its
+  # command: the option's closing quote straight after it is what "says
+  # nothing" looks like. The same words further on are a device's name,
+  # written by somebody's hand, and a name is not rewritten.
   def identified(line, root)
     return line unless ours?(line, root, DEVICE)
 
-    bare = %(#{script_token(root, 'remote.sh')}" )
+    token = script_token(root, 'remote.sh')
+    at = line.index(token)
     print = print_of(line)
-    return line unless print && line.include?(bare)
+    return line unless print && at && line[at + token.size, 2] == '" '
 
-    line.sub(bare) { %(#{script_token(root, 'remote.sh')} #{IDENTITY}#{print}" ) }
+    line.dup.insert(at + token.size, " #{IDENTITY}#{print}")
   end
 
   # Whether a line of the file is one this installation wrote: by its
@@ -256,8 +262,13 @@ module Pairing
   # given back as it was found, and read as part of the name it made a
   # device called "Telefon\r" that --revoke could not find by its name,
   # and a waiting code no app's answer matched.
+  #
+  # Read with whatever is not UTF-8 put aside: a name somebody retyped by
+  # hand in another encoding raised on the pattern, and one such line took
+  # every list -- and, once a list was a thing an app asks for, every
+  # device's -- down with it.
   def comment_of(line, marker)
-    line[/ #{Regexp.escape(marker)}(.*?)\r?\z/, 1].to_s
+    line.scrub('?')[/ #{Regexp.escape(marker)}(.*?)\r?\z/, 1].to_s
   end
 
   # A name for a device, as it will stand at the end of a line of
@@ -716,9 +727,13 @@ module Pairing
   # Every app this installation let in by a code, as [name, fingerprint].
   # A line written by hand is not here: it has no closing comment of ours,
   # and what somebody wrote into that file themselves is theirs.
+  #
+  # `line` is the line itself, for whoever has to say WHICH device and
+  # cannot say it by a key: one whose key cannot be read has no
+  # fingerprint, and a name is not always one device's.
   def devices(root:)
     read_lines.select { |line| ours?(line, root, DEVICE) }.map do |line|
-      { 'name' => comment_of(line, DEVICE), 'fingerprint' => print_of(line).to_s }
+      { 'name' => comment_of(line, DEVICE), 'fingerprint' => print_of(line).to_s, 'line' => line }
     end
   end
 
@@ -729,8 +744,14 @@ module Pairing
   # Looked at before anything is locked, like the sweep: with nothing to
   # bring up to date -- which is every run but the first after an upgrade
   # -- nothing is written and no folder is made.
+  #
+  # And only in a file that is this user's own. A file replaced whole
+  # belongs to whoever replaced it: one run of `sudo ./blog.sh pair --list`
+  # would hand the account's authorized_keys to root, 0600, and sshd --
+  # which reads it as the account -- would let nobody in by a key again.
   def identify(root:)
     return 0 unless read_lines.any? { |line| identified(line, root) != line }
+    return 0 unless File.stat(keys_target).uid == Process.euid
 
     changed = 0
     locked do
@@ -761,16 +782,21 @@ module Pairing
     gone
   end
 
-  # Takes a device out, by its name or by its key's fingerprint. Answers
-  # the devices removed -- more than one when two were given one name.
+  # Takes a device out, by its name or by its key's fingerprint -- or by
+  # its line, whole, which is how one is said that has no key to say it
+  # by. Answers the devices removed -- more than one when two were given
+  # one name. Nothing said is nobody: an empty word used to be the name of
+  # a device that has none.
   def revoke(root:, which:)
     gone = []
+    return gone if which.to_s.empty?
+
     locked do
       lines = read_lines
       kept = lines.reject do |line|
         next false unless ours?(line, root, DEVICE)
 
-        match = comment_of(line, DEVICE) == which || print_of(line) == which.to_s.sub(/\ASHA256:/, '')
+        match = line == which || comment_of(line, DEVICE) == which || print_of(line) == which.to_s.sub(/\ASHA256:/, '')
         gone << comment_of(line, DEVICE) if match
         match
       end

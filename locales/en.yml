@@ -1227,6 +1227,7 @@ pair:
   q_revoke_which: "Which one goes? [1–%{count}]: "
   q_revoke: "Take \"%{device}\" out? The app on it will no longer reach the blog. [y/N] "
   write_failed: "❌ %{path} could not be written: %{error}"
+  read_failed: "%{path} could not be read: %{error}"
   unknown_option: "pair does not know %{option} -- it takes --list, --revoke <device>, --json, --host <address>, --port <number> and --no-wait."
   needs_value: "%{option} wants a value."
 

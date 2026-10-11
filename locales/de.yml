@@ -1210,6 +1210,7 @@ pair:
   q_revoke_which: "Welches soll weg? [1–%{count}]: "
   q_revoke: "„%{device}“ entfernen? Die App darauf erreicht den Blog dann nicht mehr. [j/N] "
   write_failed: "❌ %{path} konnte nicht geschrieben werden: %{error}"
+  read_failed: "%{path} konnte nicht gelesen werden: %{error}"
   unknown_option: "pair kennt %{option} nicht -- es nimmt --list, --revoke <Gerät>, --json, --host <Adresse>, --port <Nummer> und --no-wait."
   needs_value: "%{option} braucht einen Wert."
 

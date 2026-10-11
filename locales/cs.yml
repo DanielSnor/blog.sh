@@ -1197,6 +1197,7 @@ pair:
   q_revoke_which: "Které odebrat? [1–%{count}]: "
   q_revoke: "Odebrat „%{device}“? Aplikace v něm se pak k blogu nepřipojí. [a/N] "
   write_failed: "❌ %{path} se nepodařilo zapsat: %{error}"
+  read_failed: "%{path} se nepodařilo přečíst: %{error}"
   unknown_option: "pair nezná %{option} -- bere --list, --revoke <zařízení>, --json, --host <adresa>, --port <číslo> a --no-wait."
   needs_value: "%{option} chce hodnotu."
 

@@ -24,8 +24,10 @@
 # The two --json forms are what an app reaches through scripts/remote.sh.
 # Which device is asking is known by one thing only: the word its line in
 # authorized_keys hands that script (BLOG_SH_DEVICE by the time it is
-# here). A device can therefore show the others and take out itself; a
-# code is shown, and another device taken out, by somebody at a terminal.
+# here; ./blog.sh carries it past env.sh, so nothing written there
+# stands in for it). A device can therefore show the others and take out
+# itself; a code is shown, and another device taken out, by somebody at
+# a terminal.
 #
 # What a code is and what happens when one is read is in lib/pairing.rb.
 # This is the screen: it checks that an app would have something to
@@ -88,8 +90,7 @@ end
 # a program asks: the status says that an answer arrived, the object says
 # what it was. A sentence written for the terminal loses its mark on the way.
 JSON_OUT = ARGV.include?('--json')
-# Set by scripts/remote.rb and by nothing else: the request came through
-# the door.
+# Set by scripts/remote.rb: the request came through the door.
 REMOTE = ENV['BLOG_SH_REMOTE'] == '1'
 # How long a program waits for the key file when somebody else is
 # changing it, before it is told to come back.
@@ -158,6 +159,14 @@ rescue SystemCallError => e
   refuse('write_failed', t('write_failed', path: Pairing.keys_file, error: e.message))
 end
 
+# ...and one that cannot be read, likewise: through the door nothing is
+# swept first, so the list is the first thing to find that out.
+def keys_read
+  yield
+rescue SystemCallError => e
+  refuse('read_failed', t('read_failed', path: Pairing.keys_file, error: e.message))
+end
+
 # Whatever was asked, the doors left open by a terminal that was closed
 # are shut first: their keys stopped working when their minute passed,
 # and this takes their lines out.
@@ -173,7 +182,7 @@ unless REMOTE
   keys_guarded { Pairing.sweep(root: ROOT) }
   begin
     Pairing.identify(root: ROOT)
-  rescue SystemCallError
+  rescue SystemCallError, ArgumentError
     nil
   end
 end
@@ -199,7 +208,7 @@ def for_a_program(devices, me)
 end
 
 if ARGV.include?('--list')
-  devices = Pairing.devices(root: ROOT)
+  devices = keys_read { Pairing.devices(root: ROOT) }
   if JSON_OUT
     me = asking(devices)
     answer('ok' => true, 'devices' => for_a_program(devices, me), 'self' => me && printed(me))
@@ -226,7 +235,7 @@ def device_to_revoke(devices)
     return said if devices.any? { |device| device['name'] == said }
 
     numbered = said.match?(/\A\d+\z/) ? devices[said.to_i - 1] : nil
-    return numbered['fingerprint'] if numbered && said.to_i.positive?
+    return said_by(numbered) if numbered && said.to_i.positive?
 
     return said
   end
@@ -245,13 +254,22 @@ def device_to_revoke(devices)
   print t('q_revoke', device: chosen['name'])
   exit 0 unless Tui.yes?($stdin.gets)
 
-  chosen['fingerprint']
+  said_by(chosen)
+end
+
+# What a device picked off the list is taken out by: its key's
+# fingerprint -- one device, whatever else shares its name -- and, where
+# the key cannot be read and there is no fingerprint, its line as it
+# stands. (With a fingerprint of nothing for such a line, its number
+# named no device at all.)
+def said_by(device)
+  device['fingerprint'].empty? ? device['line'] : device['fingerprint']
 end
 
 # A device's own way out. By its key and by nothing else -- two devices
 # may share a name, and every name is on the list for anybody to read.
 if ARGV.include?('--revoke') && JSON_OUT
-  me = asking(Pairing.devices(root: ROOT))
+  me = asking(keys_read { Pairing.devices(root: ROOT) })
   refuse('device_unknown', t('device_unknown')) unless me
   gone = begin
     keys_guarded { Pairing.revoke_key(root: ROOT, print: me, wait: LOCK_SECONDS) }

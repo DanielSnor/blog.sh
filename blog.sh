@@ -106,14 +106,22 @@ case "${1:-}" in
   # there: read by doctor and not by pair, a device let in through the file
   # it names was "no device" to `pair --list` and "no such device" to
   # `pair --revoke`, beside its own line in the file sshd reads.
+  #
+  # Two things are carried past env.sh as they arrived: whether the
+  # request came through the door, and which device's line it came
+  # through (scripts/remote.rb sets both, to a value or to nothing). They
+  # say who is asking, and a line left in env.sh must not answer that.
   pair)
     shift
+    through_door="${BLOG_SH_REMOTE:-}"
+    asking_device="${BLOG_SH_DEVICE:-}"
     if [ -f env.sh ]; then
       set -a
       # shellcheck source=/dev/null
       . ./env.sh
       set +a
     fi
+    export BLOG_SH_REMOTE="$through_door" BLOG_SH_DEVICE="$asking_device"
     exec ruby scripts/pair.rb "$@"
     ;;
   # Counts the archive on disk, so it needs no env.sh either -- and it is
