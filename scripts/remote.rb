@@ -23,6 +23,12 @@
 # network on somebody else's account; a program with a key is not the
 # author at their desk.
 #
+# `pair` is here for two things only: --list, the devices let in by a
+# code, and --revoke with nothing after it, which takes out the device
+# that is asking -- known by the word its own line in authorized_keys
+# hands scripts/remote.sh, never by anything the request says. Showing a
+# code and taking out ANOTHER device stay at the terminal.
+#
 # Like receive.sh: an answer is an object and the status is 0, whatever
 # the answer. The engine speaking prose instead (no env.sh, a config that
 # will not parse, a backtrace) is wrapped as engine_failed with its words.
@@ -120,7 +126,11 @@ ALLOWED = {
   # The installation's diagnosis, as it stands on disk. Not --online
   # (it reaches the network on the author's accounts) and not
   # --strip-location (it rewrites photographs).
-  'doctor' => %w[]
+  'doctor' => %w[],
+  # The devices let in by a code, and the caller's own way out. Held to
+  # exactly one of the two words below (see `check`): `pair` with neither
+  # opens a code, and a device named after --revoke is somebody else's.
+  'pair' => %w[--list --revoke]
 }.freeze
 
 WORD = /\A[a-z0-9-]{1,200}\z/
@@ -240,8 +250,9 @@ end
 # speaks its own language, and an app in Czech showing an English blog's
 # diagnosis shows English -- reported twice by the first person to try it
 # (Pavel, 8. 10. 2026). Where the answer is sentences for a person and
-# nothing is built -- `check` and `doctor` -- the engine says them in the
-# language asked for, if it has one by that name.
+# nothing is built -- `check` and `doctor`, and what `pair` refuses --
+# the engine says them in the language asked for, if it has one by that
+# name.
 #
 # Only a language the engine ships a locale for, and by its exact name:
 # anything else -- missing, not a string, a path, a language nobody
@@ -284,6 +295,9 @@ def check(args)
     else
       refuse('bad_args', "#{word.inspect} is not a slug.") unless slug?(word)
     end
+  end
+  if command == 'pair' && ![%w[--list], %w[--revoke]].include?(args.drop(1) - ['--json'])
+    refuse('bad_args', 'pair takes --list or --revoke here: one of the two, and nothing after it.')
   end
   args.include?('--json') ? args : args + ['--json']
 end
@@ -379,8 +393,11 @@ args = check(args)
 engine = File.join(ROOT, 'blog.sh')
 # BLOG_SH_SPEAK is named or UNSET, never inherited: what the forced
 # command's own environment says is not what this caller asked for.
+# BLOG_SH_DEVICE likewise, and it is what scripts/remote.sh read off the
+# key's own line -- a fingerprint, or nothing.
+device = ENV['BLOG_SH_DEVICE'].to_s[%r{\A[A-Za-z0-9+/]{43}\z}]
 out, err, status = begin
-  run_engine({ 'BLOG_SH_REMOTE' => '1', 'BLOG_SH_SPEAK' => speak }, [engine, 'blog.sh'], args)
+  run_engine({ 'BLOG_SH_REMOTE' => '1', 'BLOG_SH_SPEAK' => speak, 'BLOG_SH_DEVICE' => device }, [engine, 'blog.sh'], args)
 rescue SystemCallError => e
   refuse('engine_failed', "Could not run the engine: #{e.message}")
 end

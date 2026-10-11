@@ -1243,7 +1243,7 @@ A request may also say which language its reader reads, `{"args":
 Czech showing an English blog's diagnosis would show English; with
 `lang`, `check` and `doctor` -- the two answers that are sentences for a
 person, and that build nothing -- are said in that language, if the
-engine ships it. Every other command answers in the blog's language as
+engine ships it, and so is a refusal of `pair`'s. Every other command answers in the blog's language as
 before, because a command that may rebuild the site must not be handed
 another one. A language the engine does not have is not an error: the
 answer is then in the blog's own. The code is the bare one a locale file
@@ -1262,7 +1262,8 @@ with spaces or diacritics is one word on both ends. Before the engine sees it,
 program may run (`version`, `list`, `drafts`, `edit`, `translate`,
 `props`, `queue`, `schedule`, `publish`, `unpublish`, `delete`,
 `restore`, `rebuild`, `empty`, `toot`, `bluesky`, `stats`,
-`on-this-day`, `check`, `doctor`), each flag one that command has in its
+`on-this-day`, `check`, `doctor`, and `pair` for its list and the
+caller's own way out), each flag one that command has in its
 `--json` form, every positional word a slug, and no word may hold a
 control character or be longer than 4000 bytes. A slug here is a name as a file may have it and a
 reader would read it -- letters and digits of any alphabet, `_`, `.` and
@@ -1275,8 +1276,11 @@ hand the text out, and the changed text comes back as a file through
 `deliver`. What is not on the list is what asks a question, writes
 outside the archive or reaches a network on somebody else's account:
 `add` (a post arrives through `receive`), `export`, `preview`, `browse`,
-`check --repair`, `doctor --online` and `--strip-location`, `pair`, the
-wizard. **`receive`** is the delivery
+`check --repair`, `doctor --online` and `--strip-location`, the wizard
+-- and of `pair` everything but `--list` and `--revoke` with nothing
+after it: showing a code opens a way in, and a device named after
+`--revoke` is somebody else's (see "Letting an app in by a code").
+**`receive`** is the delivery
 `scripts/receive.sh` takes -- pictures and a markdown, or a `publish.txt`
 or `drafts.txt` request -- for the same key. **`deliver`** is the same
 delivery for a sender that cannot close its side of the stream: it ends
@@ -1410,6 +1414,16 @@ a line written by hand. The key the app lives on never leaves the
 device, and the one that was on the screen opens nothing once it has
 been used.
 
+A device's line says one thing a line written by hand does not: whose
+it is. Its command ends `.../scripts/remote.sh' --device=<fingerprint>`,
+the fingerprint of the key on that same line. sshd tells a forced
+command nothing about the key that was used, so that word is how one
+device is told from another -- and the only thing it is told by: not by
+anything a request says, and not by the environment a session arrives
+with. A device let in before lines said this gets the word the next
+time `./blog.sh pair` is run at a terminal -- `--list` is enough -- and
+nothing else on its line moves.
+
 What `pair` does to `authorized_keys`, since that is the file that
 decides who may log in:
 
@@ -1431,7 +1445,9 @@ decides who may log in:
   for byte what it was: carriage returns on lines that are not `pair`'s
   stay, and so does a last line with no line feed after it.
 - `pair --list` only reads: it makes no folder and takes no lock unless
-  there is a run-out code's line to take out.
+  there is a run-out code's line to take out, or a device's line from
+  before lines said whose they are to bring up to date. Asked through
+  the door it writes nothing at all.
 - A line names this installation by its folder. Move the folder and its
   devices' lines still name the old one: sshd finds no script there, the
   apps are refused, and neither `pair --list` nor `doctor` sees the lines
@@ -1484,6 +1500,45 @@ on another line of the account's file -- another blog's, or one written
 by hand: sshd runs the first line a key is on and never a second, so an
 app makes one key for each blog it connects to. From then
 on the app's own key works as any app's does.
+
+A device let in this way can show the others and take itself out. Both
+are `run` requests like any other:
+
+```
+{"args": ["pair", "--list"]}
+{"ok": true,
+ "devices": [{"name": "Daniel's iPhone", "fingerprint": "SHA256:k/JB...QCo", "self": true},
+             {"name": "Tablet",          "fingerprint": "SHA256:wL8H...u+w", "self": false}],
+ "self": "SHA256:k/JB...QCo"}
+
+{"args": ["pair", "--revoke"]}
+{"ok": true,
+ "revoked": {"name": "Daniel's iPhone", "fingerprint": "SHA256:k/JB...QCo"},
+ "devices": [{"name": "Tablet", "fingerprint": "SHA256:wL8H...u+w", "self": false}],
+ "self": null}
+```
+
+`devices` are in the order `pair --list` numbers them at the terminal,
+and a fingerprint is written as `ssh-keygen -l` writes it: `SHA256:` and
+43 characters of base64 with no padding. `self` -- on each device, and
+once beside the list -- says which of them is asking; it is `null`, and
+every device's is `false`, for a key whose line does not say whose it is:
+one written by hand, or one of a pairing older than the word, until
+`./blog.sh pair` has been run at the terminal once. An app shows the
+list all the same and offers no way out.
+
+`--revoke` takes out the device that is asking and no other; nothing
+may follow it. The request is answered -- sshd does not end a session
+because the key's line has gone -- and the next connection with that
+key is refused by sshd itself, so an app forgets the blog when it reads
+`ok: true`. The refusals: `device_unknown` when the blog cannot tell who
+is asking (`self` was `null`), `busy` when somebody else is changing the
+file at that moment (nothing was taken out; ask again), `write_failed`
+when the file could not be written, and `bad_args` for anything else
+after `pair` -- a code, an address, a name. Taking out ANOTHER device is
+done at the terminal, by whoever can sit at it: `./blog.sh pair
+--revoke`. A blog whose app was set up by hand answers `--list` with no
+devices, since none came in by a code.
 
 ## Pinning a post to the front page
 

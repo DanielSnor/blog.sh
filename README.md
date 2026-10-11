@@ -283,9 +283,11 @@ says what you are running.
                                # --online also asks the feeds, the analytics script, the access
                                # token and the deploy target -- whether it answers, what is in its root;
                                # --json prints the findings as data instead of a screenful
-./blog.sh pair [--list] [--revoke [<device>]] [--host <address>] [--port <n>] [--no-wait]
+./blog.sh pair [--list] [--revoke [<device>]] [--json] [--host <address>] [--port <n>] [--no-wait]
                                # shows a code an app reads to connect, with no key or address typed;
-                               # --list names the devices let in this way, --revoke takes one out
+                               # --list names the devices let in this way, --revoke takes one out;
+                               # --list --json and --revoke --json are what an app asks through its key:
+                               # the list, and its own way out
                                # (by its number, name or fingerprint, or asked which)
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive

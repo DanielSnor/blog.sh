@@ -14,6 +14,19 @@
 #   --no-wait                         prints the code and leaves; the code
 #                                     keeps its ten minutes
 #
+#   --list --json                     the same list for a program: one
+#                                     object, each device with its name,
+#                                     its fingerprint and whether it is
+#                                     the one asking
+#   --revoke --json                   takes out the device that is asking,
+#                                     and no other; nothing may follow it
+#
+# The two --json forms are what an app reaches through scripts/remote.sh.
+# Which device is asking is known by one thing only: the word its line in
+# authorized_keys hands that script (BLOG_SH_DEVICE by the time it is
+# here). A device can therefore show the others and take out itself; a
+# code is shown, and another device taken out, by somebody at a terminal.
+#
 # What a code is and what happens when one is read is in lib/pairing.rb.
 # This is the screen: it checks that an app would have something to
 # connect to, asks the one thing it cannot know -- the address this
@@ -22,6 +35,7 @@
 # The way in by hand, a line written into authorized_keys, is untouched
 # by any of this and stays what docs/operations.md describes.
 require 'io/console'
+require 'json'
 require_relative '../lib/yaml_compat'
 require_relative '../lib/config_lang'
 
@@ -30,7 +44,13 @@ SITE_YML = File.join(ROOT, 'config', 'site.yml')
 
 require_relative '../lib/i18n'
 lang = ConfigLang.of(SITE_YML)
-I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)
+# A program's answer is said in the language of whoever reads it, when
+# they said which (scripts/remote.rb hands an app's language over in
+# BLOG_SH_SPEAK, as it does for check and doctor). The terminal speaks
+# the blog's own, as before.
+spoken = ARGV.include?('--json') ? ENV['BLOG_SH_SPEAK'].to_s : ''
+spoken = '' unless spoken.match?(/\A[a-z]{2,3}\z/) && File.file?(File.join(ROOT, 'locales', "#{spoken}.yml"))
+I18n.force_lang(spoken.empty? ? (lang.to_s.empty? ? 'en' : lang.to_s) : spoken)
 
 require_relative '../lib/tui'
 require_relative '../lib/qr_code'
@@ -64,7 +84,28 @@ def revoke_words
   at ? ARGV.drop(at + 1).take_while { |word| !word.start_with?('--') } : []
 end
 
-KNOWN = %w[--list --revoke --host --port --no-wait].freeze
+# With --json every answer is one object and the status is 0, as wherever
+# a program asks: the status says that an answer arrived, the object says
+# what it was. A sentence written for the terminal loses its mark on the way.
+JSON_OUT = ARGV.include?('--json')
+# Set by scripts/remote.rb and by nothing else: the request came through
+# the door.
+REMOTE = ENV['BLOG_SH_REMOTE'] == '1'
+# How long a program waits for the key file when somebody else is
+# changing it, before it is told to come back.
+LOCK_SECONDS = 5
+
+def answer(object)
+  puts JSON.generate(object)
+  exit 0
+end
+
+def refuse(code, message)
+  answer('ok' => false, 'error' => code, 'message' => message.sub(/\A\s*❌\s*/, '')) if JSON_OUT
+  abort message
+end
+
+KNOWN = %w[--list --revoke --host --port --no-wait --json].freeze
 with_value = %w[--host --port]
 skip = false
 named = revoke_words.size
@@ -79,14 +120,24 @@ unknown = ARGV.each_with_index.reject do |arg, i|
   skip = with_value.include?(arg)
   KNOWN.include?(arg)
 end.map(&:first)
-abort t('unknown_option', option: unknown.join(' ')) unless unknown.empty?
-with_value.each { |flag| abort t('needs_value', option: flag) if ARGV.include?(flag) && value_of(flag).to_s.empty? }
+refuse('bad_args', t('unknown_option', option: unknown.join(' '))) unless unknown.empty?
+with_value.each { |flag| refuse('bad_args', t('needs_value', option: flag)) if ARGV.include?(flag) && value_of(flag).to_s.empty? }
+# A program gets two things and nothing else: the list, and its own way
+# out. `--revoke Telefon --json` is refused here rather than read as
+# "the caller": a name after --revoke means somebody else, and that is
+# not a program's to ask. And what came through the door is a program
+# whatever it says -- without --json it would be a code on a screen
+# nobody is looking at.
+if JSON_OUT || REMOTE
+  asked = %w[--list --revoke].select { |word| ARGV.include?(word) }
+  refuse('bad_args', t('json_scope')) unless JSON_OUT && asked.size == 1 && (ARGV - ['--json', asked.first]).empty?
+end
 # The file every road below reads or writes, asked for once here: a path
 # that cannot be expanded is said in a sentence, not in a backtrace.
 begin
   Pairing.keys_file
 rescue Pairing::Refused => e
-  abort t('keys_path_bad', path: e.message)
+  refuse('keys_path', t('keys_path_bad', path: e.message))
 end
 
 def site_name
@@ -104,16 +155,55 @@ end
 def keys_guarded
   yield
 rescue SystemCallError => e
-  abort t('write_failed', path: Pairing.keys_file, error: e.message)
+  refuse('write_failed', t('write_failed', path: Pairing.keys_file, error: e.message))
 end
 
 # Whatever was asked, the doors left open by a terminal that was closed
 # are shut first: their keys stopped working when their minute passed,
 # and this takes their lines out.
-keys_guarded { Pairing.sweep(root: ROOT) }
+#
+# ...and the line of a device let in before a line said whose it is gets
+# the word it lacks, so that the device can be told from the others the
+# next time it connects. A courtesy and not a condition: beside a file
+# that cannot be written, --list still lists.
+#
+# Both at the terminal only. Through the door a list is a read and writes
+# nothing, and the one thing a device may change there is its own line.
+unless REMOTE
+  keys_guarded { Pairing.sweep(root: ROOT) }
+  begin
+    Pairing.identify(root: ROOT)
+  rescue SystemCallError
+    nil
+  end
+end
+
+# Which device is asking: the fingerprint its own line handed the door,
+# and only when a line of this blog really holds that key. Anything else
+# -- a line written by hand, one from before the word, a variable somebody
+# set -- is nobody.
+def asking(devices)
+  said = ENV['BLOG_SH_DEVICE'].to_s
+  said.match?(Pairing::PRINT) && devices.any? { |device| device['fingerprint'] == said } ? said : nil
+end
+
+# A fingerprint as ssh-keygen and --list print it.
+def printed(fingerprint)
+  fingerprint.to_s.empty? ? '' : "SHA256:#{fingerprint}"
+end
+
+def for_a_program(devices, me)
+  devices.map do |device|
+    { 'name' => device['name'], 'fingerprint' => printed(device['fingerprint']), 'self' => !me.nil? && device['fingerprint'] == me }
+  end
+end
 
 if ARGV.include?('--list')
   devices = Pairing.devices(root: ROOT)
+  if JSON_OUT
+    me = asking(devices)
+    answer('ok' => true, 'devices' => for_a_program(devices, me), 'self' => me && printed(me))
+  end
   if devices.empty?
     puts t('list_none')
   else
@@ -156,6 +246,24 @@ def device_to_revoke(devices)
   exit 0 unless Tui.yes?($stdin.gets)
 
   chosen['fingerprint']
+end
+
+# A device's own way out. By its key and by nothing else -- two devices
+# may share a name, and every name is on the list for anybody to read.
+if ARGV.include?('--revoke') && JSON_OUT
+  me = asking(Pairing.devices(root: ROOT))
+  refuse('device_unknown', t('device_unknown')) unless me
+  gone = begin
+    keys_guarded { Pairing.revoke_key(root: ROOT, print: me, wait: LOCK_SECONDS) }
+  rescue Pairing::Refused => e
+    raise unless e.reason == :busy
+
+    refuse('busy', t('busy'))
+  end
+  # Taken out by somebody at the terminal between the look and the lock.
+  refuse('device_unknown', t('device_unknown')) unless gone
+  answer('ok' => true, 'revoked' => { 'name' => gone['name'], 'fingerprint' => printed(gone['fingerprint']) },
+         'devices' => for_a_program(Pairing.devices(root: ROOT), nil), 'self' => nil)
 end
 
 if ARGV.include?('--revoke')

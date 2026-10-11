@@ -765,7 +765,7 @@ cli:
                                      geht das Archiv am Bildschirm durch: Filter, Suche, Vorschau, Enter öffnet den Beitrag
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      liest die Konfiguration und sagt, was daran nicht stimmt
-      ./blog.sh pair [--list] [--revoke [<Gerät>]] [--host <Adresse>] [--port <n>] [--no-wait]
+      ./blog.sh pair [--list] [--revoke [<Gerät>]] [--json] [--host <Adresse>] [--port <n>] [--no-wait]
                                      zeigt einen Code, mit dem sich eine App auf dem Telefon verbindet; --list nennt die zugelassenen Geräte,
                                      --revoke nimmt eines heraus, nach Nummer, Name oder Fingerabdruck
       ./blog.sh check [--online] [--json] [--repair] [--languages]
@@ -1204,10 +1204,13 @@ pair:
   revoked: "✅ Entfernt: %{device}"
   revoke_none: "❌ Ein Gerät namens „%{which}“ gibt es hier nicht. ./blog.sh pair --list zeigt, welche es gibt."
   revoke_needs_device: "❌ --revoke will wissen, welches Gerät: seine Nummer, sein Name oder sein Fingerabdruck aus ./blog.sh pair --list."
+  json_scope: "Mit --json kann pair zweierlei: --list und --revoke, hinter dem nichts steht -- das entfernt das Gerät, das fragt. Ein Code wird am Terminal gezeigt, und ein anderes Gerät wird ebenfalls dort entfernt."
+  device_unknown: "Der Blog kann nicht sagen, welches Gerät fragt: Die Zeile, die es hereingelassen hat, wurde von Hand geschrieben oder stammt von einer Kopplung aus der Zeit, als eine Zeile noch nicht sagte, wem sie gehört. Auf dem Server bringt ./blog.sh pair --list eine ältere Kopplung auf den Stand, und ./blog.sh pair --revoke entfernt ein Gerät; eine von Hand geschriebene Zeile wird von Hand entfernt."
+  busy: "Die Datei mit den Schlüsseln wird gerade von jemand anderem geändert, also wurde nichts entfernt. Versuch es gleich noch einmal."
   q_revoke_which: "Welches soll weg? [1–%{count}]: "
   q_revoke: "„%{device}“ entfernen? Die App darauf erreicht den Blog dann nicht mehr. [j/N] "
   write_failed: "❌ %{path} konnte nicht geschrieben werden: %{error}"
-  unknown_option: "pair kennt %{option} nicht -- es nimmt --list, --revoke <Gerät>, --host <Adresse>, --port <Nummer> und --no-wait."
+  unknown_option: "pair kennt %{option} nicht -- es nimmt --list, --revoke <Gerät>, --json, --host <Adresse>, --port <Nummer> und --no-wait."
   needs_value: "%{option} braucht einen Wert."
 
 doctor:

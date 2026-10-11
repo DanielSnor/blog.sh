@@ -76,6 +76,13 @@ module Pairing
   # code is waiting, `blog.sh:<device>` once an app has come in.
   WAITING = 'blog.sh-pair:'
   DEVICE = 'blog.sh:'
+  # The word a device's line hands scripts/remote.sh: the fingerprint of
+  # the key on that same line. It is how a request through the door is
+  # known to be one device and not another -- sshd tells a forced command
+  # nothing about the key that was used, and what the caller says of
+  # itself is not evidence.
+  IDENTITY = '--device='
+  PRINT = %r{\A[A-Za-z0-9+/]{43}\z}.freeze
   # An ed25519 public key as OpenSSH writes one: the type, a space, 68
   # characters of base64. Nothing before, nothing after -- a line break,
   # an option or a second key cannot ride in on it.
@@ -207,7 +214,33 @@ module Pairing
   end
 
   def device_line(root, public_key, name)
-    %(restrict,command="#{forced_command(root, 'remote.sh')}" #{public_key} #{DEVICE}#{name})
+    print = public_key.to_s.match?(PUBLIC_KEY) ? fingerprint(public_key.split.last) : nil
+    words = print ? ["#{IDENTITY}#{print}"] : []
+    %(restrict,command="#{forced_command(root, 'remote.sh', *words)}" #{public_key} #{DEVICE}#{name})
+  end
+
+  # The fingerprint of the key a device's line holds -- nil for a line
+  # whose key is not one (somebody's hand has been at it). Asked of
+  # nothing, the hash answers with the fingerprint of nothing, and that
+  # was shown for such a line as if it were its key's.
+  def print_of(line)
+    key = line[/ (ssh-ed25519 [A-Za-z0-9+\/]{68}) #{Regexp.escape(DEVICE)}/, 1]
+    key && fingerprint(key.split.last)
+  end
+
+  # A device's line as it is written now. One written before a line said
+  # whose it is ends its command at the script; the word is put in after
+  # it and nothing else on the line moves -- the PATH it was given on the
+  # day it was written stays the PATH it runs with. Every other line, and
+  # one whose key cannot be read, comes back as it was.
+  def identified(line, root)
+    return line unless ours?(line, root, DEVICE)
+
+    bare = %(#{script_token(root, 'remote.sh')}" )
+    print = print_of(line)
+    return line unless print && line.include?(bare)
+
+    line.sub(bare) { %(#{script_token(root, 'remote.sh')} #{IDENTITY}#{print}" ) }
   end
 
   # Whether a line of the file is one this installation wrote: by its
@@ -268,10 +301,23 @@ module Pairing
   # One change at a time: the terminal that is waiting and the app that
   # has just arrived both rewrite this file, and each has to see what the
   # other did.
-  def locked
+  #
+  # wait: how many seconds somebody who cannot be kept waiting gives it --
+  # a program on the far end of the door -- before it is refused as busy.
+  # The terminal waits for as long as it takes, as before.
+  def locked(wait: nil)
     FileUtils.mkdir_p(File.dirname(keys_file), mode: 0o700)
     File.open("#{keys_file}.blog-sh.lock", File::CREAT | File::RDWR, 0o600) do |lock|
-      lock.flock(File::LOCK_EX)
+      if wait
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + wait
+        until lock.flock(File::LOCK_EX | File::LOCK_NB)
+          raise Refused, :busy if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+          sleep 0.1
+        end
+      else
+        lock.flock(File::LOCK_EX)
+      end
       yield
     end
   end
@@ -672,9 +718,47 @@ module Pairing
   # and what somebody wrote into that file themselves is theirs.
   def devices(root:)
     read_lines.select { |line| ours?(line, root, DEVICE) }.map do |line|
-      key = line[/ (ssh-ed25519 [A-Za-z0-9+\/]{68}) #{Regexp.escape(DEVICE)}/, 1].to_s
-      { 'name' => comment_of(line, DEVICE), 'fingerprint' => fingerprint(key.split.last.to_s).to_s }
+      { 'name' => comment_of(line, DEVICE), 'fingerprint' => print_of(line).to_s }
     end
+  end
+
+  # Brings the lines of devices let in before a line said whose it is up
+  # to date, so that each of them can be told from the others through the
+  # door. Answers how many it rewrote.
+  #
+  # Looked at before anything is locked, like the sweep: with nothing to
+  # bring up to date -- which is every run but the first after an upgrade
+  # -- nothing is written and no folder is made.
+  def identify(root:)
+    return 0 unless read_lines.any? { |line| identified(line, root) != line }
+
+    changed = 0
+    locked do
+      lines = read_lines
+      fresh = lines.map { |line| identified(line, root) }
+      changed = lines.zip(fresh).count { |was, now| was != now }
+      write_lines(fresh) unless changed.zero?
+    end
+    changed
+  end
+
+  # Takes out the device whose key has this fingerprint, and only by that:
+  # what a device asks of itself through the door, where a name -- which
+  # two devices may share, and which anybody can read off the list -- is
+  # not a way to say which one. Answers the device, or nil when no line of
+  # this installation holds that key.
+  def revoke_key(root:, print:, wait: nil)
+    gone = nil
+    locked(wait: wait) do
+      lines = read_lines
+      kept = lines.reject do |line|
+        match = ours?(line, root, DEVICE) && print.to_s.match?(PRINT) && print_of(line) == print
+        gone ||= { 'name' => comment_of(line, DEVICE), 'fingerprint' => print } if match
+        match
+      end
+      write_lines(kept) if gone
+    end
+    gone
   end
 
   # Takes a device out, by its name or by its key's fingerprint. Answers
@@ -686,8 +770,7 @@ module Pairing
       kept = lines.reject do |line|
         next false unless ours?(line, root, DEVICE)
 
-        key = line[/ (ssh-ed25519 [A-Za-z0-9+\/]{68}) #{Regexp.escape(DEVICE)}/, 1].to_s
-        match = comment_of(line, DEVICE) == which || fingerprint(key.split.last.to_s) == which.to_s.sub(/\ASHA256:/, '')
+        match = comment_of(line, DEVICE) == which || print_of(line) == which.to_s.sub(/\ASHA256:/, '')
         gone << comment_of(line, DEVICE) if match
         match
       end

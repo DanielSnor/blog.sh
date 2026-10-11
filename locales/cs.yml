@@ -752,7 +752,7 @@ cli:
                                      projde archiv na obrazovce: filtry, hledání, náhled, Enter otevře příspěvek
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      přečte konfiguraci a řekne, co je s ní špatně
-      ./blog.sh pair [--list] [--revoke [<zařízení>]] [--host <adresa>] [--port <n>] [--no-wait]
+      ./blog.sh pair [--list] [--revoke [<zařízení>]] [--json] [--host <adresa>] [--port <n>] [--no-wait]
                                      ukáže kód, kterým se připojí aplikace v telefonu; --list vypíše připojená zařízení,
                                      --revoke jedno odebere podle čísla, jména nebo otisku
       ./blog.sh check [--online] [--json] [--repair] [--languages]
@@ -1191,10 +1191,13 @@ pair:
   revoked: "✅ Odebráno: %{device}"
   revoke_none: "❌ Zařízení „%{which}“ tu není. ./blog.sh pair --list vypíše, která jsou."
   revoke_needs_device: "❌ --revoke chce vědět, které zařízení: jeho číslo, jméno nebo otisk z ./blog.sh pair --list."
+  json_scope: "S --json umí pair dvě věci: --list a --revoke, za kterým nic nestojí -- to odebere zařízení, které se ptá. Kód se ukazuje u terminálu a jiné zařízení se odebírá tam taky."
+  device_unknown: "Blog nepozná, které zařízení se ptá: řádek, který ho pustil dovnitř, psal někdo ručně, nebo ho zapsalo párování z doby, kdy řádek ještě neříkal, čí je. Na serveru starší párování doplní ./blog.sh pair --list a zařízení odebere ./blog.sh pair --revoke; ručně psaný řádek se odebírá ručně."
+  busy: "Soubor s klíči zrovna mění někdo jiný, takže se nic neodebralo. Za chvíli to zkus znovu."
   q_revoke_which: "Které odebrat? [1–%{count}]: "
   q_revoke: "Odebrat „%{device}“? Aplikace v něm se pak k blogu nepřipojí. [a/N] "
   write_failed: "❌ %{path} se nepodařilo zapsat: %{error}"
-  unknown_option: "pair nezná %{option} -- bere --list, --revoke <zařízení>, --host <adresa>, --port <číslo> a --no-wait."
+  unknown_option: "pair nezná %{option} -- bere --list, --revoke <zařízení>, --json, --host <adresa>, --port <číslo> a --no-wait."
   needs_value: "%{option} chce hodnotu."
 
 doctor:

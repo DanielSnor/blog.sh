@@ -773,7 +773,7 @@ cli:
                                      walks the archive on screen: filters, search, preview, Enter opens the post
       ./blog.sh doctor [--online] [--json] [--strip-location]
                                      reads the configuration and says what is wrong with it
-      ./blog.sh pair [--list] [--revoke [<device>]] [--host <address>] [--port <n>] [--no-wait]
+      ./blog.sh pair [--list] [--revoke [<device>]] [--json] [--host <address>] [--port <n>] [--no-wait]
                                      shows a code an app on a phone connects with; --list names the devices let in,
                                      --revoke takes one out by its number, name or fingerprint
       ./blog.sh check [--online] [--json] [--repair] [--languages]
@@ -1221,10 +1221,13 @@ pair:
   revoked: "✅ Removed: %{device}"
   revoke_none: "❌ There is no device called \"%{which}\" here. ./blog.sh pair --list shows which there are."
   revoke_needs_device: "❌ --revoke wants to know which device: its number, name or fingerprint from ./blog.sh pair --list."
+  json_scope: "With --json pair does two things: --list, and --revoke with nothing after it -- which takes out the device that is asking. A code is shown at the terminal, and another device is taken out there too."
+  device_unknown: "This blog cannot tell which device is asking: the line that let it in was written by hand, or by a pairing from before a line said whose it is. On the server, ./blog.sh pair --list brings an older pairing up to date and ./blog.sh pair --revoke takes a device out; a line written by hand is taken out by hand."
+  busy: "Somebody else is changing the file with the keys right now, so nothing was taken out. Try again in a moment."
   q_revoke_which: "Which one goes? [1–%{count}]: "
   q_revoke: "Take \"%{device}\" out? The app on it will no longer reach the blog. [y/N] "
   write_failed: "❌ %{path} could not be written: %{error}"
-  unknown_option: "pair does not know %{option} -- it takes --list, --revoke <device>, --host <address>, --port <number> and --no-wait."
+  unknown_option: "pair does not know %{option} -- it takes --list, --revoke <device>, --json, --host <address>, --port <number> and --no-wait."
   needs_value: "%{option} wants a value."
 
 doctor:

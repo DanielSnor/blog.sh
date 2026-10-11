@@ -15,6 +15,21 @@
 #
 #   restrict,command="/path/to/blog/scripts/remote.sh" ssh-ed25519 AAAA... app
 #
+# A line `./blog.sh pair` wrote says one thing more, as this script's
+# first argument: `--device=<fingerprint>`, the fingerprint of the key on
+# that same line. sshd tells a forced command nothing about the key that
+# was used, so this is how one device is told from another -- and the
+# only place it is taken from. Never from what the caller sent, never
+# from the environment the session arrived with: the word is set here,
+# to what the line says or to nothing, every time. Only a whole
+# fingerprint is taken for it; anything else in that place is read as
+# the command word it would otherwise be, and refused as one.
+#
+# (A wrapper that hands the caller's word on as an argument -- the
+# container's line in docs/operations.md -- hands it on as ONE argument,
+# in quotes, as written there. Split into words, what the caller sent
+# would stand where this word stands.)
+#
 # Everything answers as one JSON object and leaves with 0, for the reason
 # receive.sh gives: the status says whether an answer arrived, the object
 # says what it was. The command word is never echoed back -- it is the
@@ -22,6 +37,14 @@
 set -uo pipefail
 CDPATH=
 cd "$(dirname "$0")/.." >/dev/null || { printf '{"ok":false,"error":"no_cd","message":"Cannot reach the installation directory."}\n'; exit 0; }
+
+BLOG_SH_DEVICE=
+DEVICE_WORD='^--device=[A-Za-z0-9+/]{43}$'
+if [[ "${1:-}" =~ $DEVICE_WORD ]]; then
+  BLOG_SH_DEVICE="${1#--device=}"
+  shift
+fi
+export BLOG_SH_DEVICE
 
 case "${SSH_ORIGINAL_COMMAND:-${1:-}}" in
   run)

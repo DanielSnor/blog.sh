@@ -116,6 +116,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
   public half of a key the app made itself, which the engine then writes a line for, held to
   `scripts/remote.sh`. `pair --list` and `pair --revoke` show and remove the devices let in this
   way: `--list` numbers them, and `--revoke` takes that number, the name or the fingerprint, or asks.
+  A device let in this way can do the same two things for itself through its own key:
+  `pair --list` answers it with every device and which of them it is, and `pair --revoke`, with
+  nothing after it, takes it out -- itself and no other. Who is asking is known by a word the
+  device's own line in `authorized_keys` hands the script (`--device=<fingerprint>`), never by
+  anything a request says; showing a code and taking out another device stay at the terminal.
   The engine writes only `restrict,command=` lines of its own, touches no line it did not
   write, and keeps the file as it was beside it. For a blog and an SSH server in one account; a
   container still wants its line written by hand. `doctor` mentions a code's line left behind.

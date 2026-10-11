@@ -14,7 +14,7 @@
 #   ./blog.sh browse [--type=image] [--tag=foo]
 #   ./blog.sh list [--type=image] [--tag=foo]
 #   ./blog.sh doctor [--online] [--strip-location]
-#   ./blog.sh pair [--list] [--revoke <device>]
+#   ./blog.sh pair [--list] [--revoke [<device>]] [--json]
 #   ./blog.sh check [--online] [--json] [--repair]
 #   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
 #   ./blog.sh stats [--json]
