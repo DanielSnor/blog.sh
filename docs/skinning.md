@@ -203,7 +203,8 @@ The numbers are filled in by a script after the page loads, so this is a
 class you will not find by reading the built HTML.
 
 **A mention and a hashtag in a post's text.** A link whose whole text is
-"@somebody" or "#something" is `a.mention`, a hashtag `a.mention.hashtag`
+"@somebody" or "#something" -- in a post, or in a text the site says
+about itself (`about.html`) -- is `a.mention`, a hashtag `a.mention.hashtag`
 as well -- the classes Mastodon's own markup gives them, which is what
 the comments under a post and the toots in the sidebar already carry. One
 rule now reaches all three:
@@ -222,7 +223,9 @@ than the post, is `.comment.comment--reply`, and `site.css` sets it in by
 the width of a picture (`margin-left`, less below 700px). One step
 whatever the depth: the list is in thread order, so an answer already
 stands under what it answers. To have the thread flat again, set the
-margin to zero.
+margin to zero. In a live thread the page reads the answer off the
+thread; on a moderated site the cron that writes `comments.json` marks
+it (`reply: true`), so the indent appears with the next refresh.
 
 **The search's count and its matches.** The status over the results is
 `<span class="search-count">4</span> <span class="search-unit">results</span>`,

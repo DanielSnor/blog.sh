@@ -75,7 +75,8 @@ around one workflow rather than around the general case.
 - **The archive is a directory of JSON files.** One post, one file. It is
   readable, greppable and backed up by copying it.
 - **Authoring is a command.** `./blog.sh` writes, edits, publishes,
-  schedules and deploys. A phone writes at `/write/` and sends over SSH.
+  schedules and deploys. A phone writes in an app over the SSH the server
+  already has; the `/write/` page does it too, until 1.11.
 - **The deploy is paranoid.** A SHA-256 manifest ships only what changed,
   and refuses when the file count or the byte total swings too far from
   the last build it accepted.
@@ -90,8 +91,8 @@ What you give up: themes, plugins, and a second author.
 Each part says where it is described in full.
 
 - **Content.** One post is one JSON file, `content.nosync/posts/<year>/<slug>.json`, holding typed blocks. Drafts, scheduled posts, pages, unlisted posts, series, tags and a trash with restore. → [architecture.md](docs/architecture.md#content-model)
-- **Writing.** `./blog.sh` bare is a menu; every command also works directly: add, edit, publish, schedule, unpublish, delete, restore, rename, re-announce. `add <file>` takes a markdown file and asks nothing; `--json` answers as one object. → [operations.md](docs/operations.md#writing-and-publishing)
-- **From a phone.** `/write/` is a page on the blog itself: title, text, tags, photographs, video. It sends over the SSH the server already has, publishes, and polls for the answer. → [operations.md](docs/operations.md#writing-from-a-phone)
+- **Writing.** `./blog.sh` bare is a menu; every command also works directly: add, edit, publish, schedule, unpublish, delete, restore, rename, re-announce. `add <file>` takes a markdown file and asks nothing; `--json` answers as one object. On a Mac, `./setup.sh --launcher` puts an icon in Applications that opens it. → [operations.md](docs/operations.md#writing-and-publishing), [install.md](docs/install.md#macos)
+- **From a phone.** Native apps for iOS and Android, in preparation, reach the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut work as before and leave in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
 - **Markdown.** One parser, shared by the build and the authoring tool, with a cheat sheet the parser generates for your own site at `/markdown/`. Editing a post round-trips through it. → [operations.md](docs/operations.md#writing-and-publishing)
 - **Search, and the other ways to find a post.** Full text over the whole archive, entirely in the
   reader's browser -- no server, no index service, nothing called from outside, on a site of any
@@ -105,7 +106,7 @@ Each part says where it is described in full.
 - **Build.** Static HTML from JSON through ERB templates: stable pagination, tag, series and type archives, RSS, sitemap, `robots.txt`, a generated favicon, a 404 in the site's own chrome. A page whose inputs have not moved is not rendered again. → [architecture.md](docs/architecture.md#build-pipeline-buildbuild_blogrb)
 - **Deploy.** Cloudron Surfer, a local directory, rsync over SSH, a git-pages push, any rclone remote, or SFTP. A SHA-256 manifest ships only what changed and refuses a build that swings too far from the last one. → [operations.md](docs/operations.md#deploying)
 - **Comments.** The announcement's replies are the thread; `comments.approval: fav` publishes only the ones you favourite. → [Why this exists](#why-this-exists)
-- **Sidebar widgets.** Toots, Bluesky posts, Pixelfed posts, commits, any RSS feed, per-post stats -- each optional, all fetched server-side on a cron. → [operations.md](docs/operations.md#cron-sidebar-widgets-and-post-stats)
+- **Sidebar widgets.** Toots, Bluesky posts, Pixelfed posts, commits, any RSS feed, per-post stats -- each optional, all fetched server-side on a cron -- and the archive's own posts from this day in earlier years. → [operations.md](docs/operations.md#cron-sidebar-widgets-and-post-stats), [operations.md](docs/operations.md#on-this-day)
 - **Appearance.** Light and dark from CSS custom properties, a three-state toggle, and a seven-key palette in `config/site.yml` that the wizard previews before writing. A listing card is cut to a size budget as it is written rather than drawn in full and hidden with CSS. → [install.md](docs/install.md#the-palette-and-the-headers-type)
 - **Reachable without a mouse.** One focus ring for the whole site, skip links, and motion that respects `prefers-reduced-motion`. → [architecture.md](docs/architecture.md#the-client-side)
 - **Security.** A Content-Security-Policy on every page, self-hosted fonts, nothing third-party in post data, `env.sh` out of git at mode 600. → [architecture.md](docs/architecture.md#security)
@@ -139,6 +140,7 @@ scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers
                            refresh-sidebar.sh cron: refreshes only the sidebar widgets (no site rebuild)
                            publish-scheduled.sh cron: publishes whatever the queue has come due
                            receive.sh         takes a whole post over one SSH connection into incoming/
+                           remote.sh          the forced command for an app's key: one engine command (remote.rb) or one delivery per connection
                            pair.rb            ./blog.sh pair: lets an app in by a code it reads (enroll.sh takes its key)
                            migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)

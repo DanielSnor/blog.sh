@@ -257,14 +257,21 @@ The example is fully commented. The short version:
 
 - **Required:** `site` (title, short_name, description, author, lang,
   locale, base_url) and `banner`. That alone is a complete, working
-  site.
+  site. `site.author_name` is the optional other half of `author`, for a
+  language that inflects names: `author` is the form the site's sentences
+  use ("na webu Daniela Šnora"), `author_name` the name as it stands
+  alone -- under a hero title, as the person the structured data names,
+  and on the pages of another language. Without it `author` is used
+  everywhere.
 - **`about` and `footer`** introduce the site and close every page; the
   example ships both filled in. Neither is required: an emptied value
   takes its section with it -- heading and all -- rather than rendering
   empty, and a deleted block reads the same as an emptied one.
 - **Optional, each activates only when present:** `analytics`, `social`,
-  `widgets` (toots / pixelfed / commits / bluesky / rss, each
-  independently), `mastodon` **or** `bluesky` (comments + auto-announce
+  `widgets` (toots / pixelfed / commits / bluesky / rss / on_this_day, each
+  independently -- `on_this_day` is the archive's own posts from this day in
+  earlier years, see
+  [operations.md](operations.md#on-this-day)), `mastodon` **or** `bluesky` (comments + auto-announce
   -- exactly one, see [step 8](#8-comments-network-optional-mastodon-or-bluesky)),
   `comments` (which replies get published -- same step),
   `colors` (7 keys per light/dark mode -- omitted keys fall back to the
@@ -424,7 +431,12 @@ for one either way with `hero:` in its own header (see
 [operations.md](operations.md#writing-and-publishing)). They are switches
 for regions, not for how a region looks: what things look like belongs in
 a stylesheet, and a key per visual property would turn this file into a
-stylesheet written in YAML.
+stylesheet written in YAML. `layout.lead_card` is the third: the card
+that opens the front page leads with its post's first picture -- a card
+is otherwise cut by height, so a picture after the opening paragraph is
+usually left out -- and carries `post-list-item--lead` for a skin, with
+or without a picture. Off unless you ask; what a skin can do with it is in
+[skinning.md](skinning.md).
 
 `site.extra_css` is that stylesheet -- one path, or a list of them, loaded
 after the site's own, so a skin can live in a file of yours instead of in
@@ -776,7 +788,11 @@ variant:
    ceiling are in
    [operations.md](operations.md#a-post-sent-from-the-phone-itself).
    Nothing new listens on the network; it travels over the SSH the
-   server already has.
+   server already has. The blog.sh app on a phone or a tablet uses the
+   same SSH with a key of its own, held to `scripts/remote.sh`: written by
+   hand as [operations.md](operations.md#over-ssh-from-an-app) shows, or
+   let in by a code that `./blog.sh pair` draws in the terminal
+   ([operations.md](operations.md#letting-an-app-in-by-a-code)).
 5. In a container setup (Cloudron and similar), the engine lives inside
    the container's persistent data directory and commands run via
    `docker exec` / the platform's terminal -- the engine itself doesn't
@@ -912,12 +928,12 @@ followed by a deploy leaves the second language's pages as the previous
 version built them -- and uploads them that way.
 
 `main` is the release branch: a clone on it gets each release by `git
-pull`. A clone that was put on a release tag (`git checkout v1.8`) is on
+pull`. A clone that was put on a release tag (`git checkout v1.9`) is on
 no branch, and `git pull` refuses with "You are not currently on a
 branch"; move it to the next release by name instead:
 
 ```bash
-git fetch --tags && git checkout v1.9
+git fetch --tags && git checkout v1.10
 ```
 
 The first build after an upgrade may be a full one -- the engine's own
@@ -943,8 +959,12 @@ languages is asked about every post again. Old addresses a translation was given
 read them, and a translation saved there is written without the list, so
 those addresses are not in the post on the way forward again either.
 What 1.10 left in the installation folder for itself
-(`.on-this-day.*.json`, `.search_index.json`, `.last-sidebar-run`) is
-safe to delete. The posts, the media and the rest of the configuration
+(`.on-this-day.*.json`, `.search_index.json`, `.last-sidebar-run`,
+`tmp/pairing/`) is safe to delete. The apps stop reaching the blog: the
+door they come through, `scripts/remote.sh`, is new in 1.10 and 1.9 does
+not have it. A line `./blog.sh pair` wrote into `~/.ssh/authorized_keys`
+(it ends `blog.sh:<device>`) then points at nothing -- take it out by
+hand. The posts, the media and the rest of the configuration
 are otherwise untouched in both directions.
 
 Per-deployment files (`content.nosync/`, `media.nosync/`,

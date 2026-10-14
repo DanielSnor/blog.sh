@@ -153,6 +153,13 @@ already carries, so each can be read as well as changed:
   is how an app saves a post it opened (see
   [Writing from a phone](#editing-a-draft-from-the-phone)), and a way for
   a script to edit without the `$EDITOR` trick.
+- **`lang: <code>`** beside `edits:` and `base:` makes the file a
+  translation rather than the post's own text: the words become the
+  post's text in that language, the one `translate <slug> --lang <code>
+  --json` handed out with its `base:`. The same rules as `edits:` hold --
+  `changed`, `content_lost`, what is left as it was stays as stored --
+  except that `base:` is required for a draft too (`base_required`), and
+  a title and a body both empty take the language off the post.
 - **`toc: true` / `toc: false`** overrides the table of contents. A post
   with four headings or more gets one on its own -- that is the length at
   which a reader starts scrolling to look for something rather than
@@ -1167,7 +1174,7 @@ Three rules follow from "nobody is at the keyboard":
 
 | command | what it answers | refusals |
 |---|---|---|
-| `version --json` | `engine`, `site`: name, claim, url, lang, locales, accent (`light`, `dark`: the palette's accent as colors.css resolves it), palette (`light`, `dark`, each `bg`, `text`, `meta_text`, `border`, resolved the same way) -- the identity block as data; answers on a broken config with what it can | -- |
+| `version --json` | `ok`, `engine`, `max_mb` (the receiver's ceiling for a delivery, so a sender can weigh one first), `site`: name, claim, url, lang, locales, accent (`light`, `dark`: the palette's accent as colors.css resolves it), palette (`light`, `dark`, each `bg`, `text`, `meta_text`, `border`, resolved the same way) -- the identity block as data; answers on a broken config with what it can | -- |
 | `list [--type=<type>] [--tag=<tag>] [--search=<words>] [--drafts] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned, match), `count`, `drafts`, `search`; `--search="words"` is the search `browse` runs behind [/] -- the same query language, over the whole text -- and `match` is the line that says why a row is there (null when the hit is in the title or a tag); `search` says the query back, null when there was none. A filter's value is written after `=` or as the next word (`--tag=cats`, `--tag cats`); a filter with nothing after it (`--tag`, or `--tag=`), or a word the command has no use for, is an abort -- but an empty `--search=` is a query, which matches nothing | -- |
 | `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back, and so is `series_part` -- a string or null, though the post's file holds a number; `languages` names the site's own (`own`) and says of each other one (`others`) `none`, `started` or `written` -- the three states `check --languages --json` calls `missing`, `title_only` and `written`; `languages.allow_partial` is true on a site that lets a post out without the words of every language (`publishing.allow_partial`), where `publish` and `schedule` need no `--allow-partial` | `not_found`, `ambiguous_slug` |
 | `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property`, `busy`, `not_found`, `ambiguous_slug` |
@@ -1627,16 +1634,19 @@ in publish order and acts on the one you pick:
   anything across.
 - `[p]` publishes it right now, the same flow as publishing a draft by
   hand (announcement included).
-- `[s]` asks for a different time, same prompt as scheduling.
-- `[n]` returns it to the drafts; the post keeps its text, loses only
-  the plan.
+- `[s]` reschedules it, same prompt as scheduling.
+- `[n]` cancels the schedule: back to the drafts, the post keeps its
+  text and loses only the plan. (The post's own screen says the same two
+  words for the same two keys.)
 
 When a post leaves the queue -- published now, or removed -- its time is
 free again, and the screen offers to let the posts behind it each step
 forward into the gap, every one taking over its predecessor's time. It
 only offers: a hand-picked date further down may be deliberate, and
 nothing moves a post's time except you. A post whose time already passed
-is waiting for the cron and can't be reordered.
+can't be reordered: it is the next to go out -- with the next run of the
+publishing cron, or, on a blog where nothing runs the queue, when you
+publish it yourself (below).
 
 If the publishing cron happens to be running at the moment you move
 something, the move is refused rather than written: the two would be
@@ -2654,7 +2664,8 @@ the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still
 owes the target a deploy; see [Deploying](#deploying)) and
-`.last-scheduled-run` (the scheduled-publish heartbeat above). The
+`.last-scheduled-run` (the scheduled-publish heartbeat above) with
+`.last-sidebar-run` (the same for the sidebar's cron). The
 wizards' `config/site.yml.bak` and `env.sh.bak` are not needed either --
 but the second holds your previous tokens, so delete rather than
 archive it.
