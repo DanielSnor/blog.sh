@@ -419,7 +419,8 @@ LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
 # unless a site asks for it, because it reshapes every post page it
 # touches -- and a site is entitled to have had the shape it has.
 LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
-# The first card on the front page opened with its post's picture. Off
+# The first card on the front page opened with its post's picture, and
+# marked as the lead whether or not there was one (build/cards.rb). Off
 # unless a site asks for it: a card is cut by height, so a picture that
 # stands after the opening paragraph usually falls outside it, and a
 # front page that suddenly leads with one is a front page reshaped.
@@ -2582,8 +2583,9 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # its item count identical, so no /page/N/ boundary moves.
     # layout.lead_card: the card that opens the landing page -- the pinned
     # post where there is one, since that is what stands first -- is the
-    # one that leads with its picture. Never a card further down, and never
-    # a page under /page/N/: those are written once and left alone.
+    # lead: marked as such, and opening with its picture when it has one.
+    # Never a card further down, and never a page under /page/N/: those are
+    # written once and left alone.
     leads = lead && landing
     if pinned && number > fixed
       rest = page_posts.reject { |post| post.equal?(pinned) }

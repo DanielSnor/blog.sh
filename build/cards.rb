@@ -19,8 +19,9 @@ module Cards
     # key: it differs from the post's ordinary appearance by exactly the
     # badge mark, and caching one over the other would leak the mark into
     # the chronological copy (or lose it from the pinned one).
-    # The card that opens the front page with its picture (layout.lead_card)
-    # is a third copy kept out of the cache, for the same reason.
+    # The card that opens the front page (layout.lead_card) is a third copy
+    # kept out of the cache, for the same reason: it carries the lead's mark,
+    # and its post's picture where it has one.
     return build_list_item(post, pinned: pinned, lead: true) if lead
     return build_list_item(post, pinned: true) if pinned
     # The copy on a series' own listing carries the part's number, and is
@@ -35,8 +36,8 @@ module Cards
   # picture is taken by IDENTITY out of whatever follows, so a post that
   # opens with it does not show it twice, and it is not weighed against
   # the budget -- that it would not have fitted is the reason this exists.
-  # Nil for a post with no picture worth leading with: its card is then the
-  # card it always was.
+  # Nil for a post with no picture worth leading with: its card then has
+  # the body it always had -- and is the lead all the same (build_list_item).
   def lead_content(post, prefix)
     block, = first_usable_image(post)
     return nil unless block
@@ -140,15 +141,20 @@ module Cards
     # because each post's HTML is rendered (and cached) on its own.
     led = lead ? lead_content(post, prefix) : nil
     content, cut = led if led
-    # The card that leads the front page was asked for by the site and is
-    # left exactly as it was; every other card of a picture or video post
-    # carries its medium.
+    # The card that leads the front page with its picture was asked for by
+    # the site and is left exactly as it was; every other card of a picture
+    # or video post carries its medium -- a lead with no picture to lead
+    # with among them, a video post's video included.
     medium = led ? nil : medium_block(post)
     content, cut = media_content(post, prefix, medium) if medium
-    kind = if led then ' post-list-item--lead'
-           elsif medium then " post-list-item--media#{tall_medium?(medium) ? ' post-list-item--media-tall' : ''}"
-           else ''
-           end
+    # The lead is a PLACE -- the card that opens the front page -- and it is
+    # marked whether or not its post had a picture to lead with. Marked only
+    # when a picture came with it, the lead a skin had dressed was gone the
+    # day the newest post had none (sean.cz, 12. 10. 2026). Without a picture
+    # the mark is all that changes: the body is the one the card would have
+    # had unmarked, and a medium's own marks stay beside it.
+    media_kind = medium ? " post-list-item--media#{tall_medium?(medium) ? ' post-list-item--media-tall' : ''}" : ''
+    kind = "#{lead ? ' post-list-item--lead' : ''}#{media_kind}"
     content = content.gsub(%r{<(h[1-6])([^>]*) id="[^"]*"}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2)}" }
     # The link is there exactly when a block did not fit -- or when the
     # author wrote a teaser, which says the same thing about the post. It

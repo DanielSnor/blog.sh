@@ -275,7 +275,8 @@ colors:
 #   # height, so a picture that comes after the first paragraph is usually
 #   # left out of it. Only that one card (the pinned post, where there is
 #   # one), only on the front page itself, and it carries the class
-#   # post-list-item--lead for a stylesheet to dress. Default: false.
+#   # post-list-item--lead for a stylesheet to dress -- also when its post
+#   # has no picture, which leaves the card's body as it was. Default: false.
 #   lead_card: false
 # --- end of layout ---
 

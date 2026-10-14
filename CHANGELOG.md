@@ -175,8 +175,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
   there is one -- leads with its post's first picture, under the title and above the opening
   words. A card is cut by height, so a picture written after the first paragraph is usually left
   out of it, and a stylesheet cannot show what the card was never given. Only that one card and
-  only the front page itself; it carries `post-list-item--lead` for a skin to dress. Off by
-  default, and a post with no picture keeps the card it had.
+  only the front page itself; it carries `post-list-item--lead` for a skin to dress. The mark goes
+  with the place, not with the picture: a post with nothing to lead with keeps the body its card
+  had (a video post its video) and is marked all the same, so the lead a skin dresses does not
+  vanish the day the newest post has no photograph. Off by default.
 
 ### Changed
 

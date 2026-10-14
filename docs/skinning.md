@@ -97,7 +97,7 @@ could have one.
 Since 1.3.2 a listing's `<body>` says which it is:
 
 ```css
-.page-first .post-list-item:first-child { /* the lead card */ }
+.page-first .post-list-item:first-of-type { /* the first card */ }
 .page-cont  .archive-note { /* only on the continuations */ }
 ```
 
@@ -105,6 +105,9 @@ Since 1.3.2 a listing's `<body>` says which it is:
 is everything under `/page/N/`, and both are emitted for every listing --
 the front page, a tag, a series, a content type. A post page carries a bare
 `<body>`, so a rule scoped to either class cannot leak onto one.
+`:first-of-type`, not `:first-child`: the listing's heading stands first in
+`<main>`, and the cards are the `div`s after it -- `:first-child` matches
+no card at all.
 
 Two of them exist rather than one on purpose: a single mark on the
 continuations would force you to write the first page's look
@@ -113,17 +116,22 @@ undoes another is the kind a later change quietly stops undoing. Scope
 positively instead.
 
 One card can be more than first by position. With `layout.lead_card` on
-in `config/site.yml`, the card that opens the front page is handed its
-post's first picture -- placed before its words, whatever the height
-budget would have cut -- and marked for you:
+in `config/site.yml`, the card that opens the front page is marked for
+you -- and handed its post's first picture, placed before its words
+whatever the height budget would have cut, when the post has one:
 
 ```css
 .post-list-item--lead .content figure img { width: 100%; }
 ```
 
-Without the setting no card carries the class, and a rule scoped to it
-does nothing; `.page-first .post-list-item:first-child` alone cannot do
-this, because the picture is usually not in the card to be styled.
+The mark goes with the place, not with the picture. A post with nothing to
+lead with keeps the body its card would have had -- a video post its video,
+with `post-list-item--media` beside the mark -- and is the lead all the
+same, so the card you dressed does not vanish the day the newest post has
+no photograph. Write the lead's rules so that they hold without a picture
+too. Without the setting no card carries the class, and a rule scoped to
+it does nothing; `.page-first .post-list-item:first-of-type` alone cannot
+do this, because the picture is usually not in the card to be styled.
 
 A card of a picture post or a video post opens with its medium on every
 listing, setting or no setting, and says so: `.post-list-item--media`. One
