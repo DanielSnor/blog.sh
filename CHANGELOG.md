@@ -177,8 +177,9 @@ goes in is still being decided; the suffix and the date both come off at the tag
   out of it, and a stylesheet cannot show what the card was never given. Only that one card and
   only the front page itself; it carries `post-list-item--lead` for a skin to dress. The mark goes
   with the place, not with the picture: a post with nothing to lead with keeps the body its card
-  had (a video post its video) and is marked all the same, so the lead a skin dresses does not
-  vanish the day the newest post has no photograph. Off by default.
+  would have had without the setting (a video post its video) and is marked all the same, so the
+  lead a skin dresses does not vanish the day the post that opens the front page has no picture.
+  Off by default.
 
 ### Changed
 
@@ -191,8 +192,8 @@ goes in is still being decided; the suffix and the date both come off at the tag
   and the budget is charged that height, so the caption under a portrait photograph is on the card.
   Such a card is `post-list-item--media` (and `--media-tall`). **This changes listings without
   anything being set**: every site with such posts shows more pictures after the upgrade. An
-  article with a photograph in it is still an article, and the card `layout.lead_card` asks for is
-  left as it was.
+  article with a photograph in it is still an article, and the card `layout.lead_card` leads with a
+  picture is left as it was; one with no picture to lead with is the media card, marked as the lead.
 - **The cheat sheet shows a picture and a gallery.** Its section on pictures had a source and a
   sentence and nothing to look at. It now draws both -- a picture with its caption, and a gallery
   of a landscape beside a portrait, which is the crop the paragraph above it describes -- from two
@@ -274,6 +275,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Fixed
 
+- **The skinning guide's selector for the first card matched no card.** Since 1.3.2
+  `docs/skinning.md` advised `.page-first .post-list-item:first-child`, but a listing's heading
+  stands first in `<main>`, so no card is ever its first child; it says `:first-of-type` now. The
+  example beside it named `.archive-note`, which the engine has never written, and uses the
+  listing's heading instead.
 - **The config writer read a config in whatever encoding the shell named.** Under a shell that
   names none, a `config/site.yml` with one accented letter in it could not be searched for a key,
   and every setting written to it failed with "invalid byte sequence in US-ASCII". The wizards set

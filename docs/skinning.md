@@ -98,7 +98,7 @@ Since 1.3.2 a listing's `<body>` says which it is:
 
 ```css
 .page-first .post-list-item:first-of-type { /* the first card */ }
-.page-cont  .archive-note { /* only on the continuations */ }
+.page-cont  .listing-heading { /* only on the continuations */ }
 ```
 
 `page-first` is the page that lives at the listing's own address, `page-cont`
@@ -127,9 +127,9 @@ whatever the height budget would have cut, when the post has one:
 The mark goes with the place, not with the picture. A post with nothing to
 lead with keeps the body its card would have had -- a video post its video,
 with `post-list-item--media` beside the mark -- and is the lead all the
-same, so the card you dressed does not vanish the day the newest post has
-no photograph. Write the lead's rules so that they hold without a picture
-too. Without the setting no card carries the class, and a rule scoped to
+same, so the card you dressed does not vanish the day the post that opens
+the front page has no picture. Write the lead's rules so that they hold
+without a picture too. Without the setting no card carries the class, and a rule scoped to
 it does nothing; `.page-first .post-list-item:first-of-type` alone cannot
 do this, because the picture is usually not in the card to be styled.
 
@@ -146,8 +146,10 @@ whose medium is taller than wide, or square, is also
 
 The build charges the card's height budget those same 22rem, so a much
 smaller cap leaves room the card does not use and a much larger one lets
-the card run long; neither breaks anything. The lead card above stays
-`--lead` alone.
+the card run long; neither breaks anything. A lead card that leads with
+its picture stays `--lead` alone; a video post's lead with no picture to
+lead with is the media card it would have been, with `--lead` beside its
+marks.
 
 The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
