@@ -185,6 +185,23 @@ unless REMOTE
   rescue SystemCallError, ArgumentError
     nil
   end
+  # ...and the record of when a device was last seen goes with a device
+  # that is no longer in the file.
+  keys_read { Pairing.prune_seen(root: ROOT) }
+end
+
+# When a device last came through the door, as a line of the list says
+# it: the day and the hour in this machine's time, or that it has not
+# been seen since this was recorded (1.11) -- a device let in before then
+# that has not asked for anything since.
+def seen_words(time)
+  return t('list_seen_never') unless time
+
+  t('list_seen', when: time.localtime.strftime("#{I18n.t('date_format')} #{I18n.t('time_format')}"))
+end
+
+def row(device, index)
+  t('list_row', number: index + 1, name: device['name'], fingerprint: device['fingerprint'], seen: seen_words(device['last_seen']))
 end
 
 # Which device is asking: the fingerprint its own line handed the door,
@@ -203,7 +220,10 @@ end
 
 def for_a_program(devices, me)
   devices.map do |device|
-    { 'name' => device['name'], 'fingerprint' => printed(device['fingerprint']), 'self' => !me.nil? && device['fingerprint'] == me }
+    { 'name' => device['name'], 'fingerprint' => printed(device['fingerprint']), 'self' => !me.nil? && device['fingerprint'] == me,
+      # When it last came through the door, in UTC; null for one that has
+      # not since this was recorded.
+      'last_seen' => device['last_seen']&.utc&.iso8601 }
   end
 end
 
@@ -217,9 +237,7 @@ if ARGV.include?('--list')
     puts t('list_none')
   else
     puts t('list_head')
-    devices.each_with_index do |device, i|
-      puts t('list_row', number: i + 1, name: device['name'], fingerprint: device['fingerprint'])
-    end
+    devices.each_with_index { |device, i| puts row(device, i) }
   end
   exit 0
 end
@@ -245,7 +263,7 @@ def device_to_revoke(devices)
   chosen = devices.first
   if devices.size > 1
     puts t('list_head')
-    devices.each_with_index { |device, i| puts t('list_row', number: i + 1, name: device['name'], fingerprint: device['fingerprint']) }
+    devices.each_with_index { |device, i| puts row(device, i) }
     print t('q_revoke_which', count: devices.size)
     number = $stdin.gets.to_s.strip
     chosen = number.match?(/\A\d+\z/) && number.to_i.positive? ? devices[number.to_i - 1] : nil

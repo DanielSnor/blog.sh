@@ -18,6 +18,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Added
 
+- **`pair --list` says when each device was last seen.** The door notes every request; `last_seen` in `--json`.
 - **`series_index:` names the page of every series and says which way it runs.** `title`, `description`, `order: oldest`.
 - **`layout.series_contents`: every part of a series on each part's page.** Under "part N of M", never cut short.
 - **A card carries the hour its post went out, hidden.** For a skin that wants it; never an hour an importer made up.

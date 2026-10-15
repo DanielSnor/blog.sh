@@ -1166,6 +1166,15 @@ device's name (quotes or no quotes: `--revoke motorola edge 70 fusion`)
 or its fingerprint. With nothing after it, somebody at a terminal is
 asked which one, and nothing goes without a yes.
 
+`--list` also says when each device was last seen: the door notes the
+moment on every request a device makes, a delivery included, and the
+pairing makes the first note. It is as near as a server comes to testing
+the connection -- it cannot call a phone, the phone calls it -- so a
+device not seen for weeks is one whose app has stopped asking. A device
+let in before 1.11 is "not seen yet" until its next request. The notes
+are `tmp/pairing/seen/`, one empty file per key dated by its time, and
+one goes with its device.
+
 `pair` draws a QR code in the terminal (and prints the same thing as a
 line of text, for an app with no camera to point). The code wants a
 window of some sixty columns by thirty-five rows, which is more than a
@@ -1215,10 +1224,12 @@ decides who may log in:
 - With a code closed again, or a device come and gone, the file is byte
   for byte what it was: carriage returns on lines that are not `pair`'s
   stay, and so does a last line with no line feed after it.
-- `pair --list` only reads: it makes no folder and takes no lock unless
-  there is a run-out code's line to take out, or a device's line from
-  before lines said whose they are to bring up to date. Asked through
-  the door it writes nothing at all.
+- `pair --list` only reads the key file: it makes no folder and takes no
+  lock unless there is a run-out code's line to take out, or a device's
+  line from before lines said whose they are to bring up to date. At the
+  terminal it clears the note of when a device was last seen for a key
+  no line holds any more. Asked through the door it writes nothing but
+  that note for the device asking, which every request writes.
 - A line names this installation by its folder. Move the folder and its
   devices' lines still name the old one: sshd finds no script there, the
   apps are refused, and neither `pair --list` nor `doctor` sees the lines
@@ -1290,18 +1301,21 @@ are `run` requests like any other:
 ```
 {"args": ["pair", "--list"]}
 {"ok": true,
- "devices": [{"name": "Daniel's iPhone", "fingerprint": "SHA256:k/JB...QCo", "self": true},
-             {"name": "Tablet",          "fingerprint": "SHA256:wL8H...u+w", "self": false}],
+ "devices": [{"name": "Daniel's iPhone", "fingerprint": "SHA256:k/JB...QCo", "self": true,
+              "last_seen": "2026-10-15T12:41:07Z"},
+             {"name": "Tablet",          "fingerprint": "SHA256:wL8H...u+w", "self": false,
+              "last_seen": null}],
  "self": "SHA256:k/JB...QCo"}
 
 {"args": ["pair", "--revoke"]}
 {"ok": true,
  "revoked": {"name": "Daniel's iPhone", "fingerprint": "SHA256:k/JB...QCo"},
- "devices": [{"name": "Tablet", "fingerprint": "SHA256:wL8H...u+w", "self": false}],
+ "devices": [{"name": "Tablet", "fingerprint": "SHA256:wL8H...u+w", "self": false, "last_seen": null}],
  "self": null}
 ```
 
-`devices` are in the order `pair --list` numbers them at the terminal,
+`last_seen` is when the device last came through the door, in UTC, or
+`null` for one not seen since 1.11. `devices` are in the order `pair --list` numbers them at the terminal,
 and a fingerprint is written as `ssh-keygen -l` writes it: `SHA256:` and
 43 characters of base64 with no padding (an empty string for a line
 whose key somebody's hand has left unreadable). `self` -- on each

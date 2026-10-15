@@ -385,6 +385,21 @@ def left_how(status)
   "ended by signal #{status.termsig}#{name ? " (#{name})" : ''}"
 end
 
+# Every request a paired device makes, a delivery included, is the device
+# being seen: `pair --list` says when it last was (Pairing.seen!). The
+# fingerprint is the one its own line in authorized_keys handed
+# scripts/remote.sh, never anything the request says. Recording it can
+# fail and the request still goes on.
+begin
+  seen_print = ENV['BLOG_SH_DEVICE'].to_s[%r{\A[A-Za-z0-9+/]{43}\z}]
+  if seen_print
+    require_relative '../lib/pairing'
+    Pairing.seen!(ROOT, seen_print)
+  end
+rescue StandardError, LoadError
+  nil
+end
+
 deliver if ARGV.first == '--deliver'
 
 args, speak = read_request

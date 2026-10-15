@@ -135,6 +135,58 @@ module Pairing
     File.join(root, 'tmp', 'pairing')
   end
 
+  # When each device last came through the door: one empty file per key,
+  # named by its fingerprint (with the two characters base64 has that a
+  # file name cannot carry swapped for two it can) and dated by its mtime.
+  # Touched by scripts/remote.rb on every request a device makes, made by
+  # the pairing, taken away with the device -- so `pair --list` can say
+  # "last seen", which is as near to a test of the connection as a server
+  # gets: it cannot call a phone, the phone calls it (issue 59, Pavel).
+  def seen_dir(root)
+    File.join(records_dir(root), 'seen')
+  end
+
+  def seen_path(root, print)
+    print.to_s.match?(PRINT) ? File.join(seen_dir(root), print.tr('+/', '-_')) : nil
+  end
+
+  # Never in the way of the request it records: a folder that cannot be
+  # made or a file that cannot be touched leaves the answer as it was.
+  def seen!(root, print, now = Time.now)
+    path = seen_path(root, print)
+    return unless path
+
+    FileUtils.mkdir_p(File.dirname(path))
+    File.open(path, 'a') {}
+    File.utime(now, now, path)
+  rescue SystemCallError, IOError
+    nil
+  end
+
+  def last_seen(root, print)
+    path = seen_path(root, print)
+    path && File.file?(path) ? File.mtime(path) : nil
+  end
+
+  def forget_seen(root, print)
+    path = seen_path(root, print)
+    FileUtils.rm_f(path) if path
+  rescue SystemCallError
+    nil
+  end
+
+  # A record of a device that is no longer in the file -- taken out by
+  # hand, or by another way than this one -- goes too. At the terminal
+  # only, like the sweep.
+  def prune_seen(root:)
+    known = devices(root: root).map { |device| device['fingerprint'] }.reject(&:empty?)
+    Dir.glob(File.join(seen_dir(root), '*')).each do |file|
+      FileUtils.rm_f(file) unless known.any? { |print| seen_path(root, print) == file }
+    end
+  rescue SystemCallError
+    nil
+  end
+
   def record_path(root, id)
     File.join(records_dir(root), "#{id}.json")
   end
@@ -672,6 +724,8 @@ module Pairing
       write_lines(lines)
       AtomicWrite.write_json(record_path(root, id), known.merge('state' => 'paired', 'device' => device,
                                                                 'fingerprint' => fingerprint(public_key.split.last)), permissions: 0o600)
+      # Coming in is being seen: the device has just spoken to the door.
+      seen!(root, fingerprint(public_key.split.last), now)
     end
   end
 
@@ -757,7 +811,8 @@ module Pairing
   # fingerprint, and a name is not always one device's.
   def devices(root:)
     read_lines.select { |line| ours?(line, root, DEVICE) }.map do |line|
-      { 'name' => comment_of(line, DEVICE), 'fingerprint' => print_of(line).to_s, 'line' => line }
+      print = print_of(line).to_s
+      { 'name' => comment_of(line, DEVICE), 'fingerprint' => print, 'line' => line, 'last_seen' => last_seen(root, print) }
     end
   end
 
@@ -803,6 +858,7 @@ module Pairing
       end
       write_lines(kept) if gone
     end
+    forget_seen(root, print) if gone
     gone
   end
 
@@ -813,6 +869,7 @@ module Pairing
   # a device that has none.
   def revoke(root:, which:)
     gone = []
+    prints = []
     return gone if which.to_s.empty?
 
     locked do
@@ -821,11 +878,15 @@ module Pairing
         next false unless ours?(line, root, DEVICE)
 
         match = line == which || comment_of(line, DEVICE) == which || print_of(line) == which.to_s.sub(/\ASHA256:/, '')
-        gone << comment_of(line, DEVICE) if match
+        if match
+          gone << comment_of(line, DEVICE)
+          prints << print_of(line)
+        end
         match
       end
       write_lines(kept) unless gone.empty?
     end
+    prints.compact.each { |print| forget_seen(root, print) }
     gone
   end
 end
