@@ -23,6 +23,7 @@ require_relative '../lib/content_type'
 require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 require_relative '../lib/colors_css'
+require_relative '../lib/css_text'
 require_relative '../lib/post_text'
 require_relative '../lib/card_teaser'
 require_relative '../lib/path_glob'
@@ -2800,9 +2801,11 @@ end
 # all but the part below `---- after the skin ----`, which no skin may undo
 # (that hidden means hidden), and which therefore goes last.
 ENGINE_BEFORE, ENGINE_AFTER = File.read(ENGINE_CSS, encoding: 'utf-8').split(%r{^/\* ---- after the skin ---- \*/\n}, 2)
+# Without the comments: they are for whoever edits the files, and they are
+# most of the bytes (lib/css_text.rb).
 Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'site.css'),
-            "#{ENGINE_BEFORE.rstrip}\n\n#{File.read(File.join(SKINS_DIR, "#{SITE_SKIN}.css"), encoding: 'utf-8').rstrip}\n" \
-            "#{ENGINE_AFTER ? "\n#{ENGINE_AFTER.lstrip}" : ''}")
+            CssText.without_comments("#{ENGINE_BEFORE.rstrip}\n\n#{File.read(File.join(SKINS_DIR, "#{SITE_SKIN}.css"), encoding: 'utf-8').rstrip}\n" \
+                                     "#{ENGINE_AFTER ? "\n#{ENGINE_AFTER.lstrip}" : ''}"))
 Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
                         plain_banner: !BANNER_SHOW_IMAGE,

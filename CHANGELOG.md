@@ -27,6 +27,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Changed
 
+- **The published stylesheet leaves its comments behind.** 92 kB became 39, 29 kB over the wire became 8.
 - **The stylesheet is the engine's rules and a skin.** `site.css` + `skins/classic.css`, `site.skin:`; a site that says nothing looks as it did.
 - **A listing's later pages light up its menu item.** A series' `/page/2/` and on, as a tag's always did.
 - **`pair` on a Mac says what a blog in Documents, on the Desktop or in iCloud Drive also needs.** Full disk access for remote users -- before the code, whenever the blog is in one; the docs add `--host 127.0.0.1` for an app on the same Mac.

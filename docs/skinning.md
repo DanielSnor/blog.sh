@@ -18,7 +18,9 @@ says otherwise. The build publishes `/assets/css/site.css` as the engine's
 own rules (`assets/css/site.css`: the fonts, the focus ring, media that
 keep to their column, the lightbox), then the skin, then the engine's last
 word -- that a control arriving `hidden` stays hidden, which no skin may
-undo. Only the skin chosen reaches the server.
+undo. Only the skin chosen reaches the server, and without its comments:
+the sources explain themselves at length, and that is for whoever edits
+them (lib/css_text.rb).
 
 A skin of your own is one stylesheet of yours, loaded after all of that,
 that repaints what is already on the page. The rest of this guide is
