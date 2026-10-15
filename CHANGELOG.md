@@ -11,7 +11,7 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.10.pre -- 2026-09-28
+## 1.10 -- 2026-10-15
 
 The release that opens a door for programs. Every screen read before acting, and every action it
 offers, also answers as data; a program on another machine reaches them over the SSH the server
