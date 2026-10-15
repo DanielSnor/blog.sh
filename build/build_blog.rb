@@ -1642,14 +1642,20 @@ end
 
 # A post's first picture worth showing large, with the file it shows --
 # the question the hero asks of a post and the lead card asks too.
+#
+# 🪤 The first block that is a real picture AND has a file. It took the
+# first real picture and only then asked for its file, so an image block
+# with none -- no importer writes one, but a post file can say anything --
+# hid every picture after it from the hero, the lead card and the card of
+# a photo post (found checking lead_card, 14. 10. 2026).
 def first_usable_image(post)
-  block = (post['content'] || []).find do |b|
-    b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
-  end
-  return nil unless block
+  (post['content'] || []).each do |b|
+    next unless b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
 
-  media = (block['media'] || []).first
-  media && media['url'] ? [block, media] : nil
+    media = (b['media'] || []).first
+    return [b, media] if media.is_a?(Hash) && media['url']
+  end
+  nil
 end
 
 # Empty string rather than a conditional in the template: post.html.erb
