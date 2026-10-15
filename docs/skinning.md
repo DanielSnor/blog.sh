@@ -14,7 +14,8 @@ It is not a CSS tutorial. Everything here is specific to this engine.
 A skin is one stylesheet that repaints what is already on the page. The
 engine ships its own in `skins/` and a site picks one with `site.skin:` in
 `config/site.yml` -- `classic`, the look blog.sh has always had, unless it
-says otherwise. The build publishes `/assets/css/site.css` as the engine's
+says otherwise, or `minimal`: paper, ink and one colour, the base of the
+Minimal family. The build publishes `/assets/css/site.css` as the engine's
 own rules (`assets/css/site.css`: the fonts, the focus ring, media that
 keep to their column, the lightbox), then the skin, then the engine's last
 word -- that a control arriving `hidden` stays hidden, which no skin may

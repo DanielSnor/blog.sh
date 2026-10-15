@@ -378,8 +378,8 @@ The stylesheet is the other half, and it is not generated. It is two
 files published as one `/assets/css/site.css`: the engine's own rules
 (`assets/css/site.css` -- the fonts, the focus ring, media that keep to
 their column, the lightbox) and the skin the site wears
-(`skins/<name>.css`, `site.skin:` in `config/site.yml`, `classic` unless
-you say otherwise): layout and structure, plus the few colors that are
+(`skins/<name>.css`, `site.skin:` in `config/site.yml` -- `classic` unless
+you say otherwise, or `minimal`): layout and structure, plus the few colors that are
 fixed because they work against any palette -- white on accent surfaces,
 the dark scrims behind the banner overlays, the search field's grey
 placeholder. Only the skin chosen is published. Changing `colors:` or
