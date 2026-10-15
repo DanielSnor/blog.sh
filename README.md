@@ -149,6 +149,7 @@ locales/                 UI strings for the generated site and the CLI (en.yml, 
 templates/               ERB templates (layout, post, index, search, partials)
                          + markdown-cheat-sheet.<lang>.md, the /markdown/ page's source
 assets/                  CSS/JS/fonts (drop your own images into assets/images/)
+skins/                   The skins a site can wear (site.skin; classic unless it says otherwise)
 config/site.yml.example  Documented config template -- copy to config/site.yml (gitignored) per deployment
 config/site.lang.yml.example  One more published language, described -- copy to config/site.<lang>.yml
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment

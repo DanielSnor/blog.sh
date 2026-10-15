@@ -191,6 +191,7 @@ module Doctor
     findings.concat(of(:share, check_share(data)))
     findings.concat(of(:retired_keys, check_retired_keys(data)))
     findings.concat(of(:series_index, check_series_index(data)))
+    findings.concat(of(:skin, check_skin(data, root)))
     findings.concat(of(:trash, check_trash(root)))
     findings.concat(of(:pairing, check_pairing(root)))
     findings.concat(of(:deploy, check_deploy(root)))
@@ -1383,6 +1384,21 @@ module Doctor
       warn(I18n.t('doctor.share_unknown', name: name.to_s,
                                           known: ShareTargets::NAMES.join(', ')))
     end
+  end
+
+  # site.skin: the look the site wears (skins/<name>.css). A name the
+  # engine has no file for is worn as classic -- the build says so in a
+  # line that scrolls past with the rest of its output, and this is where
+  # somebody looks afterwards.
+  def check_skin(data, root)
+    name = dig(data, 'site', 'skin')
+    return [] if name.nil? || name.to_s.strip.empty?
+
+    word = name.to_s.strip
+    known = Dir.glob(File.join(root, 'skins', '*.css')).map { |f| File.basename(f, '.css') }.sort
+    return [] if word.match?(/\A[a-z0-9-]{1,64}\z/) && known.include?(word)
+
+    [warn(t('skin_unknown', name: word[0, 60], known: known.join(', ')), t('skin_unknown_fix'))]
   end
 
   # series_index: the page of every series. A section that is not a map

@@ -374,13 +374,19 @@ there are seven keys and not twenty, and why a palette cannot end up
 internally inconsistent. Omit the section entirely and the site uses
 blog.sh's own blue (`DEFAULT_COLORS`).
 
-`assets/css/site.css` is the other half, and it is not generated: layout
-and structure, plus the few colors that are fixed because they work
-against any palette -- white on accent surfaces, the dark scrims behind
-the banner overlays and the lightbox, the search field's grey
-placeholder. Changing `colors:` is configuration; editing that file is
-editing an engine file, with the pull conflicts that implies (see
-[step 9](#9-updating-the-engine)).
+The stylesheet is the other half, and it is not generated. It is two
+files published as one `/assets/css/site.css`: the engine's own rules
+(`assets/css/site.css` -- the fonts, the focus ring, media that keep to
+their column, the lightbox) and the skin the site wears
+(`skins/<name>.css`, `site.skin:` in `config/site.yml`, `classic` unless
+you say otherwise): layout and structure, plus the few colors that are
+fixed because they work against any palette -- white on accent surfaces,
+the dark scrims behind the banner overlays, the search field's grey
+placeholder. Only the skin chosen is published. Changing `colors:` or
+`site.skin` is configuration; editing either file is editing an engine
+file, with the pull conflicts that implies (see
+[step 9](#9-updating-the-engine)) -- a look of your own belongs in
+`site.extra_css`, loaded after both ([skinning.md](skinning.md)).
 
 `fonts.banner_title` and `fonts.banner_claim` take a CSS font stack each,
 `fonts.banner_title_size` and `fonts.banner_claim_size` any CSS length,

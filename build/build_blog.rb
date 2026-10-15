@@ -2765,12 +2765,44 @@ PathGlob.under(DEFAULT_IMAGES_DIR, '*').each do |src|
   FileUtils.cp(src, live) unless File.exist?(live)
 end
 
+# The stylesheet a page asks for, /assets/css/site.css, is two files: the
+# engine's own rules (assets/css/site.css, what every page needs whatever
+# it looks like) and the skin the site wears after them (skins/<name>.css,
+# `site.skin:` in config/site.yml, classic unless it says otherwise). One
+# file, so a page asks for what it always did and nothing about a site that
+# keeps the default changes but the order its rules come in. A skin the
+# engine does not have is said and classic worn instead -- a site with no
+# stylesheet at all is not a site anybody can read. Only the one chosen is
+# published: skins/ is not under assets/, so the others never reach a
+# server.
+ENGINE_CSS = File.join(ROOT, 'assets', 'css', 'site.css')
+SKINS_DIR = File.join(ROOT, 'skins')
+
+def site_skin
+  name = SiteConfig.get('site', 'skin', default: nil).to_s.strip
+  return 'classic' if name.empty?
+  return name if name.match?(/\A[a-z0-9-]{1,64}\z/) && File.file?(File.join(SKINS_DIR, "#{name}.css"))
+
+  known = PathGlob.under(SKINS_DIR, '*.css').map { |f| File.basename(f, '.css') }.sort
+  warn t('build.skin_unknown', name: name[0, 60], known: known.join(', '))
+  'classic'
+end
+SITE_SKIN = site_skin.freeze
+
 PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
   next unless File.file?(src)
   next if src.start_with?("#{DEFAULT_IMAGES_DIR}/")
+  next if src == ENGINE_CSS
 
   Output.emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
+# The engine's rules come first, so a skin's rule of the same weight wins --
+# all but the part below `---- after the skin ----`, which no skin may undo
+# (that hidden means hidden), and which therefore goes last.
+ENGINE_BEFORE, ENGINE_AFTER = File.read(ENGINE_CSS, encoding: 'utf-8').split(%r{^/\* ---- after the skin ---- \*/\n}, 2)
+Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'site.css'),
+            "#{ENGINE_BEFORE.rstrip}\n\n#{File.read(File.join(SKINS_DIR, "#{SITE_SKIN}.css"), encoding: 'utf-8').rstrip}\n" \
+            "#{ENGINE_AFTER ? "\n#{ENGINE_AFTER.lstrip}" : ''}")
 Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
                         plain_banner: !BANNER_SHOW_IMAGE,

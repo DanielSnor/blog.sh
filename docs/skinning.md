@@ -11,8 +11,18 @@ It is not a CSS tutorial. Everything here is specific to this engine.
 
 ## What a skin is, and what it is not
 
-A skin is one stylesheet of yours, loaded after the engine's own, that
-repaints what is already on the page.
+A skin is one stylesheet that repaints what is already on the page. The
+engine ships its own in `skins/` and a site picks one with `site.skin:` in
+`config/site.yml` -- `classic`, the look blog.sh has always had, unless it
+says otherwise. The build publishes `/assets/css/site.css` as the engine's
+own rules (`assets/css/site.css`: the fonts, the focus ring, media that
+keep to their column, the lightbox), then the skin, then the engine's last
+word -- that a control arriving `hidden` stays hidden, which no skin may
+undo. Only the skin chosen reaches the server.
+
+A skin of your own is one stylesheet of yours, loaded after all of that,
+that repaints what is already on the page. The rest of this guide is
+about that one.
 
 Before writing one, spend ten minutes with `./style.sh`. A surprising
 amount of what looks like skinning is a setting: the colour palette (seven
@@ -29,7 +39,8 @@ can do without owning anything.
 ## Where the skin lives
 
 `site.extra_css` in `config/site.yml` -- one path, or a list of them,
-loaded in order after `colors.css` and `site.css`:
+loaded in order after `colors.css` and `site.css` (the engine's rules and
+the skin `site.skin` names, published as one file):
 
 ```yaml
 site:

@@ -614,7 +614,9 @@ A single linear pass, no framework:
    overwritten; `defaults/` itself is not published. `config/site.yml`'s 7-key palettes
    compile into `assets/css/colors.css`, together with the header's font
    stacks and sizes and any `@font-face` a site declared for its own files
-   in `assets/fonts/`; `site.css` itself contains no palette values -- its
+   in `assets/fonts/`; the published `site.css` -- the engine's rules
+   (`assets/css/site.css`) and the skin `site.skin` names (`skins/<name>.css`),
+   with the part no skin may undo after the skin -- contains no palette values -- its
    only color literals are palette-independent neutrals (white, two fixed
    grays, black/white alpha overlays) -- and no site-specific typography. One generated stylesheet rather than two on
    purpose: it is already linked from the layout, so adding fonts to it
