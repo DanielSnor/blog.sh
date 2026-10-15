@@ -91,6 +91,7 @@ build:
 
 post:
   series_nav_label: "Parts of this series"
+  series_contents_label: "Every part of this series"
   reading_time: "%{minutes} min read"
   reading_minutes: "%{minutes} min"
   # Anything under the length at which the engine stops calling a post a

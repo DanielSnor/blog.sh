@@ -425,6 +425,11 @@ LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
 # stands after the opening paragraph usually falls outside it, and a
 # front page that suddenly leads with one is a front page reshaped.
 LAYOUT_LEAD_CARD = SiteConfig.get('layout', 'lead_card', default: false) == true
+# Every part of a series listed on each part's page, under "part N of M":
+# the standing navigation of a manual, whose chapters are series. Off
+# unless a site asks for it -- a series of twenty travel posts does not
+# want twenty lines above every one of them.
+LAYOUT_SERIES_CONTENTS = SiteConfig.get('layout', 'series_contents', default: false) == true
 # The menu repeated under the content. It carries no search field, so with
 # an empty `nav:` there would be nothing left in it to show -- but a site
 # with a menu may still not want it twice.
@@ -1900,6 +1905,26 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   # bar, this one and the pagination -- of which only the toc had a name.
   # Three entries reading "navigation" are three guesses.
   %(<nav class="series-nav" aria-label="#{h(t('post.series_nav_label'))}">#{links.join}</nav>\n                )
+end
+
+# The whole series on a part's page (layout.series_contents): its name, a
+# link to its listing where it has one, and every part in reading order,
+# the one being read marked. Never cut short, however long the series --
+# a manual needs all of its chapters, and a skin that wants less can say
+# so in CSS. An <ol>, not a <ul>: the order is the point, and the narrow
+# screen's rule that folds the menu bar hides `nav ul`. Not on a draft: a
+# draft is not in the published set the list is made of.
+def series_contents_html(slug, in_series, index)
+  return '' unless LAYOUT_SERIES_CONTENTS && slug && index && in_series.size >= 2
+
+  name = h(series_name(slug))
+  heading = Slug.pageable?(slug) ? %(<a href="#{loc("/series/#{h(slug)}/")}">#{name}</a>) : name
+  items = in_series.each_with_index.map do |part, i|
+    current = i == index ? ' aria-current="page"' : ''
+    %(<li><a href="#{h(post_href(part))}"#{current}>#{h(post_title_for(part))}</a></li>)
+  end
+  %(<nav class="series-contents" aria-label="#{h(t('post.series_contents_label'))}">) +
+    %(<p class="series-contents__heading">#{heading}</p><ol>#{items.join}</ol></nav>\n                )
 end
 
 # A link post carries no title of its own -- what the reader takes for its

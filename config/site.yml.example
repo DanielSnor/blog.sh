@@ -42,7 +42,7 @@
 #               pill_bg, (banner_title), (banner_claim)
 #   fonts       (faces), (banner_title), (banner_title_size),
 #               (banner_claim), (banner_claim_size)
-#   layout      (sidebar), (hero), (lead_card)
+#   layout      (sidebar), (hero), (lead_card), (series_contents)
 #   nav         (the menu bar: label with tag, series or url -- or [] for none)
 #   series_index  (title), (description), (order: newest or oldest)
 #   about       (heading), html
@@ -278,6 +278,11 @@ colors:
 #   # post-list-item--lead for a stylesheet to dress -- also when its post
 #   # has no picture, which leaves the card's body as it was. Default: false.
 #   lead_card: false
+#   # Every part of a series listed on each part's page, under "part N of
+#   # M" and above the text, the part being read marked -- the standing
+#   # navigation of a manual whose chapters are series. Never cut short.
+#   # Default: false.
+#   series_contents: false
 # --- end of layout ---
 
 # Optional. The menu across the top. Without this key the menu is what the

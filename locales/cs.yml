@@ -90,6 +90,7 @@ build:
 
 post:
   series_nav_label: "Díly téhle série"
+  series_contents_label: "Všechny díly téhle série"
   reading_time: "Na čtení %{minutes} min"
   reading_minutes: "%{minutes} min"
   # Cokoli pod hranicí, od které engine přestává postu říkat fotka

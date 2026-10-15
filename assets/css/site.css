@@ -1186,7 +1186,7 @@ blockquote {
    reset .pagination has carried since it was written. Without it a table
    of contents comes out as an uppercase, right-aligned, 60px-per-row menu
    with the site's nav background behind it. */
-.toc, .series-nav {
+.toc, .series-nav, .series-contents {
   min-height: 0;
   box-sizing: border-box;
   border: none;
@@ -1196,15 +1196,15 @@ blockquote {
   align-items: initial;
   justify-content: initial;
 }
-.toc li, .toc a, .series-nav a { height: auto; text-transform: none; letter-spacing: normal; }
+.toc li, .toc a, .series-nav a, .series-contents li, .series-contents a { height: auto; text-transform: none; letter-spacing: normal; }
 /* An explicit line-height, on the ITEM as well as the anchor. `inherit`
    was here and was exactly wrong: on the anchor it inherits from the item,
    and the item is what carries the menu bar's 60px. The engine's own
    site.css sets that on `nav li`, so this was not a skin's doing -- every
    default site had eight chapters spread over 547px. Found on sean.cz
    after 1.3 went live, not in a test. */
-.toc li, .toc a, .series-nav a { line-height: 1.55; }
-.toc a, .series-nav a {
+.toc li, .toc a, .series-nav a, .series-contents li, .series-contents a { line-height: 1.55; }
+.toc a, .series-nav a, .series-contents a {
   height: auto;
   display: inline;
   margin-top: 0;
@@ -1231,6 +1231,31 @@ blockquote {
 .toc-heading { margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--meta-text); }
 .toc ol { margin: 0; padding-left: 1.15rem; font-size: 0.9rem; }
 .toc li { margin: 0.12rem 0; }
+
+/* Every part of a series under "part N of M" (layout.series_contents): the
+   table of contents' rule and type, but in the flow rather than floated --
+   a post can carry both, and two floats on one side would stack into a
+   column of their own. The part being read is set in the text colour and
+   not filled: the menu bar's current item is a filled tab, and this is a
+   list, not a bar. */
+.series-contents {
+  display: block;
+  margin: 0 0 1rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 3px solid var(--accent);
+}
+.series-contents__heading { margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--meta-text); }
+.series-contents__heading a { color: inherit; text-transform: inherit; letter-spacing: inherit; }
+.series-contents ol { margin: 0; padding-left: 1.15rem; font-size: 0.9rem; }
+.series-contents li { margin: 0.12rem 0; font-size: inherit; color: var(--text); }
+.series-contents a[aria-current="page"],
+.series-contents a[aria-current="page"]:hover {
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+  padding: 0;
+  margin: 0;
+}
 /* Whatever follows the article -- the tag pills, the next/previous nav --
    must not ride up beside a contents list taller than the text. */
 .post-body::after { content: ""; display: block; clear: both; }

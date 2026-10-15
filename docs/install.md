@@ -441,7 +441,11 @@ that opens the front page leads with its post's first picture -- a card
 is otherwise cut by height, so a picture after the opening paragraph is
 usually left out -- and carries `post-list-item--lead` for a skin, with
 or without a picture. Off unless you ask; what a skin can do with it is in
-[skinning.md](skinning.md).
+[skinning.md](skinning.md). `layout.series_contents` is the fourth: every
+part of a series listed on each part's page, under "part N of M" and
+above the text, the part being read marked -- the standing navigation of
+a manual whose chapters are series. Never cut short, however long the
+series; off unless you ask.
 
 `site.extra_css` is that stylesheet -- one path, or a list of them, loaded
 after the site's own, so a skin can live in a file of yours instead of in

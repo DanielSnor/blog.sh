@@ -151,6 +151,18 @@ its picture stays `--lead` alone; a video post's lead with no picture to
 lead with is the media card it would have been, with `--lead` beside its
 marks.
 
+With `layout.series_contents` on, a part's page lists the whole series
+under "part N of M": `<nav class="series-contents">`, the series' name in
+`.series-contents__heading` (a link to its listing where it has one) and
+an `<ol>` of every part in reading order, the one being read carrying
+`aria-current="page"`. `site.css` sets it in the flow, with the table of
+contents' rule; a skin that wants it beside the text moves it there:
+
+```css
+.series-contents { float: right; width: 16rem; margin: 0 0 1rem 1.5rem; }
+@media (max-width: 700px) { .series-contents { float: none; width: auto; margin: 0 0 1rem; } }
+```
+
 The date badge of a card carries the hour the post went out, as
 `<time class="date-time" datetime="…" hidden>` after the date -- hidden,
 so a skin that wants it shows it and every other skin is unchanged. It is
