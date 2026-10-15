@@ -907,7 +907,10 @@ def section_nav
 end
 
 def nav_summary(entry)
-  target = entry['tag'].to_s.empty? ? entry['url'].to_s : "/tag/#{entry['tag']}/"
+  target = if !entry['tag'].to_s.empty? then "/tag/#{entry['tag']}/"
+           elsif !entry['series'].to_s.empty? then "/series/#{Slug.slugify(entry['series'].to_s)}/"
+           else entry['url'].to_s
+           end
   "#{entry['label']} -> #{target}"
 end
 

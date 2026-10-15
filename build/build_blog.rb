@@ -2217,14 +2217,35 @@ def nav_active_for(path)
   # PARTIAL_RESULTS key: returning every path would give each of thousands
   # of tag and post pages its own cache entry for an identical menu.
   tag = bare[%r{\A/tag/([^/]+)/}, 1]
-  candidate = tag ? loc("/tag/#{tag}/") : path
+  # ...and a series listing, page 2 and on included, under its own.
+  series = bare[%r{\A/series/([^/]+)/}, 1]
+  candidate = if tag then loc("/tag/#{tag}/")
+              elsif series then loc("/series/#{series}/")
+              else path
+              end
   NAV_ITEM_HREFS.include?(candidate) ? candidate : nil
+end
+
+# The series item a post belongs under, when the menu names its series
+# with `series:` -- a manual's chapter, lit up on every part of it. Marked
+# aria-current="true" rather than "page": the reader is IN the chapter,
+# not on its listing. Nil for everything else, so the menu of every other
+# post stays one cached partial.
+def nav_part_for(post)
+  return nil unless post.is_a?(Hash) && NAV_SERIES_HREFS.any?
+
+  slug = Series.series_slug_of(post)
+  candidate = slug && loc("/series/#{slug}/")
+  NAV_SERIES_HREFS.include?(candidate) ? candidate : nil
 end
 
 # The entire attribute, or an empty string -- see the comment in
 # templates/partials/nav.html.erb for why this isn't an <% if %> block.
-def nav_current(href, active)
-  href == active ? ' aria-current="page"' : ''
+def nav_current(href, active, part_of = nil)
+  return ' aria-current="page"' if href == active
+  return ' aria-current="true"' if part_of && href == part_of
+
+  ''
 end
 
 # The origins a set of posts needs for their comment threads: the instance
@@ -2286,6 +2307,7 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     page_description: description,
     page_url: "#{SITE_BASE_URL}#{path}",
     nav_active: nav_active_for(path),
+    nav_part: nav_part_for(post),
     og_image: image,
     og_type: og_type,
     extra_head: Languages.alternates_head(links) + extra_head,
@@ -3101,6 +3123,19 @@ def nav_url(url)
   PostAddress::ROOT_DIRS.include?(first) ? "#{loc(path)}#{rest}" : url
 end
 
+# Where a menu entry leads: a tag's listing, a series' listing -- `series:`
+# takes the name as the posts write it or the slug, the address is the
+# same -- or the `url:` as written.
+def nav_entry_href(entry)
+  tag = entry['tag'].to_s.strip
+  return loc("/tag/#{tag}/") unless tag.empty?
+
+  series = entry['series'].to_s.strip
+  return loc("/series/#{Slug.slugify(series)}/") unless series.empty? || Slug.slugify(series).empty?
+
+  nav_url(entry['url'].to_s.strip)
+end
+
 def configured_nav_items
   return nil unless SiteConfig.key?('nav')
 
@@ -3113,8 +3148,7 @@ def configured_nav_items
     next unless entry.is_a?(Hash)
 
     label = entry['label'].to_s.strip
-    slug = entry['tag'].to_s.strip
-    href = slug.empty? ? nav_url(entry['url'].to_s.strip) : loc("/tag/#{slug}/")
+    href = nav_entry_href(entry)
     next if label.empty? || href.empty?
 
     [href, label]
@@ -3131,6 +3165,14 @@ NAV_POSTS_BY_ADDRESS = (pages + posts + unlisted_posts)
                        .to_h { |p| [Languages.address_of(p, SITE_OWN_LANG), p] }.freeze
 NAV_ITEMS = (configured_nav_items || ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
+# The items written as `series:`, by their href: the part of a series lights
+# its item up too, which an item written as a `url:` to the same listing
+# does not (docs/decisions.md, "The bar is a filter").
+NAV_SERIES_HREFS = (configured_nav_items ? Array(SiteConfig.get('nav', default: nil)) : []).filter_map { |entry|
+  next unless entry.is_a?(Hash) && entry['tag'].to_s.strip.empty? && !entry['series'].to_s.strip.empty?
+
+  nav_entry_href(entry)
+}.freeze
 
 # Everything a page's bytes can depend on that is not the page's own
 # content: the engine and the templates (read off disk), plus the handful

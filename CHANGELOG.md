@@ -19,9 +19,11 @@ goes in is still being decided; the suffix and the date both come off at the tag
 ### Added
 
 - **`series_index:` names the page of every series and says which way it runs.** `title`, `description`, `order: oldest`.
+- **A menu item can name a series.** `series:` leads to its listing and marks every part of it as the chapter you are in.
 
 ### Changed
 
+- **A listing's later pages light up its menu item.** A series' `/page/2/` and on, as a tag's always did.
 - **`pair` on a Mac says what a blog in Documents, on the Desktop or in iCloud Drive also needs.** Full disk access for remote users -- before the code, whenever the blog is in one; the docs add `--host 127.0.0.1` for an app on the same Mac.
 
 ### Removed

@@ -863,6 +863,18 @@ module Doctor
         next
       end
 
+      # A series item leads to the series' listing, which the build writes
+      # only for a series with two published parts and a name short enough
+      # to be a directory -- the same answer check gives (known_paths).
+      series = entry['series'].to_s.strip
+      unless series.empty?
+        path = "/series/#{Slug.slugify(series)}/"
+        unless known.include?(path) || posts.empty?
+          findings << error(t('nav_series_missing', label: label, series: series), t('nav_series_missing_fix'))
+        end
+        next
+      end
+
       url = entry['url'].to_s.strip
       next if url.empty?
 

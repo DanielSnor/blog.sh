@@ -1330,6 +1330,8 @@ doctor:
   nav_ok: "Menu: položek %{count}, každá míří na něco existujícího."
   nav_tag_missing: "Položka menu „%{label}“ míří na štítek %{tag}, který nemá žádný příspěvek."
   nav_tag_missing_fix: "Jeho výpis se nesestavuje, takže je to 404 ve vlastním menu. Obvykle byl poslední příspěvek s tím štítkem stažen z webu nebo přeštítkován. Oprav štítek, nebo položku vyhoď."
+  nav_series_missing: "Položka menu „%{label}“ míří na sérii %{series}, která výpis nemá: ten vzniká až se dvěma publikovanými díly."
+  nav_series_missing_fix: "Do té doby je položka ve tvém vlastním menu 404. Porovnej jméno s řádkem series: v příspěvcích, nebo položku vyhoď."
   nav_tag_display_form: "Položka menu „%{label}“ míří na štítek %{tag}, což je jeho jméno, ne slug, pod kterým se jeho výpis sestavuje."
   nav_tag_display_form_fix: "Příspěvky i ten výpis existují, položka je jen adresuje ve špatném tvaru a je to 404 na každé stránce webu. Napiš slug: %{slug}"
   nav_url_missing: "Položka menu „%{label}“ míří na %{url}, kde tenhle web nic nevydává."

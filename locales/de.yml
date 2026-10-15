@@ -1343,6 +1343,8 @@ doctor:
   nav_ok: "Menü: %{count} Eintrag/Einträge, jeder zeigt auf etwas Vorhandenes."
   nav_tag_missing: "Der Menüeintrag \"%{label}\" zeigt auf das Schlagwort %{tag}, das kein Beitrag trägt."
   nav_tag_missing_fix: "Dessen Liste wird nicht gebaut, der Eintrag ist also ein 404 im eigenen Menü. Meist wurde der letzte Beitrag damit zurückgezogen oder neu verschlagwortet. Korrigiere das Schlagwort oder entferne den Eintrag."
+  nav_series_missing: "Der Menüeintrag „%{label}“ zeigt auf die Serie %{series}, die keine Liste hat: die entsteht erst mit zwei veröffentlichten Teilen."
+  nav_series_missing_fix: "Bis dahin ist der Eintrag in deinem eigenen Menü ein 404. Prüf den Namen gegen die Zeile series: in den Beiträgen, oder lass den Eintrag weg."
   nav_tag_display_form: "Der Menüeintrag \"%{label}\" zeigt auf das Schlagwort %{tag} -- das ist dessen Name und nicht der Slug, unter dem die Liste gebaut wird."
   nav_tag_display_form_fix: "Die Beiträge und die Liste gibt es beide, der Eintrag adressiert sie nur in der falschen Form und ist von jeder Seite der Website aus ein 404. Schreibe den Slug: %{slug}"
   nav_url_missing: "Der Menüeintrag \"%{label}\" zeigt auf %{url}, wo diese Website nichts ausliefert."

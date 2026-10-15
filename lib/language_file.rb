@@ -61,7 +61,12 @@ module LanguageFile
   # languages is a second site, and the reader who switches language would
   # lose the item they were about to click.
   PLACED_LISTS = {
-    %w[nav] => ->(entry) { entry['tag'].to_s.strip.empty? ? entry['url'].to_s.strip : "tag:#{entry['tag'].to_s.strip}" },
+    %w[nav] => lambda { |entry|
+      if !entry['tag'].to_s.strip.empty? then "tag:#{entry['tag'].to_s.strip}"
+      elsif !entry['series'].to_s.strip.empty? then "series:#{entry['series'].to_s.strip}"
+      else entry['url'].to_s.strip
+      end
+    },
     %w[footer links] => ->(entry) { entry['url'].to_s.strip }
   }.freeze
 

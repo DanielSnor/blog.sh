@@ -397,16 +397,24 @@ they look like. Each has a default that leaves a site saying nothing
 exactly as it was, so none of them has to be touched.
 
 `nav:` replaces the menu bar the build otherwise derives from the content
-types that actually have posts. An entry takes a `label` plus either a
-`tag` (a tag's slug, which becomes `/tag/<slug>/`) or a `url` taken as
-written -- so an item can point at a post, at a generated page, or off the
-site entirely:
+types that actually have posts. An entry takes a `label` plus one of a
+`tag` (a tag's slug, which becomes `/tag/<slug>/`), a `series` (the
+series' name as the posts write it, or its slug, which becomes
+`/series/<slug>/`) or a `url` taken as written -- so an item can point at
+a post, at a generated page, or off the site entirely:
 
 ```yaml
 nav:
   - { label: "Home", url: "/" }
   - { label: "Photographs", tag: "photo" }
+  - { label: "Getting started", series: "Getting started" }
 ```
+
+The item of the page you are on is marked `aria-current="page"`. A
+`series` item is marked on every part of its series as well, with
+`aria-current="true"` -- the reader is in that chapter, not on its
+listing -- which is what a manual's menu of chapters is for; a `tag` or a
+`url` item is not, since a post is not its tag's listing.
 
 An entry missing either half is skipped rather than rendered as an empty
 link. An empty list is a decision rather than a mistake: the entries and

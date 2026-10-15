@@ -1360,6 +1360,8 @@ doctor:
   nav_ok: "Menu: %{count} item(s), every one of them pointing at something."
   nav_tag_missing: "The menu item \"%{label}\" points at the tag %{tag}, which no post carries."
   nav_tag_missing_fix: "Its listing is not built, so the item is a 404 in your own menu. Usually the last post with that tag was unpublished or retagged. Fix the tag or drop the item."
+  nav_series_missing: "The menu item \"%{label}\" points at the series %{series}, which has no listing: it takes two published parts."
+  nav_series_missing_fix: "The item is a 404 in your own menu until then. Check the name against the posts' series: line, or drop the item."
   nav_tag_display_form: "The menu item \"%{label}\" points at the tag %{tag}, which is the tag's name rather than the slug its listing is built under."
   nav_tag_display_form_fix: "The posts and the listing are both there; the item just addresses them in the wrong form, and it is a 404 from every page of the site. Write the slug: %{slug}"
   nav_url_missing: "The menu item \"%{label}\" points at %{url}, which this site does not answer at."

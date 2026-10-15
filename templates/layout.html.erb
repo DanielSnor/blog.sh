@@ -66,7 +66,7 @@
       both on load. Without the label a screen reader announces the raw sun and
       moon glyphs. %><% unless lang_switcher.empty? %></div><% end %>
     </div>
-    <%= partial('nav', search: true, active: nav_active) %>
+    <%= partial('nav', search: true, active: nav_active, part_of: nav_part) %>
 
     <div class="layout<%= SIDEBAR_SHOWN ? '' : ' layout--no-aside' %>">
       <main>

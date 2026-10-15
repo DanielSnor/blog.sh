@@ -333,7 +333,7 @@ module SiteConfig
       return false unless entry.is_a?(Hash)
 
       label = entry['label'].to_s.strip
-      target = entry['tag'].to_s.strip.empty? ? entry['url'].to_s.strip : entry['tag'].to_s.strip
+      target = [entry['tag'], entry['series'], entry['url']].map { |v| v.to_s.strip }.find { |v| !v.empty? }.to_s
       !label.empty? && !target.empty?
     end
 

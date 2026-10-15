@@ -76,7 +76,10 @@ wandered in. The item matching the page carries `aria-current="page"`
 and is filled with the accent colour, so a reader can see which listing
 they are in without reading the heading. Only listings light up: a post
 deliberately doesn't highlight its own type, since the menu filters
-listings and a video post is not the video listing. The banner still
+listings and a video post is not the video listing. (One exception, since
+1.11: a menu item written as `series:` is marked `aria-current="true"`
+on every part of its series -- a manual's menu is a list of chapters, and
+the reader of a chapter is in it.) The banner still
 links home, as it always did. *Cost:* the label lives on every page, so
 changing it rewrites the whole archive -- which is why the rename
 happened before 1.0 rather than after, along with its locale key
