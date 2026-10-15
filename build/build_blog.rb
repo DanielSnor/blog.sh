@@ -1334,7 +1334,7 @@ end
 # Only on the post's own page, and only when there is no title: in a
 # listing the heading is the post title at h2 and the badge beside it is a
 # link to the post, which is a different job.
-def date_badge(post, link: nil, pinned: false, heading: false)
+def date_badge(post, link: nil, pinned: false, heading: false, time: false)
   # A tag's icon REPLACES the content type's rather than joining it. The
   # badge is a small tile carrying a date and one glyph, and the only
   # thing that ever adds a second is a pinned post -- which earns it by
@@ -1344,10 +1344,35 @@ def date_badge(post, link: nil, pinned: false, heading: false)
   icon = tag_icon_for(post) || CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
   pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
-  inner = "#{icon}<span>#{date}</span>"
+  inner = "#{icon}<span>#{date}</span>#{time ? card_time_html(post) : ''}"
   inner = %(<a href="#{link}">#{inner}</a>) if link
   tag = heading ? 'h1' : 'div'
   %(<#{tag} class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</#{tag}>)
+end
+
+# The hour of a post on its card, for a skin that wants it -- a journal's
+# card says when in the day (Minimal Journal, 13. 10. 2026) -- and hidden
+# from every other: `hidden` keeps it off the page and out of what a
+# screen reader says, and the stylesheet that wants it says so. Only on a
+# listing's card; the post's own page already says its date.
+#
+# Only a time somebody actually had. An importer that knew the day and
+# not the hour wrote one in: midnight, in the site's zone or in UTC (both
+# turn up in b2evolution archives), noon for Jekyll and Medium, and the
+# moment of capture for the Wayback Machine. Said as the hour a post went
+# out, each would be wrong, so none is said.
+INVENTED_HOUR_PLATFORMS = %w[jekyll medium].freeze
+
+def card_time_html(post)
+  platform = post['source'].is_a?(Hash) ? post['source']['platform'].to_s : ''
+  return '' if platform == 'wayback'
+
+  time = post_display_time(post)
+  on_the_hour = ->(t, hour) { t.hour == hour && t.min.zero? && t.sec.zero? }
+  return '' if on_the_hour.call(time, 0) || on_the_hour.call(time.getutc, 0)
+  return '' if INVENTED_HOUR_PLATFORMS.include?(platform) && on_the_hour.call(time, 12)
+
+  %(<time class="date-time" datetime="#{time.iso8601}" hidden>#{time.strftime(t('time_format'))}</time>)
 end
 
 # Folding/slugification lives in lib/slug.rb, shared with the CLI and both

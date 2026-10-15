@@ -9,6 +9,7 @@
 thousands_separator: "."
 decimal_point: ","
 date_format: "%d.%m.%Y"
+time_format: "%H:%M"
 date_time_format: "%d.%m.%Y %H:%M"
 
 # The language in its own name: what a reader looking for it recognises.

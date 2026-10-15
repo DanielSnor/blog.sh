@@ -151,6 +151,17 @@ its picture stays `--lead` alone; a video post's lead with no picture to
 lead with is the media card it would have been, with `--lead` beside its
 marks.
 
+The date badge of a card carries the hour the post went out, as
+`<time class="date-time" datetime="…" hidden>` after the date -- hidden,
+so a skin that wants it shows it and every other skin is unchanged. It is
+left out where the engine does not know the hour: a post an importer
+dated at midnight, at noon from Jekyll or Medium, or from the Wayback
+Machine. Only on a listing's card, not on the post's own page.
+
+```css
+.post-list-item .date-time[hidden] { display: inline; margin-left: 0.4em; }
+```
+
 A card of a post with two pictures or more says how many it has, as
 `data-photos="N"` on the card -- the card itself shows one at most, its
 height budget sees to that, so this is the only place a skin can learn

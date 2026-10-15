@@ -185,7 +185,7 @@ module Cards
     <<~HTML
       <div class="card post-list-item#{kind}"#{photos_attr}>
         <div class="post-header">
-          #{date_badge(post, link: prefix, pinned: pinned)}
+          #{date_badge(post, link: prefix, pinned: pinned, time: true)}
           <div class="post-body">
             #{title}
             #{stats}#{series_note}
