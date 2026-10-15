@@ -1209,7 +1209,7 @@ pair:
   bad_address: "❌ \"%{address}\" is not an address to connect to: a name or a number, with no spaces."
   no_sshd: "❌ Nothing answers SSH on port %{port} here, so the app would have nowhere to connect."
   keys_path_bad: "BLOG_SH_AUTHORIZED_KEYS says %{path}, and that path cannot be expanded -- a ~user this machine does not have. Correct it in env.sh."
-  no_sshd_mac: "   Turn it on in System Settings → General → Sharing → Remote Login and run ./blog.sh pair again."
+  no_sshd_mac: "   Turn it on in System Settings → General → Sharing → Remote Login and run ./blog.sh pair again. If the blog lives in Documents, on the Desktop or in iCloud Drive, also turn on (i) beside Remote Login → Allow full disk access for remote users: without it macOS keeps whatever logs in over SSH out of those folders, and the app is refused."
   no_sshd_other: "   Start sshd on this machine (or name its port with --port), or set the app up by hand as docs/operations.md describes."
   container: "   The blog runs in a container: the keys for logging in are the host's, not the container's. Set the app up by hand as docs/operations.md describes."
   no_keygen: "❌ ssh-keygen is missing; a code cannot be made without it."

@@ -1235,13 +1235,23 @@ itself refuses it. The next `./blog.sh pair`, of any kind, removes it,
 and `doctor` mentions one that is left.
 
 It needs the blog and the SSH server in the same account: a plain
-server, or a Mac with Remote Login turned on. `pair` checks that SSH
+server, or a Mac with Remote Login turned on. On a Mac whose blog lives
+in Documents, on the Desktop or in iCloud Drive, Remote Login is not
+enough: macOS keeps whatever logs in over SSH out of those folders until
+System Settings → General → Sharing → (i) beside Remote Login → *Allow
+full disk access for remote users* is on, and until then everything the
+app asks is refused for want of access. A blog outside those folders
+needs no such switch, and is the better place for one an app reaches.
+`pair` checks that SSH
 answers before it makes a code, and asks for the one thing it cannot
 know -- the address this machine has from where the phone is. What it
 offers is the machine's number on its network, which a phone on the same
 network can always use; a name works where the phone can look it up
 (`--host` and `--port` say it without being asked; `--no-wait` prints
-the code and leaves). Where the blog lives in a container the keys are the host's and
+the code and leaves). An app on the same Mac as the blog can be given
+`--host 127.0.0.1`: that address does not change with the network,
+where the number on the local network stops working the day the Mac
+joins another Wi-Fi. Where the blog lives in a container the keys are the host's and
 `pair` cannot reach them; that setup is written by hand, as above.
 `BLOG_SH_AUTHORIZED_KEYS` names the file for an account whose sshd reads
 another one. Write it into `env.sh`: `pair` and `doctor` both read it

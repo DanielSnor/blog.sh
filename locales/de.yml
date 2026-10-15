@@ -1192,7 +1192,7 @@ pair:
   bad_address: "❌ „%{address}“ ist keine Adresse, zu der man sich verbinden kann: ein Name oder eine Nummer, ohne Leerzeichen."
   no_sshd: "❌ Auf Port %{port} antwortet hier kein SSH, die App hätte also nichts, womit sie sich verbinden könnte."
   keys_path_bad: "BLOG_SH_AUTHORIZED_KEYS sagt %{path}, und dieser Pfad lässt sich nicht auflösen -- ein ~Benutzer, den diese Maschine nicht hat. Korrigier ihn in env.sh."
-  no_sshd_mac: "   In den Systemeinstellungen → Allgemein → Teilen → Entfernte Anmeldung einschalten und ./blog.sh pair erneut starten."
+  no_sshd_mac: "   In den Systemeinstellungen → Allgemein → Teilen → Entfernte Anmeldung einschalten und ./blog.sh pair erneut starten. Liegt der Blog in Dokumente, auf dem Schreibtisch oder in iCloud Drive, dort bei Entfernte Anmeldung zusätzlich (i) → vollen Festplattenzugriff für entfernte Benutzer erlauben: ohne das lässt macOS nichts, was sich über SSH anmeldet, in diese Ordner, und die App wird abgewiesen."
   no_sshd_other: "   sshd auf diesem Rechner starten (oder den Port mit --port nennen), oder die App von Hand einrichten, wie docs/operations.md es beschreibt."
   container: "   Der Blog läuft in einem Container: die Schlüssel für die Anmeldung gehören dem Host, nicht dem Container. Die App von Hand einrichten, wie docs/operations.md es beschreibt."
   no_keygen: "❌ ssh-keygen fehlt; ohne es lässt sich kein Code erzeugen."

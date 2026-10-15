@@ -16,6 +16,10 @@ prints what an installation is running.
 Opened the morning 1.10 went out, so `version` does not claim a release nobody has cut. What
 goes in is still being decided; the suffix and the date both come off at the tag.
 
+### Changed
+
+- **`pair` on a Mac says what a blog in Documents, on the Desktop or in iCloud Drive also needs.** Full disk access for remote users; the docs add `--host 127.0.0.1` for an app on the same Mac.
+
 ### Removed
 
 - **The `/write/` page and the `SendPost` shortcut.** A phone writes in the apps; `write:` is no longer read, and `doctor` says so.
