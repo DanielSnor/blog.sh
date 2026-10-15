@@ -1240,7 +1240,9 @@ in Documents, on the Desktop or in iCloud Drive, Remote Login is not
 enough: macOS keeps whatever logs in over SSH out of those folders until
 System Settings → General → Sharing → (i) beside Remote Login → *Allow
 full disk access for remote users* is on, and until then everything the
-app asks is refused for want of access. A blog outside those folders
+app asks is refused for want of access. `pair` cannot see the switch,
+so on a Mac it says this before the code whenever the blog is in one of
+those folders, and makes the code all the same. A blog outside them
 needs no such switch, and is the better place for one an app reaches.
 `pair` checks that SSH
 answers before it makes a code, and asks for the one thing it cannot

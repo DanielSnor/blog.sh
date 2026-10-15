@@ -457,6 +457,30 @@ module Pairing
     false
   end
 
+  # The folders of a Mac account that macOS keeps whatever logs in over SSH
+  # out of, until Sharing → (i) beside Remote Login → "Allow full disk
+  # access for remote users" is on. sshd answering says nothing about it:
+  # the app is let in and then refused at the door, so `pair` says it
+  # before the code. Which of them holds the installation -- as the user
+  # would type it, from the home -- or nil. Asked of the real paths on
+  # both sides, so a link into one of them counts and a link out does not.
+  PROTECTED_ON_MAC = ['Documents', 'Desktop', 'Library/Mobile Documents'].freeze
+
+  def protected_folder(root, home: Dir.home)
+    real = begin
+      File.realpath(root)
+    rescue SystemCallError
+      File.expand_path(root)
+    end
+    PROTECTED_ON_MAC.find do |rel|
+      base = File.join(home, rel)
+      base = File.realpath(base) if File.exist?(base)
+      real == base || real.start_with?("#{base}/")
+    end&.then { |rel| "~/#{rel}" }
+  rescue ArgumentError
+    nil
+  end
+
   def keygen?
     _, status = Open3.capture2e(KEYGEN, '-?')
     !status.nil?

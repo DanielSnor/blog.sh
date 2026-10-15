@@ -1181,6 +1181,7 @@ pair:
   keys_path_bad: "BLOG_SH_AUTHORIZED_KEYS říká %{path} a tu cestu nejde rozvinout — ~uživatel, kterého tenhle stroj nemá. Oprav ji v env.sh."
   no_sshd_mac: "   Zapni ho v Nastavení systému → Obecné → Sdílení → Vzdálené přihlášení a pusť ./blog.sh pair znovu. Když blog leží v Dokumentech, na Ploše nebo na iCloud Drive, zapni tam u Vzdáleného přihlášení ještě (i) → Povolit vzdáleným uživatelům plný přístup k disku: bez toho macOS do těch složek nepustí nic, co se přihlásí přes SSH, a aplikace dostane odmítnutí."
   no_sshd_other: "   Spusť na tomhle stroji sshd (nebo řekni port přes --port), případně aplikaci nastav ručně podle docs/operations.md."
+  protected_folder_mac: "⚠️  Blog leží v %{folder}, kam macOS nepustí nic, co se přihlásí přes SSH: dokud v Nastavení systému → Obecné → Sdílení → (i) u Vzdáleného přihlášení není zapnuté Povolit vzdáleným uživatelům plný přístup k disku, aplikace dostane odmítnutí. Blog mimo Dokumenty, Plochu a iCloud Drive žádný přepínač nepotřebuje."
   container: "   Blog běží v kontejneru: klíče pro přihlášení drží hostitel, ne kontejner. Aplikaci nastav ručně podle docs/operations.md."
   no_keygen: "❌ Chybí ssh-keygen; bez něj kód nevyrobím."
   small_window: "Okno je na kód malé (potřebuje šířku %{cols} a výšku %{rows}). Zvětši ho a pusť ./blog.sh pair znovu, nebo použij kód jako text."

@@ -18,7 +18,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Changed
 
-- **`pair` on a Mac says what a blog in Documents, on the Desktop or in iCloud Drive also needs.** Full disk access for remote users; the docs add `--host 127.0.0.1` for an app on the same Mac.
+- **`pair` on a Mac says what a blog in Documents, on the Desktop or in iCloud Drive also needs.** Full disk access for remote users -- before the code, whenever the blog is in one; the docs add `--host 127.0.0.1` for an app on the same Mac.
 
 ### Removed
 

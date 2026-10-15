@@ -311,6 +311,14 @@ unless Pairing.ssh_answers?(port)
   exit 1
 end
 
+# sshd answering is not the whole of it on a Mac: a blog in Documents, on
+# the Desktop or in iCloud Drive is out of its reach unless full disk
+# access for remote users is on, which nothing here can see. Said, not
+# refused -- the switch may well be on.
+if RUBY_PLATFORM.include?('darwin') && !File.exist?('/.dockerenv') && (folder = Pairing.protected_folder(ROOT))
+  warn Tui.paint(t('protected_folder_mac', folder: folder), :yellow)
+end
+
 host = value_of('--host').to_s
 if host.empty?
   host = guess_host
