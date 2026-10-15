@@ -66,6 +66,17 @@ module Cards
     end
   end
 
+  # The pictures a post carries: every file of every image block worth
+  # showing -- the degenerate ones (a tracking pixel) are not pictures, and
+  # a block with no file shows nothing.
+  def photo_count(post)
+    (post['content'] || []).sum do |b|
+      next 0 unless b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
+
+      (b['media'] || []).count { |m| m.is_a?(Hash) && m['url'] }
+    end
+  end
+
   # Taller than wide, or square: the shapes that at a card's full width
   # take a screen to themselves. Unknown dimensions are not tall -- there
   # is nothing to cap a size nobody wrote down against.
@@ -155,6 +166,12 @@ module Cards
     # had unmarked, and a medium's own marks stay beside it.
     media_kind = medium ? " post-list-item--media#{tall_medium?(medium) ? ' post-list-item--media-tall' : ''}" : ''
     kind = "#{lead ? ' post-list-item--lead' : ''}#{media_kind}"
+    # How many pictures the post has, for a skin that wants to say so -- or
+    # to lay the card out as a wall of them -- when the card itself shows
+    # one at most (its height budget, lib/card_teaser.rb). Only on a post
+    # with two or more: every other card is the bytes it was.
+    photos = photo_count(post)
+    photos_attr = photos >= 2 ? %( data-photos="#{photos}") : ''
     content = content.gsub(%r{<(h[1-6])([^>]*) id="[^"]*"}) { "<#{Regexp.last_match(1)}#{Regexp.last_match(2)}" }
     # The link is there exactly when a block did not fit -- or when the
     # author wrote a teaser, which says the same thing about the post. It
@@ -166,7 +183,7 @@ module Cards
     # On the stats' own line, so a card without one is the bytes it was.
     series_note = series ? series_card_note(post) : ''
     <<~HTML
-      <div class="card post-list-item#{kind}">
+      <div class="card post-list-item#{kind}"#{photos_attr}>
         <div class="post-header">
           #{date_badge(post, link: prefix, pinned: pinned)}
           <div class="post-body">

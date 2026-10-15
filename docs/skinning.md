@@ -151,6 +151,16 @@ its picture stays `--lead` alone; a video post's lead with no picture to
 lead with is the media card it would have been, with `--lead` beside its
 marks.
 
+A card of a post with two pictures or more says how many it has, as
+`data-photos="N"` on the card -- the card itself shows one at most, its
+height budget sees to that, so this is the only place a skin can learn
+the post is a gallery. A card with one picture or none has no such
+attribute.
+
+```css
+.post-list-item[data-photos]::after { content: attr(data-photos) " photos"; }
+```
+
 The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
 listing names itself.

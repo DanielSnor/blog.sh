@@ -19,6 +19,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 ### Added
 
 - **`series_index:` names the page of every series and says which way it runs.** `title`, `description`, `order: oldest`.
+- **A gallery's card says how many pictures it has.** `data-photos="N"`, on a post with two or more.
 - **A menu item can name a series.** `series:` leads to its listing and marks every part of it as the chapter you are in.
 
 ### Changed
