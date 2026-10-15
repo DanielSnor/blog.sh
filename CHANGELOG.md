@@ -13,591 +13,112 @@ prints what an installation is running.
 
 ## 1.10.pre -- 2026-09-28
 
-Opened the morning 1.9 went out, so `version` does not claim a release nobody has cut. What
-goes in is still being decided; the suffix and the date both come off at the tag.
+The release that opens a door for programs. Every screen read before acting, and every action it
+offers, also answers as data; a program on another machine reaches them over the SSH the server
+already has, through one forced command that runs one engine command and nothing else; and
+`./blog.sh pair` lets it in by a code, with no key or address typed. Around it, the archive says more
+about itself, a Mac gets an icon instead of a terminal, and the second language from 1.9 grows up.
+The `/write/` page and its shortcut are on their way out. Nothing to migrate; the first deploy
+sends nearly every page once.
 
 ### Added
 
-- **`doctor --json`, and the table of languages as data.** `./blog.sh doctor --json` prints the
-  diagnosis as one object -- `errors`, `warnings`, `oks`, and every finding with its level, the
-  check it came from (`kind`: `trash`, `scheduler`, `banner`…), its sentence and its advice,
-  problems first -- and a program with a key may now ask for it
-  (`scripts/remote.rb`; not `--online`, not `--strip-location`). `check --languages --json`
-  prints which post has a text in which language. That pair used to be refused, which made
-  `--languages` useless to the one caller it was listed for: a program's request always says
-  `--json`.
-- **An old address can belong to a translation.** Two posts that were one piece in two languages
-  become one post with a translation -- and the second one's address, which the post's own
-  `former_slugs` could only send to the post in the site's own language, now leads to the
-  translated page: a translation may carry `former_slugs` of its own
-  (`translations.en.former_slugs: ["2019/the-old-slug"]`). The redirect stands at the site's
-  root and in that language's tree; `check` asks of it what it asks of any old address, and
-  saving the translation again keeps it.
-- **`site.author_name`.** The author's name as it stands alone -- under a hero title, as the
-  person the structured data names, and on the pages of a language other than the site's own.
-  For a language that inflects names: there `author` is the form its sentences take ("na webu
-  Daniela Šnora") and this is the name itself. Optional; without it `author` is used everywhere,
-  as before.
-- **A series has a name per language.** `series:` in `config/site.<lang>.yml` gives a series the
-  name that language shows -- over its listing, in the sentence that places a part, in the page's
-  title -- keyed like `tags:` by the name the posts write or by its slug. The series itself stays
-  one thing: one address, one set of parts. Without it a second language showed the series' name
-  untranslated over translated posts.
-- **On this day.** A sidebar card with posts from this day in earlier years, switched on by
-  `on_this_day:` under `widgets:` (or in `./style.sh`). One row per year, five at most: round
-  anniversaries always, the rest spread along the years with the oldest claiming first, a titled
-  post standing for its year. A busy day rotates through up to three windows; a day with nothing
-  hides the card. No settings -- the same rule from a hundred posts to thirteen thousand.
-- **`./blog.sh list --search="words"`.** The search `browse` runs behind `/`, for a caller with
-  no screen to type it into: the same query language as the screen and the site's search box,
-  over the whole text. With `--json` each row carries `match`, the line that says why it is in
-  the results, and the answer says the query back as `search`.
-- **The search in the terminal keeps its index.** `browse` and `list --search` read every post
-  and folded its text on every query -- 4.9 s on 6,600 posts, 3.8 s of it rebuilding what the
-  query before had built. The index is now written to `.search_index.json` and a post is read
-  again only when its file changed: the same search answers in a quarter of a second. It also
-  searches what the site's own search box searches, in every language the site publishes -- a
-  translation's title and text, and the label a language gives a tag.
-- **`version --json` says the site's accent.** `site.accent` carries the palette's accent for
-  light and for dark, resolved as colors.css resolves it, so an app can wear the blog's colour
-  the way `/write/` does. `site.palette` carries the rest of what the pages are set in -- `bg`,
-  `text`, `meta_text` and `border`, for light and for dark -- so an app can wear the blog's
-  ground and ink too.
-- **`./blog.sh on-this-day [--date MM-DD] [--json]`.** The same selection in the terminal: every
-  post of the day, and which of them the card shows in which window.
-- **`./blog.sh drafts [--json] [<slug>]`.** The drafts, and with --json what a program needs to
-  edit each one.
-- **`edits: <slug>` in a file for `add`.** Saves it over that draft, as `edit` would, with every
-  question a refusal; `base:` refuses a draft that changed after its text was handed out. What
-  the new text leaves out is taken out -- a post can be made shorter this way; refused as a loss
-  is only what markdown has no words for, which the text never showed. A file with no text at all
-  is refused as `empty`, like a new one: that is not an edit.
-- **The sidebar cron turns the day over.** A site with the card wants `refresh-sidebar.sh` in
-  cron even with no other widget; it rewrites the card's file once a day, per language. The
-  script leaves the moment it ran, and `doctor` says when the card is switched on and nothing
-  runs it -- without it the card shows the day of the last build and is gone the day after.
-- **`list --json`, `props <slug> --json`, `queue --json`.** The three screens somebody reads before
-  acting, as data: the archive with its filters, one post with its properties and the actions that
-  apply to it by name, the queue in publish order. One object each, every key always present, a
-  refusal as an object with a zero exit -- the promise `add --json` already keeps. For a program
-  that cannot press a key in a dialog: a phone app, a script.
-- **The actions of those screens, for a program.** `schedule <slug> --at <time> --json` and
-  `--cancel` (with `--compact` to shift the queue behind it), `publish --compact`, `unpublish --yes`,
-  `delete --yes`, `restore` (without a slug: the trash as data), `rebuild` and `empty trash` /
-  `empty versions` (without `--yes`: the count and the size), all under `--json`. Every question
-  the terminal asks is a flag or a refusal; a flag that answers a dialog's question is refused
-  without `--json`, where the dialog is there to ask it. See *Driving the engine from a program*
-  in docs/operations.md.
-- **The rest of the properties screen and the queue, for a program.** `props <slug> --set
-  series=... --set tags=... --json` writes the [e] rows and the pin; `--drop-address`, `--rename
-  <slug> --yes`, `--versions` and `--restore-version <name> --yes` are the [a], [r] and [v] keys;
-  `queue --up <slug>`, `--down <slug>` and `--move <slug> --to <n>` are [u], [d] and [m]; `toot` and
-  `bluesky` answer with the address or the reason, `--force` answering the "announce it anyway?"
-  question. Every answer is the screen as it stands afterwards.
-- **`version --json`**, and **`scripts/remote.sh`**: the forced command for a program's key. `run`
-  takes one engine command with its argv as JSON on standard input and checks every word against a
-  whitelist of commands and flags before the engine sees it -- nothing is ever parsed as shell, and
-  the key never gets one; `receive` is the delivery `receive.sh` takes. The identity block (engine,
-  site, claim, URL, languages) comes as data, for an app to show above its screens.
-- **`deliver`** on the same key: a delivery ended by a line saying `end`, for a sender that cannot
-  close its side of the stream, handed to `receive.sh` whole; `version --json` says the receiver's
-  ceiling (`max_mb`), and `props --json` which network [t] announces on, the slot the schedule
-  dialog would offer, and the [e] rows in the words `--set` takes back.
-- **`edit <slug> --json`, and a published post edited from a file.** The text as the editor opens
-  it, handed out for any post; a file saying `edits: <slug>` may now edit a published post too, with
-  `base:` required so a change made elsewhere in the meantime is refused rather than overwritten.
-  The app on a phone is a desk now. `translate <slug> --lang <code> --json` hands a language's text
-  out the same way, and a file saying `lang:` beside `edits:` and `base:` brings it back.
-- **`./blog.sh pair`: an app is let in by reading a code.** Reaching the engine from an app has
-  meant copying the app's key out and writing a line into `~/.ssh/authorized_keys` by hand; that
-  stays, and beside it `pair` draws a QR code in the terminal that an app reads and is connected --
-  no address, user name or key typed anywhere. The code holds where to connect, the fingerprints
-  of the server's own keys, and a key good for one thing, once, for ten minutes: handing in the
-  public half of a key the app made itself, which the engine then writes a line for, held to
-  `scripts/remote.sh`. `pair --list` and `pair --revoke` show and remove the devices let in this
-  way: `--list` numbers them, and `--revoke` takes that number, the name or the fingerprint, or asks.
-  A device let in this way can do the same two things for itself through its own key:
-  `pair --list` answers it with every device and which of them it is, and `pair --revoke`, with
-  nothing after it, takes it out -- itself and no other. Who is asking is known by a word the
-  device's own line in `authorized_keys` hands the script (`--device=<fingerprint>`), never by
-  anything a request says; showing a code and taking out another device stay at the terminal.
-  The engine writes only `restrict,command=` lines of its own, touches no line it did not
-  write, and keeps the file as it was beside it. For a blog and an SSH server in one account; a
-  container still wants its line written by hand. `doctor` mentions a code's line left behind.
-- **A program may say which language it reads.** `"lang": "cs"` beside `args` in a request to
-  `scripts/remote.sh`: `check` and `doctor` then say their findings in that language where the
-  engine ships it, instead of in the blog's. An app in Czech showed an English blog's diagnosis in
-  English. Only those two -- they build nothing -- and what `pair` refuses through the door; a
-  language the engine does not have is the blog's own, never a refusal.
-- **The queue says whether anything publishes it.** `queue --json` carries `scheduler.last_run`,
-  null on a blog nothing has ever run the queue on. There, a post past its time no longer says
-  "wait for the cron": it says nothing publishes the queue here and to publish the post with
-  `./blog.sh publish <slug>`. Nothing is published by looking -- publishing announces.
-- **A launcher on a Mac.** `./setup.sh` ends by offering an icon in Applications, named after the
-  site and wearing its favicon, that opens Terminal in the site's folder and runs `./blog.sh` --
-  for the author to whom "open Terminal and type" is three things to get wrong. Built from what
-  macOS ships (`osacompile`, `sips`, `iconutil`, `codesign`); nothing is installed. The answer to
-  Enter is no, an application of the same name that blog.sh did not make is never replaced, and
-  `./setup.sh --launcher` makes it later or makes it again for a site that moved. macOS asks once
-  whether it may control Terminal -- over a sentence in the site's language saying what the
-  launcher does -- and Terminal keeps its window open afterwards; the wizard says both. Elsewhere
-  the question is not asked.
-- **`/series/`: the index of series.** A line for every series that has a page -- its name, how
-  many parts, the years they span -- with the one still being written first. A series could be
-  reached only from a post that belongs to it, and `/series/` answered 404 with every address under
-  it alive. The name in a series' own heading now leads back to the index, as a tag's leads to
-  `/tag/`; the sitemap lists the page, `check` knows the address, and a second language gets its
-  own with the names `series:` in `config/site.<lang>.yml` gives them. A site with no series has
-  no such page.
-- **The archive says what its shading means, and a year can be crossed.** The map's last row is a
-  legend: the four steps between "less" and "more", drawn with the map's own cells. A year's page
-  opens with that year's row of the map behind the words "jump to a month" -- a month with posts
-  is a link to its section further down, shaded as on the map.
-- **The tag index has a way to a letter.** Above the list, the letters that have tags under them,
-  each a link to its band, behind the words "jump to a letter". Count order has no bands, so the
-  switch puts the row away while that order is shown.
-- **`banner.show_image: false`.** A header without its picture: the short name and the description
-  stand on the page itself, in the page's own text colours, and the whole header is still the link
-  home. The markup is the banner's with the `<img>` taken out and nothing else moved -- the wrap
-  gains `banner-wrap--plain` -- and the default rules for it weigh nothing, so a skin that already
-  draws its own header and hides the picture looks exactly as it did, and its readers stop
-  downloading a file nobody showed them. `banner.src` stays: it is also the picture a page with
-  none of its own is shared with.
-- **`publishing.allow_partial`.** A site of several languages is asked about every post whether
-  it may go out without the words of all of them: `publish` and `schedule` refuse until
-  `--allow-partial` is said, the wizard asks, and a post sent from a phone with `publish: yes`
-  stays a draft. Right for a site that means to publish everything in every language, and a
-  question with one answer for the site where a translation is the exception.
-  `publishing.allow_partial: true` in `config/site.yml` gives that answer once. Only `true` does;
-  doctor names a value that is neither true nor false, and `props <slug> --json` tells a program
-  as `languages.allow_partial`. Left out, nothing changes.
-- **`layout.lead_card`.** With it on, the card that opens the front page -- the pinned post where
-  there is one -- leads with its post's first picture, under the title and above the opening
-  words. A card is cut by height, so a picture written after the first paragraph is usually left
-  out of it, and a stylesheet cannot show what the card was never given. Only that one card and
-  only the front page itself; it carries `post-list-item--lead` for a skin to dress. The mark goes
-  with the place, not with the picture: a post with nothing to lead with keeps the body its card
-  would have had without the setting (a video post its video) and is marked all the same, so the
-  lead a skin dresses does not vanish the day the post that opens the front page has no picture.
-  Off by default.
+- **Every screen as data.** `list`, `props`, `queue`, `edit`, `doctor` and the new `drafts` take `--json`; a refusal exits 0.
+- **The actions of those screens, for a program.** `schedule --at`, `delete --yes`, `props --set` and the rest, under `--json`.
+- **A post's text comes back from a file.** `edits: <slug>` and `base:` in a file for `add`; a changed post is refused.
+- **A translation comes back the same way.** `translate --json` hands it out, `lang:` beside `edits:` brings it back.
+- **`scripts/remote.sh`: a door for programs.** One whitelisted engine command per request, or one delivery.
+- **`version --json`.** The engine, the receiver's ceiling, and the site's name, languages and colours.
+- **A program may say which language it reads.** `check`, `doctor` and what `pair` refuses answer in it.
+- **`./blog.sh pair`: an app is let in by reading a code.** Good once, for ten minutes; `--list`, `--revoke`.
+- **A paired device sees the list and takes itself out.** Through the door -- itself and no other.
+- **A launcher on a Mac.** An icon in Applications that opens the site in Terminal; `./setup.sh --launcher`.
+- **On this day.** A sidebar card with posts from this day in earlier years; `on_this_day:` under `widgets:`.
+- **`./blog.sh on-this-day [--date MM-DD] [--json]`.** The same selection in the terminal.
+- **The sidebar cron turns the day over.** The card wants `refresh-sidebar.sh` in cron; `doctor` says when it does not run.
+- **`/series/`: the index of series.** Each with its parts and the years they span.
+- **The archive says what its shading means.** And a year's page jumps to a month.
+- **The tag index jumps to a letter.**
+- **`./blog.sh list --search="words"`.** The search `browse` runs, for a caller with no screen.
+- **The search in the terminal keeps its index.** `.search_index.json`; a query reads only the posts that changed.
+- **The queue says whether anything publishes it.** On a blog with no cron, a post past its time says to publish it by hand.
+- **A series has a name per language.** `series:` in `config/site.<lang>.yml`.
+- **An old address can belong to a translation.** `translations.<lang>.former_slugs`, redirected into that language.
+- **`site.author_name`.** The author's name as it stands alone, for a language that inflects names.
+- **`publishing.allow_partial`.** A site that publishes one language first is no longer asked about every post.
+- **`banner.show_image: false`.** The banner's words without its picture.
+- **`layout.lead_card`.** The front page's first card leads with its picture, and is marked with or without one.
+- **`check --languages --json`.** The table of languages as data.
 
 ### Changed
 
-- **The card of a picture post carries the picture, and a video post's the video.** A card is cut
-  by height and keeps its first block whatever that weighs, so a photograph under one line of
-  words was left off the card of a post that is that photograph: on one archive the first page of
-  the pictures showed three pictures in thirteen cards. For a post whose kind is image or video
-  the medium now goes first and the same cut runs over what follows. A post that opened with its
-  medium keeps what it kept; a medium taller than wide is held to 22rem instead of taking a screen,
-  and the budget is charged that height, so the caption under a portrait photograph is on the card.
-  Such a card is `post-list-item--media` (and `--media-tall`). **This changes listings without
-  anything being set**: every site with such posts shows more pictures after the upgrade. An
-  article with a photograph in it is still an article, and the card `layout.lead_card` leads with a
-  picture is left as it was; one with no picture to lead with is the media card, marked as the lead.
-- **The cheat sheet shows a picture and a gallery.** Its section on pictures had a source and a
-  sentence and nothing to look at. It now draws both -- a picture with its caption, and a gallery
-  of a landscape beside a portrait, which is the crop the paragraph above it describes -- from two
-  drawings of under a kilobyte each, shipped in `assets/cheat-sheet/`.
-- **A part of a series names the series first.** "Nový Sean.cz — part 3 of 19" where the note used
-  to read "Part 3 of 19 of Nový Sean.cz" -- in all three languages -- so a reader meets what they
-  are in before where they are in it. The same line now stands on each card of the series' own
-  listing, which until now showed which posts belong and not which comes when; there it is words,
-  not a link to the page it stands on. Every post in a series and every page of a series' listing
-  is rewritten by the next build.
-- **One thing, one word, in the terminal.** The queue offered "[s] different time" and "[n] remove
-  from queue" for what a post's own screen calls "[s] reschedule" and "[n] cancel the schedule";
-  both say the second now, in all three languages. Czech also called an unlisted post two things
-  and taking a post off the site two things: it is "mimo výpisy" and "vrátit do konceptů"
-  everywhere. The keys are the keys they were.
-- **A page of a listing says the days it covers.** "page 663 · Sep 12–18, 2026" where it said
-  "page 663": pages are numbered from the oldest post, so the one right behind the front page
-  carries the highest number, and a number without a total says nothing about where it is. There
-  is still no total -- it would rewrite every page each time one is added -- and the dates need
-  none: they are read off the page's own posts. What the two ends share is said once (one month,
-  one year), in each language's own way, on a line of their own under the number. The page the
-  numbering starts from says "the beginning" where the link to older posts would stand. A series
-  is paged by parts and says neither. Every page under `/page/N/` is rewritten by the next build,
-  once.
-- **The 404 page offers what its sentence promises.** It said "the menu above and the search box
-  are the way on" and put neither under the sentence. Now a search field stands there, filled with
-  the words of the address that was not found (`/posts/2019/a-day-out/` becomes "a day out";
-  nothing is searched until the reader asks), and under it pills back to the front page, to the
-  archive and to the index of tags -- each only where the site has that page -- plus the year of
-  the archive when the address names one it has. No word on the page is new: the labels are the
-  ones those pages already carry. For a skin: `.not-found-search`, `.not-found-links`,
-  `.not-found-link--back`, `--archive`, `--year`, `--tags`.
-- **A listing's heading says how many it holds.** A small number after the name, as the index of
-  tags writes it: posts under a tag or of a type, parts of a series, posts of an archive year and
-  of the whole archive, tags in the index of tags. On a tag's or a type's listing it stands on the first page only -- that
-  page is rewritten by a new post anyway, and on all of them it would rewrite every page of a tag
-  each time a post takes it. A series says it on every page, which costs nothing: its cards
-  already count the parts.
-- **A thread reads as a conversation.** A reply to somebody's comment, rather than to the post,
-  is set in under it -- one step, however deep the exchange goes. In a live thread the page
-  reads it off the thread; on a moderated site cron writes `reply: true` into `comments.json`
-  for such a comment, so the indent appears with the next refresh. `comment--reply` for a skin.
-- **The search says why a result is there.** The words that were asked for are marked in a
-  result's title and excerpt -- as written, accents and all: "ctyri" marks "Čtyři". Only what
-  the card shows is marked; a match deeper in the post marks nothing.
-- **Things a skin could not select are marked.** Nothing looks different until a stylesheet
-  says so (`docs/skinning.md`, "What the markup marks for you"):
-  a link in a post's text, or in a text the site says about itself (`about.html`), that is a
-  mention or a hashtag -- its whole text "@somebody" or "#something" -- carries `mention` or
-  `mention hashtag`, the classes the same things have in the comments and in the sidebar's toots;
-  a reply written by the account that announced the post is `comment--author`;
-  "page 12" under a listing is `pagination-word` and `pagination-number`;
-  the search's "4 results" is `search-count` and `search-unit`;
-  the series sentence is three spans -- the name, what joins it, the part -- so a series' own
-  listing can drop the name every card repeats;
-  the heading of an archive year says its kind and its year separately, as a tag's does, and the
-  year alone is the link back to the map of years (the word "Archive" was part of the link);
-  on a tag's listing the pill of that tag is `tag-pill-own`;
-  a count of zero under a post is `post-stat--zero`;
-  and on the markdown cheat sheet what a source becomes stands in `md-example`.
-  Every listing of a tag or a type, every archive year, the cheat sheet and every post whose text
-  links a mention or a hashtag are rewritten by the next build -- on an archive that came from a
-  social network that is a quarter of its posts (1 786 of 6 585 on the one it was counted on), so
-  the first deploy after the upgrade is a long one. Where such a link stands in `about.html`,
-  every page that shows the text is rewritten too.
+- **The card of a picture post carries the picture, and a video post's the video.** With nothing set.
+- **A part of a series names the series first.** "Nový Sean.cz — part 3 of 19".
+- **A page of a listing says the days it covers.** "page 663 · Sep 12–18, 2026".
+- **A listing's heading says how many it holds.**
+- **The 404 page offers a search filled with the words of the address,** and the way back.
+- **A thread reads as a conversation.** An answer to a comment stands set in under it.
+- **The search marks why a result is there.**
+- **The cheat sheet shows a picture and a gallery.**
+- **One thing, one word, in the terminal.** The queue says "reschedule" and "cancel the schedule", as a post does.
+- **What a skin could not select is marked.** `docs/skinning.md`, "What the markup marks for you".
+- **The first deploy after the upgrade sends nearly every page once.** Listings, cards and headings say more.
+- **A cold build costs a few percent more than 1.9's.** A cached rebuild costs what it did.
 
 ### On its way out
 
-- **`/write/` and the shortcut.** Native apps for iOS and Android are in preparation. They talk
-  to the engine over the SSH the server already has (`scripts/remote.sh`) and do what the page
-  does and more -- the queue, a post's properties, a published post's text, a translation -- on
-  Android as well, where the page could hand its files to nothing the engine ships. **1.11 takes
-  out** the page with everything published under `/write/`, the `SendPost` shortcut and what
-  exists only for the two: the `publish.txt` and `drafts.txt` requests. This is the notice. In
-  1.10 both work as they do today, and nothing new is added to them. `scripts/receive.sh` stays
-  -- it is what the apps deliver through, and what `./blog.sh add <file>` has always been the
-  other end of -- and so does the `receipt:` line of a delivery: the apps send it too, and it is
-  what makes a delivery that arrives twice one post.
+- **`/write/` and the `SendPost` shortcut leave in 1.11.** Native apps for iOS and Android, in preparation, take over.
+- **So do the `publish.txt` and `drafts.txt` requests.** In 1.10 everything works as before; `receive.sh` stays.
 
 ### Fixed
 
-- **The skinning guide's selector for the first card matched no card.** Since 1.3.2
-  `docs/skinning.md` advised `.page-first .post-list-item:first-child`, but a listing's heading
-  stands first in `<main>`, so no card is ever its first child; it says `:first-of-type` now. The
-  example beside it named `.archive-note`, which the engine has never written, and uses the
-  listing's heading instead.
-- **The config writer read a config in whatever encoding the shell named.** Under a shell that
-  names none, a `config/site.yml` with one accented letter in it could not be searched for a key,
-  and every setting written to it failed with "invalid byte sequence in US-ASCII". The wizards set
-  the encoding before they open the writer and never met it; anything opening the writer on its own
-  did. It reads UTF-8 by name now.
-- **A second language's build called a post's own page "already taken".** A translation that kept
-  the slug of the post it was merged from stands, in its own tree, at an address the post's
-  `former_slugs` also names; the build warned once per such post on every run. An old address
-  that is the post's own page is the post answering, and is passed over without a word.
-- **The cheat sheet's contents list had lost two sections.** The teaser (1.5) and the link card
-  (1.7) were added to the sheet and never to the list at its top, in all three languages.
-- **An export left a post's other languages behind.** `translations` was not among the keys an
-  export writes, so the documented way to move an installation carried a site of two languages
-  out as a site of one, and said "posts: N". They ride under `blogsh:` now, and an import of the
-  tree brings them home -- words, address and old addresses of each language, and its pictures
-  under the names the import gave them: a picture only a translation shows is exported and
-  brought with it.
-- **Three pages of a second language named the first language's as their own.** `/en/search/`,
-  `/en/markdown/` and `/en/404.html` carried the canonical address and `og:url` of the pages
-  without `/en/`, beside an hreflang that said otherwise. Each says its own address.
-- **`doctor` said "0 problems" about a language configuration no language builds on.** A language
-  in `site.locales` with no locale file, a key a language's file may not have, a translation of a
-  widget the site lacks, an empty tag label: `check` named them and `doctor` did not. It does;
-  and `check` names the one neither did -- `site.fallback` or `site.ui_language` kept in
-  `config/site.yml`, where 1.9 stopped reading them.
-- **The advice about a language with no locale file did not work.** Build and `check` said to
-  write `site.ui_language` into `config/site.yml`, which is where it is refused. They say
-  `ui_language: <code>` at the top of `config/site.<code>.yml`.
-- **`preview` on a port already in use printed "Serving at ..." and a stack trace.** It says the
-  port is taken, and which one to try.
-- **`translate` closed without a change left an empty template behind as rescued text,** said the
-  text was not lost, and had the next `add` ask about it.
-- **Saving a post rewrote the blocks nobody had touched.** An edit rebuilds a post from its
-  text, and the text has no word for what an import brought along: a paragraph Tumblr marked as
-  indented or as a list item, a video's provider and first address, a player handed over as HTML.
-  Fixing a typo in one paragraph saved every other block without them -- at the desk and from an
-  app alike; on one real archive 101 posts changed by being saved unchanged. A block the new text
-  did not change is now saved as it was stored, whole; so is anything a translation's entry holds
-  beside its words. (A block the text did change is made again from the text, as it always was:
-  the kind an import gave a paragraph or the address a video was first at does not outlive an
-  edit of that very block, and the page shows it as before.)
-- **Two deliveries arriving together could swap pictures.** `incoming/` knows a picture by the
-  name it was sent under, and every phone calls its first one the same: of two posts sent at the
-  same moment, the one made first got the other's `01.jpg`, and both were answered ok. The
-  receiver takes deliveries in one at a time; one that has waited `BLOGSH_TURN_SECONDS` (300) is
-  told `busy` and stores nothing.
-- **A delivery from an app that stopped in the middle of a line was waited on for ever.**
-  `deliver` read a line at a time and waited for each to end: a phone that lost its signal
-  inside a picture left a process waiting for as long as the connection stayed open, a line
-  that never ended was read into memory past the ceiling, and the receiver, once started, had no
-  time limit. A delivery has `BLOGSH_BODY_SECONDS` for the whole of it, is measured as it comes,
-  and its receiver is stopped after `BLOGSH_RUN_SECONDS` like any engine -- each answered
-  `timeout` or `too_large`.
-- **`add <file> --json` answered with three shapes.** A new post and an edit had no `ok`, a
-  translation had it and `scheduled` and `date` besides, and `publish --json` was a fourth.
-  Every action on a post answers with the same nine keys: `ok`, `slug`, `path`, `state`,
-  `scheduled`, `date`, `url`, `deploy`, `warnings`.
-- **A translation given another address left the old one dead.** `slug:` in the header of a
-  translation is a line the engine puts there; changed on a post that is out, it moved that
-  language's page and wrote down nothing, where a post renamed by its own slug has always kept
-  a redirect. The address the text was out at goes into `translations.<lang>.former_slugs` by
-  the same save.
-- **A note to oneself in a file was published.** A line starting with `//` is dropped by the
-  editor on save, and the cheat sheet says of any text that it disappears; in a file handed to
-  `add` -- a new post, an edit, a translation -- it was saved as a paragraph, and with
-  `publish: yes` it stood on the page. A file is read as the editor's buffer is.
-- **An edit from an app was refused for a loss it would not have caused.** The question was
-  asked of the post's whole text read back, which does not see that a block left alone is saved
-  as it stood: a bold range an import wrote down twice, a link of no length or an attachment the
-  text reads as a paragraph made a post uneditable -- five of the eleven posts a real archive
-  refused. What a save would really lose is asked now: a block the text has no line for at all
-  (such a post stays `editable: false`), or what a block the edit rewrote held beyond its words,
-  like a mention from an import. The refusal says nothing was written and where such a post is
-  edited.
-- **Two commands of a program writing one post at once.** Each read the post, asked its
-  questions and wrote the file back whole: a `props --set` sent together with a `publish`, an
-  `unpublish`, a rename or a `delete` saw both answer ok and one change gone, and a deleted post
-  stood in the trash and in the archive at once. Every command that writes a post for a program
-  -- those, `restore`, `schedule`, a restored version, `toot` and `bluesky` -- takes the
-  archive's own lock for the whole of it; the one that comes second, or meets a build, is told
-  `busy` and writes nothing.
-- **A listing by type was promised in a language that has none.** A photo post translated in
-  words alone is a text post in that language; where every photo post is, `/en/type/image/` is
-  never written -- and the sitemap, the hreflang of `/type/image/` and its language switcher all
-  named it. Each says only what that language's build wrote.
-- **A page and a post of one year translated to the same slug stopped every language.** "Projects"
-  for the page and for this year's post are two addresses, `/en/projects/` and
-  `/en/posts/2026/projects/`; the build called them one, with `translate` having saved both and
-  `check` finding nothing wrong.
-- **Four places where a second language met something written for one.** A menu item pointing
-  at a part of a page (`/about/#contact`) was not moved to that page's address in the other
-  language, and one pointing at a part of a post led nowhere. A language that borrows its
-  interface (`ui_language`) said `og:locale="en_US"` on every page; it now says none. What the
-  build has to say about `config/site.yml` came once per language, each time in that language's
-  words; it is said in the site's own. And a `redirect_from` into a language's folder
-  (`/en/old/`) was written by one run and deleted by the next on every build while `check` called
-  the address alive: the build refuses it aloud and `check` names it.
-- **A launcher on a Mac was replaced by another site's.** Two sites called the same -- any two
-  nobody has named yet -- wrote one icon, opening whichever was made last. The second is told so.
-- **What a third fleet found in the fixes of the second** (34 findings over the 35 commits above,
-  one serious). Saving the text of another language took the address the text stands at out of
-  its list of old addresses, "so a text renamed back does not redirect to itself" -- and at the
-  root of the site that entry is the old address of a post merged into this one, which every
-  merged post of sean.cz carries: the first save of such a text deleted its redirect, unasked.
-  Nothing is taken out of that list now. A block the text REWROTE kept only what markdown can
-  say: a paragraph an import marked indented, as a line of chat or as a list item became a plain
-  paragraph, and a video forgot where it came from; it is paired with the block it rewrote and
-  keeps what the text could not have changed. A stored paragraph beginning `//` was handed out as
-  a note to the editor and dropped by being saved back; it is written `\//` and read back. A post
-  with nothing under its header -- a title and its tags, a link card -- could not be changed from
-  a file, every save being "empty"; empty is refused only of a post that had a body. Taking a
-  language off a post owes the address its text stood at, not only the older ones. A move in the
-  queue reads the queue under the archive's lock, so a cancel landing beside it is `busy`, not a
-  sentence about the editor. `schedule --at` with a day and no time was midnight; it is `bad_date`,
-  as the documentation said. `publishing:` that is not a map, and `allow_partial:` with nothing
-  after it, are named by doctor. `check` reads a `redirect_from` without its leading slash as the
-  build serves it, instead of calling a link to it dead and having `--repair` write a second entry.
-  A fallback chain runs only through languages the site publishes and ends at the site's own
-  language: `fallback: [cs, en]` on a Czech site's German file showed English, and a language the
-  site does not publish decided the type of a post for the sitemap. A site whose own language the
-  engine has no words for is told to add the locale file or choose another `site.lang`, not sent
-  round three sentences. Four sentences of `check` said more than was true (a text with no words
-  under the site's own language, an item no list has a word for, advice about `former_slugs` for
-  an address no redirect can be made from, a `language_name` that is not text). The door for
-  programs: a clock above eight digits is `bad_limit` rather than a backtrace, KILL goes to the
-  whole group after TERM, an engine ended by a signal is named to a delivery too, the answer is
-  always valid UTF-8, and the receiver reads its clock as the door does. `props --drop-address`
-  takes an address written twice in one list out whole, and `--kind` alone, twice or naming no
-  list is a refusal with a code. A Backspace that arrived in the same read as the first letter of
-  a slug became a space in it. `pair` with a key file under a user the machine does not have
-  said so in a backtrace. The Jekyll importer read an inline image up to the first `)`, so a
-  caption with one came back with the paragraph break inside it, and a caption with a straight
-  quote was lost. The example config switches `allow_partial` on by itself only, and the
-  documentation names `--kind`, `busy` where it is answered, the shape of `delete`'s answer, and
-  what 1.9 does with `language_name` and `publishing.allow_partial` on the way back.
-- **A launcher on a Mac opened two windows.** A Terminal that is not running opens a window of its
-  own as it starts, and the launcher opened a second one beside it: an empty window and the blog,
-  at every double-click, for the author who has no Terminal open -- which is who the launcher is
-  for. blog.sh now runs in the window Terminal opened; a Terminal that was already running gets a
-  new one, as before. The question macOS asks on the first double-click came with a sentence in
-  English about nothing in particular; it now says what the launcher does, in the site's
-  language. And `./setup.sh --launcher`, which asks nothing and says two lines, wiped the terminal
-  before saying them.
-- **Pairing, on more machines and with fewer surprises.** A window too small for the code is asked
-  to grow before `pair` gives up on drawing it. The line written for sshd begins `env PATH=...`,
-  which a csh or tcsh login shell runs too. A key that already stands on another line of the
-  account's file is refused (`key_in_use`) instead of being written where sshd would never look.
-  A Ctrl-C that lands in the moment the app hands its key in says who came in, not "cancelled".
-  A device's name keeps its accents when it arrives decomposed. An address guessed from an SSH
-  session is not offered when it is the machine talking to itself or a link-local one. A site
-  name too long for the code is shortened until the code can be drawn. `pair --list` writes
-  nothing, and a key file with carriage returns or no final line feed comes back byte for byte.
-- **Six answers to a program that were written for a screen.** A file saying `edits:` for a slug
-  two years have used opened the picker -- a question in prose and a status of 1; it answers
-  `ambiguous_slug`. Every lookup that could not ask said the sentence written for `publish
-  --yes`, so an app opening a post to read it was told to publish it. `drafts --json` carried
-  `omitted` only sometimes, `empty --json` a size of null, and `delete`, `restore` and `schedule
-  --cancel` their own "Deleted: /path" among the warnings. `list --tag cats`, the value as the
-  next word, answered with the whole archive. And `schedule --at` with a moment said in UTC
-  dated the post in UTC and filed it under UTC's year, and read 30 February as 2 March.
-- **`translate` refused an address no page had.** A post never written in a language has no page
-  in its tree, and the address it would have there was counted as taken.
-- **Three answers of `check` about a second language.** `check --repair` offered to rewrite a
-  relative link standing in a translation and then could not: the rewrite opened only the post's
-  own text. It rewrites every text the post has. An empty name in a language file's `series:` was
-  answered with the sentence about a tag -- the pill, "take it out of tags:" -- and has its own.
-  And `check --languages --json` over a `config/site.yml` that cannot be read answered with the
-  empty table of a site in one language and a zero exit; it refuses, with what `check` says about
-  that file, and exits 1 -- and the table on the screen no longer says "one language" above it.
-- **Saving a translation rebuilt it from its text.** Every block of it, so whatever markdown has
-  no word for was gone after any save -- a paragraph's kind, a video's poster and player, a link
-  card whole -- and on a real archive half the translations would have changed by being saved
-  unchanged. A block the text left alone is now stored as it was, as the post's own blocks are;
-  what the text cannot carry at all is asked about at the desk, refused from a file
-  (`content_lost`), and said by `translate --json` beforehand (`editable`, `problem`). Every save
-  of a translation keeps a version, and `[v]` brings back the words of every language the version
-  holds. Taking a language off a post no longer drops the old addresses its text was owed: they
-  go to the post's own list. And a file saying `lang:` with nothing after it is refused, where it
-  was saved over the post's own text.
-- **`check` and the build agree about a translation's old addresses.** An address in
-  `translations.<lang>.former_slugs` is served in two places: at the root and in that language's
-  tree. `check` called it live under every language the site has, and still live after the
-  language was taken out of `site.locales`; it calls a link there dead, and says of the entry
-  itself that nothing serves it. Each tree is asked about its own pages: an old address another
-  post's page stands at in the language's tree -- which the build skips on every run -- is said
-  once, with where it is taken and where it is served; one taken at the root but served in its
-  language's tree is no longer "not served", and a link to the stub that answers there no longer
-  dead. One address in the lists of two languages of a post is named, with the text the root
-  leads to.
-- **`check --repair` wrote a redirect into a language's folder.** For a dead link such as
-  `/en/posts/2019/<the post's own slug>/` it offered a `redirect_from` the build refuses, wrote
-  it, and called the link repaired. It rewrites the link to the post's page in that language;
-  where the post has none, it offers nothing and says why.
-- **`./blog.sh pair` reads `env.sh`,** as `doctor` does. `BLOG_SH_AUTHORIZED_KEYS` written there
-  names one file for `pair`, `pair --list`, `pair --revoke` and `doctor`; a device let in through
-  it used to be "no device" to `pair --list`. `env.sh.example` carries the line. A path written
-  there with a tilde inside quotes is expanded; it used to be a folder called `~` inside the blog.
-- **A key file kept with Windows line endings, or with a line of its owner's nobody expected.**
-  A device let in through such a file was listed with a carriage return in its name and could not
-  be taken out by it, and a code opened before the file was saved that way stopped being a code;
-  the app's line is written with the ending the file has. A key standing only on a line its owner
-  commented out is no key in use, and a line that is not UTF-8 no longer stops a pairing.
-- **Markdown the engine refuses is refused in the site's language -- and as an object where one
-  was promised.** The three sentences (a picture inside a paragraph, a video with no caption, a
-  picture that is a folder) and the one about an editor that cannot be started stood in the code
-  in English. `add <file> --json` at a desk answered them in prose with a status of 1, and a
-  translation sent from an app let the refusal out as a failed engine; both answer
-  `bad_markdown`. A translation sent without `base:` is told what a translation needs, where a
-  draft was told it "is published"; and `changed` no longer tells the author of a published post
-  to open "the draft" again.
-- **What a program was told about the queue.** A move (`queue --up`, `--down`, `--move`) and a
-  `--compact` listed the run's own report among `warnings`; they are empty unless something is
-  one. A move that met a held lock answered `not_moved` -- the code for "first, last, or its time
-  has passed" -- and answers `busy`; and neither `busy` nor `outside_window` points a program at
-  "the line above" or at a command by its terminal name any more.
-- **A post named in another alphabet was acted on and then reported as a failure.** With no
-  `LANG` -- which is how a forced command runs -- the engine did what it was asked and died
-  printing the answer. Every word of the command line is read as UTF-8, and the door for
-  programs takes a slug whose letters carry their marks as characters of their own.
-- **`list --tag=` answered with the whole archive,** and so did `--type=`. A filter with nothing
-  after the sign is said like one with nothing after it at all.
-- **A paragraph with an unclosed `**` and backslashes after it hung the save.** A few dozen
-  characters took minutes; they are read at once.
-- **`translate` with no `--lang` offered a language the site does not publish.** It names one it
-  does, and lists them. And the usage says again what `rebuild` does -- the lines under it were
-  lost.
-- **Advice in `check` that could not be taken.** A dead link to an address under `/posts/` or
-  under a language's folder was told to "give the target a `redirect_from`", which the build
-  refuses there -- the advice is the post's `former_slugs`. Two pages translated to one address
-  were told "the build stops", which it does for two posts and not for two pages. And one piece
-  of advice printed `--lang %{lang}` as it stands.
-- **The language switch on a later page of a listing by type led to a 404** where the other
-  language has fewer pages of that type. It leads as far as the listing goes there.
-- **`check` named an old address of an unpublished language that another post answers at.** It
-  names one only when nothing answers there.
-- **A found word was marked in pieces.** In a text whose accents are characters of their own --
-  typed on a Mac, for one -- the search broke its mark at every accent.
-- **The preview of a draft named its series in the site's own language** on the page of another.
-- **What a cron wrapper refused, it said on standard output.** The line the wizard hands to cron
-  keeps that in a log and mails the rest, so a refusal by `publish-scheduled.sh` or
-  `refresh-sidebar.sh` reached nobody.
-- **`./style.sh` wrote half a sidebar card.** A card whose one necessary answer -- the account, the
-  feed's address, the user name -- was left empty was written all the same. Nothing is written,
-  and the wizard says which answer is missing.
-- **Two deliveries waiting on a dead one could both go.** Writes carrying a receipt take turns,
-  and a turn left behind by a receiver that died was cleared by every waiter at once; one clears
-  it. A turn older than any delivery can be is over whichever process now carries its number.
-- **`./setup.sh --help` said every question can be skipped.** Five cannot while they hold the
-  template's example, and the wizard's opening sentence named four of them.
-- **A slug typed into a picker could not be corrected past its first letter.** In the trash, or
-  wherever a list takes a number or a slug: the first key was read by the menu and the rest of
-  the line by the terminal, which can take back only what it took in itself -- `y` for `z` and
-  Backspace did nothing. The whole line is read a key at a time; with its last letter taken
-  back, the menu is there again.
-- **On a site of three languages the switch could not get from one text of a post to the
-  other.** A click led to the next language in the row whatever it had: from the page of a post
-  with no German text to the German front page, and on from there to the next front page. It
-  leads to the next language the page is in; one that has nothing of it is passed over, and
-  only when no other language has the page does the click go on to a front page. On a site of
-  two languages nothing changes.
-- **A language with a borrowed interface could not say what it is called.** The switch that led
-  to it was titled with its code -- "SK" beside "English" and "Deutsch" -- and the screens of
-  `./blog.sh` called it `sk`. `language_name:` at the top of `config/site.<lang>.yml` says it,
-  and `check` says so while the line is missing.
-- **A moved installation lost its teasers.** An export writes `//--more--//` as `<!--more-->`,
-  the line Jekyll and Hugo end an excerpt at, and the import did not read it back: the post came
-  home with a paragraph saying `<!--more-->` and a card showing the whole text. Read as the end
-  of the teaser, from an export of this engine and from a tree of either generator.
-- **A file named with parentheses was no picture.** `![x](IMG (1).jpg)` -- what a phone calls
-  the second download -- was refused as a picture inside a paragraph, alone on its line as it
-  was, and a post that already held such a file could not be saved from its own text. A name
-  may hold a pair of them, in a picture's, a clip's and an attachment's line alike.
-- **`schedule --at` read the thirtieth of February as the second of March** in every spelling
-  but one, and a year of five digits founded `posts/12027/`. A program says the moment as
-  `YYYY-MM-DD HH:MM` (a `T`, seconds and a zone if wanted) or as a time alone; anything else,
-  and any day the calendar does not have, is `bad_date`.
-- **On a volume that folds case, a post asked for as `Venku` was found as `venku` -- and then
-  handled under the name asked for.** Deleted that way it went to `trash/2026/Venku` and came
-  back as `Venku.json` with the slug `venku` inside, which the same archive on Linux cannot
-  read. A post is found by its name to the letter, in the archive and in the trash.
-- **The door's clocks read anything as a number.** `BLOGSH_RUN_SECONDS` or
-  `BLOGSH_LINE_SECONDS` set to a word, to nothing or to `0` made every request a `timeout` after
-  no time at all, and `30m` was thirty seconds; each is a whole number of seconds or
-  `bad_limit`. An engine ended by a signal -- a build killed for memory -- says which one, where
-  the answer read "(status )". And a reason cut to its last 600 bytes is cut where a character
-  ends: cut inside one, the answer was not UTF-8, or was empty.
-- **`props --drop-address` took an address two lists hold out of the first of them,** which
-  was the one `check` had just advised keeping. `--kind` says which list; without it such an
-  address is `address_ambiguous`.
-- **A new file sent under a name the post already has was ignored without a word.** The post
-  kept its picture, which is the rule, and the file lay in `incoming/`. The answer says so in
-  `warnings`, and the file is tidied.
-- **`translations.<lang>.excerpt` was dropped by every save of that translation.** And a
-  translation that was only a title so far opened without the original in front of it.
-- **`check --repair` sent the English reader to the Czech page.** A relative link in the text
-  of another language was rewritten to the post's own address; it is rewritten to the target's
-  page in that language where there is one, and the offer shows both.
-- **Addresses `check` counted and the build does not write, or the other way round.** An old
-  address written with a slash in front of it, a `redirect_from` linked to with a slash after
-  it (the repair then wrote the second spelling down as a second entry), `/en/robots.txt` and
-  `/en/sitemap.xml`. A text filed under the site's own language in `translations` is not read
-  by the build any more -- the post is its own text there -- and `check` names it. The run of a
-  language no longer warns, on every build, about a `redirect_from` whose words a page of that
-  language happens to stand at.
-- **What a language's file says without meaning to.** A menu item or a footer link with no
-  word of its own fell out of that language's menu, with the build blaming `config/site.yml`:
-  it is shown under the site's own word, and `check` says which item. An empty `site.title`
-  left that language's pages untitled: the site's own stands. A tag word YAML read as true,
-  false or a number was called an unknown key. A `fallback` naming a language the site does not
-  publish, a name for a series nobody writes, a file for the site's own language and a
-  `ui_language` the engine cannot lend from each have a sentence of their own. And a dead link
-  in the text of a language taken out of `site.locales` -- on no page -- is no error.
-- **"On this day" in a language with a borrowed interface showed only on the day of a full
-  deploy.** The midnight run rewrote that language's file and did not send it.
-- **`docs/install.md` updated a site in two languages halfway.** Its recipe ran the build script,
-  which renders one language per run, and deployed; the second language stayed as the previous
-  version built it. The recipe is `./blog.sh rebuild`.
-
+- **The skinning guide's selector for the first card matched no card.** It says `:first-of-type`.
+- **A second language's build called a post's own page "already taken"**, on every run.
+- **The cheat sheet's contents list left out the teaser and the link card.**
+- **An export left a post's other languages behind.** An import of it brings them home.
+- **A second language's search, cheat sheet and 404 named the first language's page as their own.**
+- **`doctor` said "0 problems" about a language configuration no language builds on.**
+- **The advice for a language with no locale file sent `ui_language` where it is refused.**
+- **`preview` on a port already in use printed "Serving at" and a stack trace.**
+- **`translate` closed without a change kept the empty template as rescued text.**
+- **Saving a post dropped what an import gave its blocks.** A block the text left alone is kept as stored.
+- **Two deliveries arriving together could swap pictures.** The receiver takes one at a time.
+- **A translation given another address left the old one dead.** It gets a redirect.
+- **A `//` note in a file handed to `add` was published.**
+- **A second language's sitemap and switcher named a listing by type it never wrote.**
+- **A page and a post of one year translated to one slug stopped every language.**
+- **A menu item pointing at part of a page lost its way in another language.**
+- **A language with a borrowed interface said `og:locale="en_US"` on every page.**
+- **The build said what it had to about `config/site.yml` once per language.** Once now, in the site's own.
+- **A `redirect_from` into a language's folder was written by one build and deleted by the next.**
+- **A paragraph beginning `//` was dropped by the next edit of its post.**
+- **A fallback chain ran past the site's own language.** `fallback: [cs, en]` showed a German reader English.
+- **The Jekyll importer cut an image's caption at its first `)`**, and lost one with a straight quote.
+- **`list --tag cats` and `list --tag=` answered with the whole archive.** `--type=` too.
+- **`translate` counted as taken an address only a post with no text in that language had.**
+- **`check --repair` offered to rewrite a relative link in a translation and then could not.**
+- **Saving a translation dropped what markdown has no words for, and kept no version.**
+- **`check --repair` wrote a `redirect_from` into a language's folder.** It rewrites the link instead.
+- **Markdown the engine refuses was refused in English**, and `add <file> --json` answered it in prose.
+- **A paragraph with an unclosed `**` and backslashes after it hung the save.**
+- **`translate` without `--lang` suggested `--lang de` on every site.** It names one the site publishes.
+- **Three pieces of advice in `check` could not be taken.** A `redirect_from` under `/posts/` among them.
+- **The language switch on a later page of a listing by type could lead to a 404.**
+- **A cron wrapper's refusal went to standard output**, which the cron line throws away.
+- **`./style.sh` wrote a sidebar card whose one necessary answer was left empty.**
+- **`./setup.sh --help` said every question can be skipped.** Five cannot while they hold the example.
+- **A slug typed into a picker could not be corrected past its first letter.**
+- **On a site of three languages the switch could not get from one text of a post to the other.**
+- **A language with a borrowed interface was called by its code.** `language_name:` names it.
+- **A moved installation lost its teasers.** An import reads `<!--more-->` as the end of one.
+- **A file named with parentheses, `IMG (1).jpg`, was no picture.**
+- **On a volume that folds case, a post asked for as `Venku` was found as `venku`.**
+- **A new picture in `incoming/` under a name the post already has was ignored without a word.**
+- **Saving a translation dropped its `excerpt`.** And one with only a title opened without the original.
+- **`check` and the build disagreed about which addresses exist.** A slash before or after one, `/en/robots.txt`.
+- **A text filed in `translations` under the site's own language was read by the build.**
+- **A language's file lost a menu item with no word of its own**, and an empty title left its pages untitled.
+- **`docs/install.md` updated a site in two languages halfway.** The recipe is `./blog.sh rebuild`.
 
 ## 1.9 -- 2026-09-28
 
