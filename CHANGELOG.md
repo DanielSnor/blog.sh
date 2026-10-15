@@ -11,6 +11,12 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.11.pre -- 2026-10-15
+
+Opened the morning 1.10 went out, so `version` does not claim a release nobody has cut. What
+goes in is still being decided; the suffix and the date both come off at the tag.
+
+
 ## 1.10 -- 2026-10-15
 
 The release that opens a door for programs. Every screen read before acting, and every action it
