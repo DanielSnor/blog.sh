@@ -1627,6 +1627,13 @@ page of its own, which is once it has two published parts, and the name in
 a series' own heading leads back here, as a tag's leads to `/tag/`. A site
 with no series has no such page.
 
+`series_index:` in `site.yml` says what the page is to the site -- a
+manual's list of chapters is not "Series" -- with `title` for its heading
+and `description` for what a search result says of it; a language file
+may give both in its own words. `order: oldest` lists the series by the
+day each began, the order a manual's chapters were written in; without it
+the newest part leads, as above. `doctor` names an order it does not know.
+
 None of the three needs a menu item to work, but `nav:` in `site.yml` is
 where you would put one; see **Configuration** in the README.
 

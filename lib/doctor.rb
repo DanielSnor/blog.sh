@@ -190,6 +190,7 @@ module Doctor
     findings.concat(of(:social_icons, check_social_icons(data)))
     findings.concat(of(:share, check_share(data)))
     findings.concat(of(:retired_keys, check_retired_keys(data)))
+    findings.concat(of(:series_index, check_series_index(data)))
     findings.concat(of(:trash, check_trash(root)))
     findings.concat(of(:pairing, check_pairing(root)))
     findings.concat(of(:deploy, check_deploy(root)))
@@ -1370,6 +1371,22 @@ module Doctor
       warn(I18n.t('doctor.share_unknown', name: name.to_s,
                                           known: ShareTargets::NAMES.join(', ')))
     end
+  end
+
+  # series_index: the page of every series. A section that is not a map
+  # holds none of the three keys, and an order the build does not know is
+  # read as the default -- newest first -- with nothing saying why.
+  SERIES_INDEX_ORDERS = %w[newest oldest].freeze
+
+  def check_series_index(data)
+    section = dig(data, 'series_index')
+    return [] if section.nil?
+    return [error(t('series_index_shape', value: section.inspect[0, 60]), t('series_index_shape_fix'))] unless section.is_a?(Hash)
+
+    order = section['order']
+    return [] if order.nil? || SERIES_INDEX_ORDERS.include?(order.to_s.strip)
+
+    [warn(t('series_index_order', value: order.to_s, known: SERIES_INDEX_ORDERS.join(', ')))]
   end
 
   # A key the engine has stopped reading. `write:` switched on the /write/

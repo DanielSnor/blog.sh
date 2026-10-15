@@ -31,7 +31,10 @@ module LanguageFile
     'site' => %w[title short_name description],
     'banner' => %w[claim alt],
     'about' => %w[heading html],
-    'footer' => %w[links_heading links note_heading note_html copyright social_heading]
+    'footer' => %w[links_heading links note_heading note_html copyright social_heading],
+    # The heading and the description of /series/ (`order:` is a fact, the
+    # same in every language).
+    'series_index' => %w[title description]
   }.freeze
   # Texts that stand in for something when site.yml leaves them out: the
   # engine's own headings, in the language of the page, and the banner's
@@ -40,7 +43,8 @@ module LanguageFile
   # shows one, in its own words. Every other text translates something
   # site.yml says, and with nothing there it would be a text only this
   # language has.
-  STANDS_IN = %w[about.heading footer.links_heading footer.social_heading banner.claim].freeze
+  STANDS_IN = %w[about.heading footer.links_heading footer.social_heading banner.claim
+                 series_index.title series_index.description].freeze
   # A widget's heading is words; its account, instance and limit are not.
   WIDGET_TEXTS = %w[heading].freeze
   # What the reader of this language sees for a tag: `tags:` maps a tag to

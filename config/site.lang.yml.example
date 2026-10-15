@@ -36,6 +36,7 @@
 #   about       heading, html
 #   footer      links_heading, links, note_heading, note_html, copyright,
 #               social_heading
+#   series_index title, description
 #   nav
 #   widgets     <name>: heading
 #   tags        <tag>: the word for it

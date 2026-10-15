@@ -247,8 +247,8 @@ The keys it takes, and nothing else: `site.title`, `site.short_name`,
 `site.description`; `banner.claim`, `banner.alt`; `about.heading`,
 `about.html`; `footer.links_heading`, `footer.links`,
 `footer.note_heading`, `footer.note_html`, `footer.copyright`,
-`footer.social_heading`; `nav`; `heading` under a widget; `tags`; and
-`series`.
+`footer.social_heading`; `series_index.title`, `series_index.description`;
+`nav`; `heading` under a widget; `tags`; and `series`.
 Everything else in site.yml -- the picture in the banner, the author, the
 address, the colours, the widgets' accounts -- is a fact about the site,
 the same in every language, and a translation of it would be a second site.

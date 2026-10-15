@@ -3644,20 +3644,42 @@ Tags.write_index(tags_map)
 # too different in size for anything a tag's pill does.
 SERIES_PAGES = SERIES_MAP.select { |slug, _| Slug.pageable?(slug) }.freeze
 
+# `series_index:` lets a site call the page what it is to it -- a manual's
+# list of chapters is not "Series" -- and say which way it runs. `order:
+# oldest` lists by each series' FIRST part, the order the chapters were
+# begun in; anything else is the newest part first, as it always was
+# (doctor names a word it does not know). The title and the description
+# stand in for the engine's own, and a language file may give its own.
+SERIES_INDEX = SiteConfig.get('series_index', default: nil).then { |v| v.is_a?(Hash) ? v : {} }
+SERIES_INDEX_TITLE = SERIES_INDEX['title'].is_a?(String) && !SERIES_INDEX['title'].strip.empty? ? SERIES_INDEX['title'].strip : t('series.index_title')
+SERIES_INDEX_DESCRIPTION =
+  if SERIES_INDEX['description'].is_a?(String) && !SERIES_INDEX['description'].strip.empty?
+    SERIES_INDEX['description'].strip
+  else
+    t('series.index_description', site_title: SITE_TITLE)
+  end
+SERIES_INDEX_OLDEST = SERIES_INDEX['order'].to_s.strip == 'oldest'
+
 unless SERIES_PAGES.empty?
-  series_index_rows = SERIES_PAGES.sort_by { |slug, parts| [-parts.map { |part| post_time(part).to_i }.max, slug] }
-                                  .map do |slug, parts|
+  ordered = if SERIES_INDEX_OLDEST
+              SERIES_PAGES.sort_by { |slug, parts| [parts.map { |part| post_time(part).to_i }.min, slug] }
+            else
+              SERIES_PAGES.sort_by { |slug, parts| [-parts.map { |part| post_time(part).to_i }.max, slug] }
+            end
+  series_index_rows = ordered.map do |slug, parts|
     # The years a reader sees on the parts themselves: the displayed date.
     years = parts.map { |part| post_display_time(part).year }.minmax.uniq.join("–")
     %(<li class="series-index-item"><a class="series-index-name" href="#{loc("/series/#{h(slug)}/")}">#{h(series_name(slug))}</a>) +
       %(<sup class="series-index-count">#{parts.size}</sup><span class="series-index-years">#{h(years)}</span></li>)
   end
-  # Names, counts and years are the whole page, so the rows are the whole key.
-  Output.cached_emit(File.join(CONTENT_ROOT, 'series', 'index.html'), Digest::SHA256.hexdigest(series_index_rows.join)) do
-    layout(listing_heading_html(t('series.index_title'), variant: 'series-index', icon: :series, count: SERIES_PAGES.size) +
+  # Names, counts and years are the whole page, with the heading and the
+  # description the site gave it, so those are the whole key.
+  key = Digest::SHA256.hexdigest([SERIES_INDEX_TITLE, SERIES_INDEX_DESCRIPTION, *series_index_rows].join("\n"))
+  Output.cached_emit(File.join(CONTENT_ROOT, 'series', 'index.html'), key) do
+    layout(listing_heading_html(SERIES_INDEX_TITLE, variant: 'series-index', icon: :series, count: SERIES_PAGES.size) +
            %(\n<ul class="series-index">\n#{series_index_rows.join("\n")}\n</ul>),
-           title: "#{t('series.index_title')} – #{SITE_SHORT_NAME}",
-           description: t('series.index_description', site_title: SITE_TITLE),
+           title: "#{SERIES_INDEX_TITLE} – #{SITE_SHORT_NAME}",
+           description: SERIES_INDEX_DESCRIPTION,
            path: loc('/series/'))
   end
 end

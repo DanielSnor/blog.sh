@@ -44,6 +44,7 @@
 #               (banner_claim), (banner_claim_size)
 #   layout      (sidebar), (hero), (lead_card)
 #   nav         (the menu bar: label with tag or url -- or [] for none)
+#   series_index  (title), (description), (order: newest or oldest)
 #   about       (heading), html
 #   widgets     (toots, pixelfed, commits, bluesky, rss, on_this_day)
 #   footer      (links_heading), links, note_heading, note_html, copyright,
@@ -302,6 +303,19 @@ colors:
 #   - { label: "Photography", tag: "photography" }
 #   - { label: "Syntax", url: "/markdown/" }
 # --- end of nav ---
+
+# The page that lists every series, /series/: what it is called, what a
+# search result says about it, and which way it runs. All three optional:
+# without them the heading is the engine's ("Series", in the language of
+# the page) and the series whose newest part is newest stands first.
+# `order: oldest` lists them by the day each began instead -- the order a
+# manual's chapters were written in. A language file may give its own
+# title and description.
+# series_index:
+#   title: "Chapters"
+#   description: "Every chapter of the manual, in the order it was written."
+#   order: oldest
+# --- end of series_index ---
 
 # The sidebar's introduction card. Nothing here is load-bearing: an
 # emptied html takes the card with it, heading and all, and deleting
