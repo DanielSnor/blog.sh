@@ -579,7 +579,7 @@ The post is saved either way; the only hard stop for a video is the
 per-file size limit, and a long 4K clip reaches that on its own -- a
 phone clip out of the share sheet runs about 1.3 MB a second, so the
 24 MB default is roughly seventeen seconds of it. A longer one wants a
-smaller size chosen in the shortcut's own Encode Media step.
+smaller size chosen on the phone before it is sent.
 
 ### Handing over a whole file
 
@@ -678,261 +678,41 @@ standard error.
 
 ### A post sent from the phone itself
 
-**This page and its shortcut are on their way out.** Native apps for iOS
-and Android are in preparation; they reach the engine over the same SSH
-([Over SSH, from an app](#over-ssh-from-an-app)) and need neither. 1.11
-removes `/write/` -- the page and everything published under that
-address -- the `SendPost` shortcut and the `publish.txt` and `drafts.txt`
-requests described below. In 1.10 everything in this section works as
-written -- but for the link that opens a draft
-([Editing a draft from the phone](#editing-a-draft-from-the-phone)) --
-and nothing is being added to it. Two things stay, because the
-apps use them as the page does: the receiver itself,
-`scripts/receive.sh`, and the `receipt:` line of a delivery, which is
-what makes a delivery that arrives twice one post.
+A phone writes through the blog.sh apps for iOS and Android. They reach
+the engine over the SSH the server already has, through one forced
+command ([Over SSH, from an app](#over-ssh-from-an-app)): `./blog.sh
+pair` lets an app in by a code, and a new post travels as a *delivery*
+-- the pictures, then the markdown, down one connection -- which
+`scripts/remote.sh` hands to `scripts/receive.sh`, the receiver this
+section describes.
 
-`write: true` publishes a page at `/write/` to write the post on: a title,
-the text, tags, and photographs each with its description. It keeps what
-is typed in the browser, so closing the tab in a tunnel loses nothing --
-the text in localStorage, the bytes of the pictures and videos in
-IndexedDB, which holds hundreds of megabytes where localStorage holds
-five. The
-page is marked `noindex` and holds no secret of its own -- what sending
-needs is the key, and that lives in the shortcut on the phone. Add it to
-the home screen and it opens as an app -- that is what the manifest among
-the published files is for.
+Until 1.11 there was a second road: a page at `/write/`, switched on
+with `write: true`, and an iOS shortcut, `SendPost`, that carried what
+the page wrote to the same receiver. 1.11 took both out of the engine --
+the page, everything the build published under `/write/` (its
+`site.js`, and the answers it read back from `/write/r/`), and the
+shortcut. A site that still says `write: true` hears about it from
+`doctor` and nothing else changes: the build no longer produces
+`/write/`, so the sweep takes it out of the site like any page nothing
+generates. The receiver stayed as it was, and so did the `receipt:` line
+of a delivery, which is what makes a delivery that arrives twice one
+post.
 
-It also carries a content policy of its own, which is the one thing it
-could not inherit: the page is copied onto the site as a file and never
-goes through the layout every other page is rendered by, so until 1.7 it
-had none. Now it does, and it is a short list -- scripts and styles from
-the blog, pictures and video only as the page's own `data:` and `blob:`
-bytes, one place to connect to (itself, for the receipt), the preview
-frame same-origin, no form action at all, and scripts never inline. A
-reply arriving in the address bar has nowhere to reach even if it
-carried something that ran.
+**Publishing and the drafts, through the receiver.** A delivery of
+exactly one file called `publish.txt`, holding the slug of a draft, is
+not stored: the receiver runs `publish <slug> --yes --json` and answers
+with that. One called `drafts.txt`, holding `all` or the slug of a
+draft, is answered with `drafts --json` -- with a slug, for that draft.
+The word is checked as hard as a filename is, because it becomes an
+argument to a command: a leading dash is a flag, and anything outside a
+slug's own alphabet is refused here rather than explained by whatever it
+hits. The apps ask through `remote.sh` instead; these two are for
+anything that has the receiver and nothing else.
 
-The page is the same file on every site; what is this site's the build
-writes beside it as `write/site.js`: the short name and claim for the
-header, the palette from `colors:` so the page is dressed like the blog,
-the favicon, and every tag the blog has used, with its count of all time
-and of the last twelve months. The tags are offered as they are typed:
-with nothing typed yet, what the blog has tagged in the last year, most
-used first -- not the most used of all time, which on an imported
-archive are the places it came from; then whatever begins with or
-contains the letters so far, searched across every tag. So a tag is
-tapped rather than typed, and typed as it was before instead of the blog
-growing a second spelling of it.
-
-The page speaks the blog's language, `site.lang`, whatever the phone is
-set to; the browser's is used only where there is no `site.js`, or where
-the blog's language is one the page has not been translated into. Above
-the text sits a row of marks -- bold, italic, strikethrough, code, link,
-heading, quote, list, numbered list, code block. A paired mark wraps
-what is selected, and a second tap takes it off; with nothing selected
-it puts the pair in and leaves the caret between. A line mark goes to
-the start of every line the selection touches, and comes off the same
-way. The link mark reads the selection, widened to whole words: an
-address -- `https://…`, or a bare domain, which gets its `https://` --
-becomes a link with the words left to type; words become one with the
-address left to type.
-
-A picture does not travel as it is. The page draws it through a canvas
-first -- 2560 px on its long edge, JPEG at quality 0.88 -- which is what
-makes a post of four photographs fit under the ceiling at all, and it is
-why the file arrives as `vlak-v-chocni.jpg` whatever the phone called it:
-the name is folded to ASCII so the markdown can name it without escaping,
-and a second picture folding to the same name gets `-2`. A picture this
-browser cannot decode -- a HEIC outside Safari -- is passed through
-untouched under its own extension. Send the original by SFTP and use
-`add` if the re-encode is not what you want.
-
-A video goes the same way as a picture -- the same button, the same
-card, the same description -- and into the text as `!![description]
-(clip.mp4)`, two marks where a picture has one. Nothing on the page
-shrinks it: it travels as it is, and the blog says on arrival what it
-says of any phone video (see below). What limits it is the receiver's
-ceiling on one delivery, `BLOGSH_MAX_MB` (24): the page carries that
-number in `site.js`, says under the pictures what happens to a picture,
-what to a video and how much the server takes, and turns the batch line
-red the moment the post outgrows it -- before the phone spends the
-upload finding out. The first tap on Send stops there and says it; a
-second tap sends anyway, because the page's number is the build's and
-the server's may have been raised since. The receiver reads the variable in its own
-environment, the forced command's, and the build reads it in the
-build's; raise it in both places or in neither.
-
-*Preview*, under the text, shows the post as the blog would show it --
-in the blog's own stylesheets, which `site.js` names, with the pictures
-in their places. Near enough, not exact: the engine renders the real
-thing, and the draft's preview after sending is that. What it is for is
-seeing the shape of a post before it leaves the phone.
-
-Pressing send hands the files to iOS: **one for each picture, and one for
-the text**. Nothing is packed for the server: it takes files, not
-archives. A browser that refuses to hand files over at all gets the post
-saved as one archive instead -- a net, so a post written on the way home
-is not lost to a browser that will not share it, rather than a road this
-page offers. `/write/` is for a phone; on a phone the files go over.
-
-**Under Chromium the text is called `<name>.md.txt`.** Chrome and Edge,
-on Android as at a desk, share from a page only a file whose extension is
-on their own list, and `.md` is not on it while `.txt` is; a `.md` is
-refused before any sheet opens, and `canShare` says true all the same.
-The page tells Chromium by `navigator.userAgentData` and names the text
-accordingly; the receiver puts the `.md` back, so whatever takes the
-files on such a phone passes them on under the names it was given and
-nothing else. WebKit keeps `.md`, and must: iOS reads a `.txt` as text
-rather than a file and hands the shortcut its first line for a name. A
-browser the page misjudges gets a second tap -- the refusal says so --
-which sends the text as `.md.txt`. Note what the list also leaves out:
-`.zip`, `.heic` and `.mov`. A video from an Android phone is `.mp4` and
-goes; the saved archive never went anywhere but a shortcut anyway.
-
-**One shortcut, run twice, because the run that receives the files may
-not open an SSH connection.** A shortcut started from the Share Sheet
-runs in Shortcuts' background runner, whose only screen is a banner; *Run
-Script over SSH* asks for a screen there -- the host prompt, the
-first-run privacy question -- and is refused with "This action could not
-be run with the current user interface", before any connection is made.
-The action that would hand the run over to the full app, *Continue in
-Shortcuts App*, is no longer offered. A shortcut started from a URL, on
-the other hand, always runs in the app. So the same shortcut runs twice:
-from the Share Sheet it packs the files into one batch, writes it to a
-file and opens a URL that names itself; from that URL, with nothing
-handed to it, it reads the file back and sends it. The two runs are told
-apart by the one thing that differs between them, whether there is a
-Shortcut Input. One shortcut per blog.
-
-"Show in Share Sheet" on, accepting Images and Files; "If there's no
-input": **Continue** -- not Stop and Respond, because the second run has
-none and has to go on. Then:
-
-1. **If** *Shortcut Input* **does not have any value** -- the second run.
-   Inside it:
-   1. **Get File** `incoming/batch.txt` from the **Shortcuts** folder in
-      iCloud Drive, without the document picker. A folder chosen in the
-      action, not a variable; see the warning below.
-   2. **Run Script over SSH** with that file as the **Input**; the script
-      is the receiver, or the wrapper that reaches it.
-   3. **Base64 Encode** the *Shell Script Result* (Line Breaks: None, if
-      the option is offered; the page copes either way).
-   4. **Delete Files** with the *File* from Get File, *Immediately
-      Delete* on. Without the switch it asks before every post; without
-      the action a batch already sent would wait for the next run that
-      finds nothing to share, and go out a second time.
-   5. **Text**: `https://YOUR-BLOG-URL/write/#b=` followed by the *Base64
-      Encoded* variable, with nothing between them.
-   6. **Open URLs** with that text.
-   7. **Stop and Output** the result, or **Stop This Shortcut** -- the
-      second run ends here and never reaches the loop below.
-
-   **End If.**
-2. **Repeat with Each** over Shortcut Input -- the first run -- and inside it: Get **Name**,
-   Get **File Extension**, then a **Text** holding `mov mp4 m4v MOV MP4
-   M4V` and an **If** *Text contains File Extension*. Inside the If:
-   **Encode Media** the Repeat Item with Size **1280x720**, and **Set
-   Variable** `item` to *Encoded Media*; in Otherwise: **Set Variable**
-   `item` to *Repeat Item*. After End If: **Base64 Encode** `item`, a
-   **Text** of three lines -- `Name.File Extension`, `Base64 Encoded`,
-   `.` -- and **Add to Variable** `batch`.
-
-   The If is what makes a video from the phone fit: a clip from an
-   iPhone, 32.5 MB of HEVC, came out of Encode Media at 5 MB of H.264, in the
-   QuickTime container it arrived in, so the extension the batch names
-   is still right. A picture takes the Otherwise branch untouched. The
-   page cannot know the shortcut does this, so its red line for a video
-   measures the original; send anyway, and the answer says what
-   arrived.
-3. After the loop: **Combine Text** `batch` with New Lines.
-4. **Save File** the combined text to iCloud Drive, into the Shortcuts
-   folder, *Ask Where to Save* off, subpath `incoming/batch.txt`,
-   *Overwrite If File Exists* on -- the same file step 1 reads back.
-5. **Open URLs**: `shortcuts://run-shortcut?name=SendPost`, where
-   `SendPost` is the shortcut's own name, spelled as the library spells
-   it. Rename the shortcut and this line has to change with it; a name
-   without spaces or punctuation saves percent-encoding it.
-
-![The shortcut as the Shortcuts app shows it, with placeholders where the server's details go: the If with Get File, Run Script over SSH, Base64 Encode, Delete Files, the Text with #b=, Open URLs and Stop and Output; then the Repeat with Each loop with the If around Encode Media, Combine Text, Save File, and the Open URLs that names the shortcut itself](shortcut.png)
-
-It can be imported instead of built: [SendPost](shortcuts/SendPost.shortcut),
-signed so that anyone may import it. It arrives called `SendPost`, and
-the last *Open URLs* opens it by that name; rename it and change the name
-there to match. Then fill in what is yours.
-In *Run Script over SSH*: the machine you log into (a host name or an IP
-address), its SSH port, the user, and the path to `scripts/receive.sh` or
-the wrapper that reaches it. In the *Text*: `YOUR-BLOG-URL` is the address
-the site is served at, `base_url` in `config/site.yml`. The SSH action
-carries no key; pick or generate one there and put its public half on the
-server, as the key line below shows.
-
-⚠️ **Pasting actions between shortcuts rewires them.** Shortcuts reconnects
-a pasted action's inputs to whatever stands above the place it lands. A
-Get File copied in this way came back reading from a *Text*, then from
-*If Result*, then from *Shortcut Input* -- which is empty in the second
-run, so it read nothing, the SSH action sent nothing, and the server
-answered `empty_input` for a batch that was whole. After any paste or
-move, check that Get File still reads *from Shortcuts*, and that the SSH
-*Input* and *Delete Files* both name the *File* it produces.
-
-**It runs on a Mac as well.** The Shortcuts app there has the same
-shortcut through iCloud, Safari's Share Sheet offers it, and the terminal
-runs it: `shortcuts run SendPost` with a `batch.txt` in the Shortcuts
-folder sends that batch and prints the address it would have opened --
-which is how the sending half is tested without a phone. `/write/`
-itself is still made for a phone.
-
-Base64, not URL Encode, and not for taste: Shortcuts reads a reply
-that is JSON as a Dictionary and then refuses to hand a Dictionary to
-URL Encode -- "couldn't convert from Dictionary to Text" -- on exactly
-the replies that matter, the refusals. Base64 Encode takes anything.
-(The page also still reads a percent-encoded reply after `#r=`.)
-
-Base64 Encode, the Text and Open URLs carry the answer back to the page. It opens with the
-reply after `#b=` -- a fragment, so it never leaves the browser -- and
-says what the server did: the pictures it kept, the draft's preview
-address or the post's public one, the command that publishes a draft
-from a keyboard, and a refusal in the reader's language where the page
-knows the code, in the server's own words where it does not. A post the
-server took is cleared from the device; a refusal keeps everything, so
-it can be mended and sent again.
-
-**And the page asks, as well as waiting.** That road back has one break
-in it that nothing on this end can mend: a page kept on a phone's home
-screen runs with storage of its own, so a reply that arrives as a URL
-opens in the browser, where the draft it is about does not exist -- and
-the draft stays on the home-screen copy, looking unsent. So the page
-picks a name for its answer before it sends anything (`receipt:`, sixteen
-hexadecimal characters, written into the markdown), and the build leaves
-a small JSON file at `/write/r/<receipt>.json` saying the slug, the
-state, the title, the address, and whatever the save had to complain
-about -- a picture whose size could not be read, a video that will make
-the reader wait, a player that was not found. The page draws those the
-way it draws the answer that comes back through the address bar, because
-the phone is the one place with no terminal to read them in. Only what
-was said about the POST: the file is served to anyone who has the
-sixteen characters, so what the run says about the SITE afterwards (a
-missing `base_url`, whatever the rebuild warns about) stays out of it.
-The page asks for it every three seconds for fifteen minutes, and says
-so if it never comes; a page reopened later asks once more, and shows
-the answer or says it did not come. Whichever answer arrives first is
-the one that is shown.
-
-The file is written by the BUILD, which is what keeps it true: publish
-the post and the next build says published and gives the public address;
-delete the post and nothing generates the file, so the sweep takes it
-away. It exists only on a site that serves the page, and only for a post
-that asked for one.
-
-**Publishing from the phone.** The answer for a draft carries a Publish
-button, and it sends one file called `publish.txt` holding the slug --
-down the same connection, through the same shortcut. The receiver
-knows that shape: exactly one file, called that, and it runs
-`publish <slug> --yes --json` rather than storing anything. The slug is
-checked as hard as a filename is, because it becomes an argument to a
-command: a leading dash is a flag, and anything outside a slug's own
-alphabet is refused here rather than explained by whatever it hits. The
-page then asks the same receipt again until it says published.
+A file named `<name>.md.txt` is taken as `<name>.md`. Chromium shares
+from a page only a file whose extension is on its own list, and `.txt`
+is on it while `.md` is not; the receiver puts the `.md` back before it
+checks the names, so `a.md` beside `a.md.txt` is one name twice.
 
 ### Editing a draft from the phone
 
@@ -943,17 +723,11 @@ This is what an app does: it asks the blog for its drafts
 [header keys](#writing-and-publishing) for what such a save keeps and
 what it refuses.
 
-The page was given a link for it too, *Open a draft from the blog*,
-which sends one file, `drafts.txt`, through the shortcut and waits for
-the list of drafts in the address. Tried on a tablet it loaded nothing,
-and it is not being repaired: the page is frozen and leaves in 1.11.
-
 **A delivery that arrives twice is one post.** The receipt is minted once
 per send, immediately before the files it names are built, so two
 deliveries carrying the same one are the same send arriving twice --
 which is what a connection that breaks after the bytes have gone but
-before the answer comes back produces, and both the shortcut and the
-Termux script retry. The second delivery updates the post the first one
+before the answer comes back produces, and the apps retry. The second delivery updates the post the first one
 wrote instead of founding another beside it -- and that holds when the
 retry arrives while the first is still being written, because writes
 carrying a receipt take turns. Once the post is **published**, a late
@@ -963,21 +737,13 @@ The copy the phone is still holding was made before publishing happened
 and cannot know about it, so letting it write would put the post back to
 draft -- with a new address, a new date and the announcement pointing at
 nothing. Pressing send again is not
-that: the page mints a fresh receipt each time, so a second send is a
+that: the app mints a fresh receipt each time, so a second send is a
 second post. A delivery carrying no receipt at all -- anything
 hand-rolled -- has nothing to be recognised by, and a repeat of one is
 two posts as it always was.
 
 One connection carries the post however many photographs are in it, which
-is the point: connections are the scarce thing, not bytes. The first run
-in the app asks whether the shortcut may send its items to the host --
-answer Always Allow; that is the very question the background runner
-could not put on screen.
-
-The page that sent the files sees the share end in an abort -- that is
-how the hand-off to the app looks from a web page, not a failure -- so it
-says the files have left. The answer arrives when the second run opens the
-page again with it.
+is the point: connections are the scarce thing, not bytes.
 
 The order inside the batch matters, because the markdown arriving is what
 makes the post and everything its text names has to be on the server by
@@ -986,9 +752,8 @@ and nothing breaks -- the engine answers `missing_images` and writes
 nothing, and sending the text again once the pictures are up is all it
 takes.
 
-**Draft or public is decided when the post is sent.** The page has a
-switch, Draft or Publish now; Draft is the default and writes nothing.
-Publish now writes `publish: yes` into the front matter, and `add` then
+**Draft or public is decided when the post is sent.** A post is a
+draft unless its front matter says `publish: yes`, and then `add`
 takes the road `publish <slug> --yes` takes at a desk: the date is
 settled, the announcement goes out to the networks the site has
 configured, the site is rebuilt and deployed, and the answer carries the
@@ -1025,7 +790,7 @@ of the stream either way -- so half a photograph arrived, decoded into
 half a picture, and was answered with `ok`. Without the dot the transfer
 is refused as `truncated` and nothing is stored.
 
-A shortcut on a phone sends a whole post that way -- every picture, then
+An app sends a whole post that way -- every picture, then
 the markdown, down one connection -- and **the markdown last**, because
 the markdown arriving is what makes the post. Everything its text names
 is already staged under the name it
@@ -1033,19 +798,16 @@ uses, so there is no other signal to send and none is needed. The answer
 to a picture is `{"ok":true,"stored":"photo.jpg"}`; the answer to the
 markdown is the same JSON `add --json` gives.
 
-⚠️ **The shortcut has to SHOW the answer, or every refusal looks like it
-worked.** A refusal leaves with zero -- deliberately, because iOS Shortcuts
-discards the output of a remote command that failed, and the reason is the
-whole point of the answer. The cost is that Shortcuts then reports a tick
-for a refusal exactly as it does for a post. End the shortcut by opening the
-page with the answer, as the second run above does, or with a *Show Content*
-of the SSH output. The reply is one JSON object per file, so read it
+⚠️ **A sender has to read the answer, or every refusal looks like it
+worked.** A refusal leaves with zero -- deliberately, because a phone
+discards the output of a remote command that failed (iOS Shortcuts did,
+which is how this was learned), and the reason is the whole point of the
+answer. The cost is that the status alone reports a refusal exactly as
+it reports a post. The reply is one JSON object per file, so read it
 whole: a picture answers `"ok":true` and the name it was `stored` under,
 a refusal answers `"ok":false` and names the reason, and the post that
 was written answers with its `slug` (and, since 1.10, `"ok":true` like
-every other answer). Without that, a shortcut whose Input field is empty connects,
-waits out the thirty-second deadline, is refused for `empty_input`, and
-shows a tick -- which is a slow, silent way to learn nothing.
+every other answer).
 
 **The exit code answers a different question from the JSON.** Zero means
 an answer arrived -- read the object, which says `"ok"` and, when that is
@@ -1090,10 +852,7 @@ uploaded twice.
 **Nothing new listens on the network.** It travels over the SSH the
 server already has, and the key it travels on wants a forced command:
 
-    restrict,command="/path/to/blog/scripts/receive.sh" ssh-rsa AAAA... phone
-
-The key has to be RSA. Shortcuts' *Run Script over SSH* does not speak
-ed25519 and says nothing when it meets one -- the run simply fails.
+    restrict,command="/path/to/blog/scripts/receive.sh" ssh-ed25519 AAAA... phone
 
 **What a stranger chooses is a filename and some bytes**, so that is what
 is checked. A name carrying a path or a backslash, beginning with a dot,
@@ -1103,9 +862,8 @@ is bounded before it lands rather than weighed afterwards:
 `BLOGSH_MAX_MB` (24) is a ceiling on reading, so a sender costs that
 much and not whatever they felt like sending. The number is measured on
 the encoded stream, not on the files -- base64 is a third larger -- so a
-24 MB ceiling takes about eighteen megabytes of photographs; the page's
-legend says the same, and the red line it draws counts the encoded
-size. A delivery that overshoots
+24 MB ceiling takes about eighteen megabytes of photographs, and the
+apps measure a delivery the same way before they send it. A delivery that overshoots
 is read to its end into nothing -- up to four times the ceiling -- and
 then refused, so the sender finishes and hears `too_large`; refused the
 moment the ceiling was reached, a phone with megabytes still to send sat
@@ -1117,16 +875,15 @@ named only by a bare filename -- `![](/etc/passwd)` is refused
 (`bad_reference`), because otherwise it would read that file into the
 post and publish it.
 
-**Raising the ceiling is two settings, not one.** The receiver reads
-`BLOGSH_MAX_MB` from its own environment -- the one the forced command
-runs in: put it in the key's line, `command="BLOGSH_MAX_MB=64
+**Raising the ceiling is one setting, in the right place.** The
+receiver reads `BLOGSH_MAX_MB` from its own environment -- the one the
+forced command runs in: put it in the key's line, `command="BLOGSH_MAX_MB=64
 /path/to/blog/scripts/receive.sh"`, or, where the command is a wrapper
 that enters a container, in that wrapper (`docker exec -e
-BLOGSH_MAX_MB=64 …`). The page at `/write/` never asks the server; it
-shows the number the BUILD saw in `BLOGSH_MAX_MB` when it wrote
-`site.js` -- so set the same value where the build runs (`env.sh`) and
-rebuild, or the page will warn at 24 while the server takes 64, or say
-nothing while the server refuses. Unset on both sides, both say 24.
+BLOGSH_MAX_MB=64 …`). An app learns the number from `version --json`,
+which runs through the same door in the same environment, so the two
+agree. (Until 1.11 the `/write/` page showed the number the BUILD had
+seen, which was a second place to set it.)
 
 There is deliberately no archive. An earlier design took a ZIP and
 unpacked it here; three adversarial audits found blocking faults in three
@@ -1241,7 +998,7 @@ and a number only in `on-this-day`, which counts with it.
 
 A program on another machine -- the blog.sh app on a phone, a script --
 reaches the engine over the SSH the server already has, on a key of its
-own with a forced command, the way the phone's shortcut does:
+own with a forced command, the way `receive.sh` is reached:
 
     restrict,command="/path/to/blog/scripts/remote.sh" ssh-ed25519 AAAA... app
 
@@ -1334,7 +1091,7 @@ An engine that a signal ended -- a build killed for memory on a small
 server -- is `engine_failed` naming the signal, to a request and to a
 delivery alike, and an answer is always valid UTF-8 whatever the engine
 printed.
-Unlike the shortcut's key this one may
+The key may
 be ed25519; the forced command runs in the same environment
 `receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.
 
@@ -1353,8 +1110,8 @@ the engine that was. What a second send does:
   `receipt:`, a name the sender makes up once for the post (sixteen
   hexadecimal characters), and then the second delivery is the first one
   arriving again and updates the post it wrote ([A delivery that arrives
-  twice is one post](#a-post-sent-from-the-phone-itself)). The line is
-  the apps' as much as the page's, and stays when `/write/` goes.
+  twice is one post](#a-post-sent-from-the-phone-itself)). The apps write
+  it on every post they send.
 - An edit or a translation -- a file saying `edits:` and `base:` --
   delivered twice is `changed` the second time: `base:` is the digest of
   the post's file, and the first delivery changed it. The answer to a
@@ -2709,7 +2466,7 @@ whole), but restoring from the archive itself is exact.
 | A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `bad_markdown` is markdown no blocks can be made of -- a picture inside a sentence, a video with no caption -- and the message says where; `unknown_frontmatter_key` names a header line the engine does not know, `not_text` a file that is not UTF-8 text, `empty` one with nothing under its header. A file is read as the post when its name ends in `.md` (or `.md.txt`); under any other name, `.markdown` included, it is kept as an attachment. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
 | `name_taken` from the receiver | Something in `incoming/` under that name is not a plain file -- a directory, or a symlink. Nothing was replaced; clear the name on the server. |
 | `busy` from the receiver | Another delivery was still being taken in when this one had waited as long as it waits (`BLOGSH_TURN_SECONDS`, 300). Nothing of this one was stored; send it again. |
-| `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the shortcut's command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. Every one of them answers with its code and leaves with a zero status, the same as any other refusal: the phone discards the output of a command that failed, and these are the answers a first delivery to a new install most needs to read. |
+| `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the key's forced command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. Every one of them answers with its code and leaves with a zero status, the same as any other refusal: the phone discards the output of a command that failed, and these are the answers a first delivery to a new install most needs to read. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |
 | sftp deploy hangs | It's waiting for a password -- the sftp backend needs key-based auth (see [install.md](install.md#sftp-hosts-with-neither-rsync-nor-git)). |

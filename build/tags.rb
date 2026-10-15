@@ -5,7 +5,8 @@
 #
 # Three functions, called where the three parts always ran in
 # build_blog.rb, so the pages are written in the order they always were:
-# `collect` early, because the writing app's site.js counts the tags too;
+# `collect` early, as it always ran (the writing app's site.js counted the
+# tags too, until 1.11);
 # `write_pages` once the menu (and with it FEED_TAG_SLUGS) is known;
 # `write_index` after them. The map `collect` returns is the build's --
 # the sitemap and the feeds read it later.

@@ -1234,6 +1234,8 @@ pair:
 doctor:
   pairing_leftover: "%{path} still holds a line from a pairing code that ran out (%{count}). It opens nothing: the engine refuses that key once its code has run out, even where SSH would still let it through."
   pairing_leftover_fix: "./blog.sh pair --list tidies it away."
+  write_retired: "`write:` is still in config/site.yml, and since 1.11 nothing reads it: the /write/ page and the SendPost shortcut were taken out of the engine. Posts come from the apps now, through scripts/remote.sh."
+  write_retired_fix: "Delete the write: line from config/site.yml."
   json_and_strip: "❌ --json and --strip-location cannot run together: --json is a document about the installation as it stands, --strip-location rewrites photographs. Run them one at a time."
   tag_icons_ok: "Tag icons: %{count}, all of them drawable."
   tag_icon_stripped: "The `icon_svg` of the tag \"%{tag}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from, and whoever wrote it should say whether that source is worth trusting."

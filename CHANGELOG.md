@@ -16,6 +16,12 @@ prints what an installation is running.
 Opened the morning 1.10 went out, so `version` does not claim a release nobody has cut. What
 goes in is still being decided; the suffix and the date both come off at the tag.
 
+### Removed
+
+- **The `/write/` page and the `SendPost` shortcut.** A phone writes in the apps; `write:` is no longer read, and `doctor` says so.
+- **What the build wrote for the page.** `/write/site.js` and the answers under `/write/r/`; the next deploy takes them off the site.
+- **`publish.txt` and `drafts.txt` stay after all.** 1.10 said they would go; `receive.sh` is unchanged, `receipt:` with it.
+
 
 ## 1.10 -- 2026-10-15
 

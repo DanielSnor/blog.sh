@@ -1257,18 +1257,18 @@ module PostWriter
   # it one: everything typed by a person is {platform: manual} with no
   # original_id, and matching two of those to each other would overwrite
   # one piece of somebody's writing with another. A receipt is different
-  # -- the page mints it per SEND, immediately before building the files
-  # it is written into, so two deliveries carrying one receipt are one
+  # -- the sender mints it per SEND (an app; the /write/ page did until
+  # 1.11), immediately before building the files it is written into, so two deliveries carrying one receipt are one
   # send that reached this machine twice.
   #
   # Which does happen: the delivery is a pipe that can break after the
-  # bytes have arrived and before the answer gets back, and both the
-  # shortcut and the Termux script retry. Without this the retry made a
+  # bytes have arrived and before the answer gets back, and the apps
+  # retry, as the shortcut and the Termux script did. Without this the retry made a
   # second post, the receipt answered with the first one, and the copy
   # sat in the archive with nothing pointing at it -- invisible to the
   # person who wrote it, because their phone was told about the other one.
   #
-  # Pressing send twice is NOT this: the page mints a fresh receipt each
+  # Pressing send twice is NOT this: the sender mints a fresh receipt each
   # time, so those are two posts, which is what asking twice means.
   def self.receipts
     return @receipts if @receipts

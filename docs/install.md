@@ -297,9 +297,6 @@ The example is fully commented. The short version:
   `share` (the row of controls under a post, drawn in the order you name
   them --
   [operations.md](operations.md#letting-a-reader-pass-a-post-on)),
-  `write` (`write: true` publishes a page at `/write/` to write a post on
-  from a phone --
-  [operations.md](operations.md#a-post-sent-from-the-phone-itself)),
   and `seo`
   (`block_ai_crawlers` writes a maintained list of the crawlers that
   collect text to train on into `robots.txt`, `robots_extra` is appended
@@ -346,7 +343,7 @@ English per key. Adding another language is data, not code -- see
 `site.locales` is the list of languages the site **publishes**, and it is
 only needed when that is more than one. The language in `site.lang` keeps
 the site root; every other one is built into a root of its own (`/de/`),
-with one copy of `/assets/` and one writing app shared between them. The
+with one copy of `/assets/` shared between them. The
 words of a post in another language are written with `./blog.sh translate`
 (see [operations.md](operations.md#writing-a-post-in-another-language)),
 and `./blog.sh rebuild` produces every language in one go. Leave the key
@@ -782,10 +779,9 @@ variant:
    photos are uploaded there by name and referenced as bare filenames
    in posts (see
    [operations.md](operations.md#writing-from-a-phone)).
-4. For a post sent whole from a phone, add the key the shortcut uses to
-   `authorized_keys` with a forced command pointing at
-   `scripts/receive.sh` -- the line, the RSA requirement and the size
-   ceiling are in
+4. For a post sent whole by a script, add its key to `authorized_keys`
+   with a forced command pointing at `scripts/receive.sh` -- the line
+   and the size ceiling are in
    [operations.md](operations.md#a-post-sent-from-the-phone-itself).
    Nothing new listens on the network; it travels over the SSH the
    server already has. The blog.sh app on a phone or a tablet uses the

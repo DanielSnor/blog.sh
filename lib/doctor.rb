@@ -189,6 +189,7 @@ module Doctor
     findings.concat(of(:tag_icons, check_tag_icons(data)))
     findings.concat(of(:social_icons, check_social_icons(data)))
     findings.concat(of(:share, check_share(data)))
+    findings.concat(of(:retired_keys, check_retired_keys(data)))
     findings.concat(of(:trash, check_trash(root)))
     findings.concat(of(:pairing, check_pairing(root)))
     findings.concat(of(:deploy, check_deploy(root)))
@@ -1369,6 +1370,17 @@ module Doctor
       warn(I18n.t('doctor.share_unknown', name: name.to_s,
                                           known: ShareTargets::NAMES.join(', ')))
     end
+  end
+
+  # A key the engine has stopped reading. `write:` switched on the /write/
+  # page, which 1.11 took out together with the SendPost shortcut: left in
+  # the config it does nothing at all, and nothing else would ever say so
+  # -- somebody reading the file years later would look for a page that
+  # is not there. Present at all is enough, whatever it says.
+  def check_retired_keys(data)
+    return [] unless data.is_a?(Hash) && data.key?('write')
+
+    [warn(t('write_retired'), t('write_retired_fix'))]
   end
 
   # What is in the trash, said out loud once in a while. Not an error: a

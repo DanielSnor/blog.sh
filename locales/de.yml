@@ -1217,6 +1217,8 @@ pair:
 doctor:
   pairing_leftover: "In %{path} steht noch eine Zeile von einem abgelaufenen Kopplungscode (%{count}). Sie öffnet nichts: die Engine weist diesen Schlüssel ab, sobald sein Code abgelaufen ist, auch wo SSH ihn noch durchließe."
   pairing_leftover_fix: "./blog.sh pair --list räumt sie weg."
+  write_retired: "In config/site.yml steht noch `write:`, und seit 1.11 liest es nichts mehr: die Seite /write/ und der Kurzbefehl SendPost sind aus der Engine entfernt. Beiträge schicken jetzt die Apps über scripts/remote.sh."
+  write_retired_fix: "Lösche die Zeile write: aus config/site.yml."
   json_and_strip: "❌ --json und --strip-location gehen nicht zusammen: --json beschreibt die Installation, wie sie ist, --strip-location schreibt Fotos um. Führe sie einzeln aus."
   tag_icons_ok: "Schlagwort-Symbole: %{count}, alle zeichenbar."
   tag_icon_stripped: "Das `icon_svg` des Schlagworts „%{tag}“ enthält etwas, das die Engine vor dem Rendern entfernt — ein Skript, ein Style, einen Event-Handler oder eine javascript:-Adresse. Die Seiten sind sicher; das Symbol ist aber nicht mehr das, woher es kopiert wurde."

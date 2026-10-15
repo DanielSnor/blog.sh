@@ -76,7 +76,7 @@ around one workflow rather than around the general case.
   readable, greppable and backed up by copying it.
 - **Authoring is a command.** `./blog.sh` writes, edits, publishes,
   schedules and deploys. A phone writes in an app over the SSH the server
-  already has; the `/write/` page does it too, until 1.11.
+  already has.
 - **The deploy is paranoid.** A SHA-256 manifest ships only what changed,
   and refuses when the file count or the byte total swings too far from
   the last build it accepted.
@@ -92,7 +92,7 @@ Each part says where it is described in full.
 
 - **Content.** One post is one JSON file, `content.nosync/posts/<year>/<slug>.json`, holding typed blocks. Drafts, scheduled posts, pages, unlisted posts, series, tags and a trash with restore. → [architecture.md](docs/architecture.md#content-model)
 - **Writing.** `./blog.sh` bare is a menu; every command also works directly: add, edit, publish, schedule, unpublish, delete, restore, rename, re-announce. `add <file>` takes a markdown file and asks nothing; `--json` answers as one object. On a Mac, `./setup.sh --launcher` puts an icon in Applications that opens it. → [operations.md](docs/operations.md#writing-and-publishing), [install.md](docs/install.md#macos)
-- **From a phone.** Native apps for iOS and Android, in preparation, reach the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut work as before and leave in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
+- **From a phone.** Native apps for iOS and Android, in preparation, reach the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut were taken out in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
 - **Markdown.** One parser, shared by the build and the authoring tool, with a cheat sheet the parser generates for your own site at `/markdown/`. Editing a post round-trips through it. → [operations.md](docs/operations.md#writing-and-publishing)
 - **Search, and the other ways to find a post.** Full text over the whole archive, entirely in the
   reader's browser -- no server, no index service, nothing called from outside, on a site of any
@@ -149,14 +149,11 @@ locales/                 UI strings for the generated site and the CLI (en.yml, 
 templates/               ERB templates (layout, post, index, search, partials)
                          + markdown-cheat-sheet.<lang>.md, the /markdown/ page's source
 assets/                  CSS/JS/fonts (drop your own images into assets/images/)
-write/                   The page served at /write/ when write: true -- the editor itself, its
-                         locale sources and the script that turns them into i18n.js
 config/site.yml.example  Documented config template -- copy to config/site.yml (gitignored) per deployment
 config/site.lang.yml.example  One more published language, described -- copy to config/site.<lang>.yml
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment
 docs/                    Install, operations, importing, architecture, decisions, skinning and
-                         localization guides; this README's screenshots; and shortcuts/,
-                         the shortcut that sends a post from a phone (iOS, and macOS too)
+                         localization guides; this README's screenshots
 
 content.nosync/, media.nosync/, public.nosync/, incoming/, trash/, drafts/, env.sh, config/site.yml
                          Per-deployment/generated, not part of the engine -- see .gitignore
@@ -480,8 +477,9 @@ copy button on code blocks were both their requests -- a blog of terminal
 how-tos wanted them first.
 
 [pavelchcepsat.cz](https://pavelchcepsat.cz) is a personal blog in Czech,
-and the first to be written from an Android phone: the writing app sends
-its text from Chrome and Edge because its owner tested what they refuse.
+and the first to be written from an Android phone: the `/write/` page of
+its day sent its text from Chrome and Edge because its owner tested what
+they refuse.
 
 [archive.bierfaristo.com](https://archive.bierfaristo.com) is the largest
 archive we know of running this engine, some 13,700 posts -- a working

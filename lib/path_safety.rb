@@ -10,7 +10,7 @@
 # meant several different answers and one missing one. The Jekyll importer
 # hands back the slug from a blogsh: front matter unchanged, on the
 # grounds that our own export wrote it, so a "../" in one travels all the
-# way to File.join; the /write/ receipt id is checked against the same
+# way to File.join; the receipt id a phone sends is checked against the same
 # regex written out twice, once in the CLI and once in the build; and the
 # checker's own slug test runs after the fact, when the directory is
 # already there.
@@ -36,7 +36,7 @@ module PathSafety
   # is a copy that drifts.
   SEGMENT_MAX_BYTES = 255
 
-  # draft_token and the /write/ receipt id are both SecureRandom.hex(8).
+  # draft_token and the receipt id an app sends are both SecureRandom.hex(8).
   TOKEN_LENGTH = 16
 
   # Separators, NUL and the C0 range. A newline in a filename is legal on

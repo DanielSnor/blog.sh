@@ -374,13 +374,13 @@ SITE_LOCALE = if SITE_LANG == SiteConfig.get('site', 'lang', default: 'en').to_s
 # of its own, in the same output tree, so the two are merged by simply
 # existing side by side.
 #
-# /assets/ and /write/ are NOT in it: one copy of the stylesheet, the
-# pictures and the writing app serves every language, and duplicating them
-# per language would mean a second cache-buster for identical bytes.
+# /assets/ is NOT in it: one copy of the stylesheet and the pictures
+# serves every language, and duplicating them per language would mean a
+# second cache-buster for identical bytes.
 SITE_OWN_LANG = SiteConfig.get('site', 'lang', default: 'en').to_s
 LANG_ROOT = SITE_LANG == SITE_OWN_LANG ? '' : "/#{SITE_LANG}"
 CONTENT_ROOT = LANG_ROOT.empty? ? PUBLIC_DIR : File.join(PUBLIC_DIR, SITE_LANG)
-SHARED_ROOTS = %w[/assets/ /write/].freeze
+SHARED_ROOTS = %w[/assets/].freeze
 
 # Everything about languages -- addresses inside this run's language, the
 # stand-in for a missing text, the sweep's share of the tree, alternates,
@@ -2693,26 +2693,6 @@ PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
 
   Output.emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
-# The writer: a page the owner opens on a phone, writes a post in, and
-# hands to a shortcut that carries it to scripts/receive.sh. Off unless a
-# site asks for it -- it is a page for whoever runs the blog, not for the
-# people reading it, and a site with no use for it should not carry the
-# weight or answer for the address.
-#
-# ⚠️ A NAMED LIST, not the directory. write/ also holds the locale sources
-# and the script that turns them into i18n.js, and neither belongs on a
-# public web server; a directory copy would publish whatever anyone ever
-# dropped in there, which is how a note-to-self becomes a URL.
-WRITE_FILES = %w[index.html app.js i18n.js manifest.webmanifest].freeze
-if SiteConfig.get('write', default: false)
-  WRITE_FILES.each do |name|
-    src = File.join(ROOT, 'write', name)
-    next unless File.file?(src)
-
-    Output.emit_copy(src, File.join(PUBLIC_DIR, 'write', name), compare_content: true)
-  end
-end
-
 Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
                         plain_banner: !BANNER_SHOW_IMAGE,
@@ -3615,95 +3595,9 @@ end
 page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post,
                            lead: LAYOUT_LEAD_CARD)
 
-# Which tags the posts carry, by address (build/tags.rb). Early, because
-# the writing app below counts them too; the sitemap reads the map at the end.
+# Which tags the posts carry, by address (build/tags.rb): the tag listings
+# below are made from it, and the sitemap reads it at the end.
 tags_map = Tags.collect(posts)
-
-# What the writer page knows about the blog it belongs to, written beside
-# it as site.js: the name and claim for its header, the palette so it is
-# dressed like the blog, the favicon, and every tag the blog has used with
-# a count, so a tag can be tapped rather than typed -- and typed the way
-# it was typed before, instead of growing a second spelling. Generated
-# here rather than kept in write/, because all of it is this site's, and
-# the page itself is the same file on every site.
-#
-# 🪤 Only in the run of the site's own language. /write/ is one shared copy
-# at the root, and every language run used to write this file into it --
-# so the last run won: blogsh.app, an English site, served its writing app
-# in Czech and marked the previews lang="cs". The author writes in the
-# site's own language, and that run always goes first, so the others have
-# nothing to add.
-if SiteConfig.get('write', default: false) && SITE_LANG == SITE_OWN_LANG
-  # Each tag with two counts: all time, and the last twelve months. The
-  # page ranks an empty field by the second -- what the blog is tagging
-  # NOW -- because all time is led by where an archive came from
-  # (twitter, tumblr, an old blog), and nobody tags a new post with
-  # those. Typing searches every tag, ranked by all time.
-  recent_since = Time.now - (365 * 24 * 60 * 60)
-  tag_counts = tags_map.map do |_slug, data|
-    recent = data[:posts].count { |post| post_time(post) >= recent_since }
-    [data[:name].to_s, data[:posts].length, recent]
-  end
-  tag_counts.sort_by! { |name, count, recent| [-recent, -count, name.downcase] }
-  site_facts = {
-    'name' => SITE_SHORT_NAME,
-    'claim' => SiteConfig.get('banner', 'claim', default: nil) || SITE_DESCRIPTION,
-    'lang' => SITE_LANG,
-    'favicon' => (File.file?(FAVICON_PNG) ? '/assets/images/favicon.png' : nil),
-    'colors' => SITE_COLORS,
-    # The stylesheets a post page wears, in order, so a preview can wear
-    # the same ones.
-    'css' => ['/assets/css/colors.css', '/assets/css/site.css'] + EXTRA_CSS,
-    # The receiver's ceiling on one delivery, as this build sees it, so the
-    # page can say "too big" before the phone spends the upload finding
-    # out. The receiver reads the same variable in ITS environment -- the
-    # forced command's -- so raise it in both places or in neither.
-    'max_mb' => (ENV['BLOGSH_MAX_MB'] || 24).to_i,
-    'tags' => tag_counts
-  }
-  Output.emit(File.join(PUBLIC_DIR, 'write', 'site.js'),
-       "// Generated by the build from config/site.yml and the posts -- do not edit.\n" \
-       "window.BLOG_SITE = #{JSON.generate(site_facts)};\n")
-
-  # A RECEIPT for a post that arrived carrying one: a small answer at an
-  # address the sender knew before it sent anything, so the page that
-  # wrote the post can ask what became of it.
-  #
-  # It exists because the road the answer takes today has one break in it
-  # that nothing on this end can mend: a page added to a phone's home
-  # screen has storage of its own, and the reply -- which arrives as a URL
-  # -- opens in the browser instead, where the draft it is about is not.
-  # So the page asks rather than waits.
-  #
-  # Written by the BUILD rather than by the save, which is what makes it
-  # keep up: publish the post and the next build says published and gives
-  # the public address; delete it and the file stops being produced, and
-  # the sweep takes it away like any other page nothing generates.
-  (posts + drafts + pages + unlisted_posts).each do |post|
-    name = post['receipt'].to_s
-    # The same predicate the CLI checks the incoming receipt with. It was
-    # this regex, written out in both places.
-    next unless PathSafety.hex_token?(name)
-
-    # `warnings` under the same name the engine's own `add --json` answer
-    # uses, because the page renders both with the same lines. Without it
-    # a post that arrived with a complaint -- an unreadable picture, a
-    # video that will make the reader wait -- looked identical on the
-    # phone to one that arrived clean, and the phone is the one place
-    # where nobody can go and read the terminal instead.
-    #
-    # Whatever the save left in the post, and nothing gathered here: the
-    # build's own warnings are about the whole site (another post's tag,
-    # somebody else's dead link), and this file is served to anyone who
-    # has the sixteen characters.
-    Output.emit(File.join(PUBLIC_DIR, 'write', 'r', "#{name}.json"),
-         "#{JSON.generate('slug' => post['slug'].to_s,
-                          'state' => post['state'].to_s,
-                          'title' => post_title_for(post).to_s,
-                          'url' => SITE_BASE_URL.empty? ? '' : "#{SITE_BASE_URL}#{post_href(post)}",
-                          'warnings' => Array(post['receipt_warnings']).map(&:to_s))}\n")
-  end
-end
 
 # A feed per tag, but only for the tags the site's own menu points at.
 #

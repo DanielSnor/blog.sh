@@ -422,7 +422,7 @@ places than site.yml's (`lib/language_file.rb`, which the build asks too).
 The addresses a site answers at are worked out per language on the same
 terms the build uses: every listing exists in every language `site.locales`
 names, a POST exists in a language only if it has words there, and
-`/assets/` and `/write/` are shared and have no copy per language.
+`/assets/` is shared and has no copy per language.
 
 A question that raises is **one finding, not the end of the run**: every
 question is asked through a guard that turns an exception into an error
@@ -653,19 +653,17 @@ post says in them.
 - **Roots.** The site's own language keeps the site root (`LANG_ROOT` is
   empty); every other writes under `/<lang>/` (`CONTENT_ROOT`). `loc()`
   turns a site path into this language's, and `SHARED_ROOTS` --
-  `/assets/` and `/write/` -- are the two it leaves alone: one copy for
-  every language.
+  `/assets/` -- is what it leaves alone: one copy for every language.
 - **The sweep.** Each run removes what it did not write, but only in the
   part of the tree it owns (`prune_root`): another language's run owns its
   root and nothing else; the site's own run owns everything except those
   roots. Without that the second run would carry off the first one's site.
 - **Written once.** `robots.txt`, `sitemap.xml` (one document naming every
   language, with `xhtml:link` alternates only where an address exists in
-  more than one), the sidebar's JSON and the writing app's `site.js` come
-  from the site's own run alone. A crawler reads the robots.txt at the
-  origin, the sidebar fetches its data by absolute address, and the writing
-  app speaks the language its author writes in -- a copy per language would
-  be files nothing reads, and for `site.js`, the last run's language.
+  more than one) and the sidebar's JSON come from the site's own run
+  alone. A crawler reads the robots.txt at the origin and the sidebar
+  fetches its data by absolute address -- a copy per language would be
+  files nothing reads.
 - **What a post says here.** `Translations.for_lang` gives the post as this
   language renders it: its own text when it has one, otherwise the nearest
   language on the `fallback` chain in `config/site.<lang>.yml`, ending at

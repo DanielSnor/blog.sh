@@ -62,18 +62,6 @@ from both.
    element a stylesheet can set apart. A sheet without them builds the
    page it always did.
 
-3. **`write/locales/<lang>.yml`** -- the strings of the `/write/` page,
-   which is a separate app: it runs in a browser with no Ruby behind it,
-   so its locales are compiled into `write/i18n.js` by
-   `ruby write/build-i18n.rb`. Copy `write/locales/en.yml`, translate the
-   values, run that script, and commit the generated file with them; it
-   reports every key that still falls back to English as it goes. The
-   `error` section is the codes `scripts/receive.sh` and `add --json`
-   return -- the server sends a code, never translated text, and this is
-   where it becomes a sentence. Optional the way the cheat sheet is: a
-   page with no locale of its own falls back to English key by key, and a
-   site without `write: true` never publishes it at all.
-
 That's the whole list. `README.md` and `docs/` stay English.
 
 ## Rules that keep a translation working
@@ -195,7 +183,6 @@ root of its own:
 /                 the site's own language
 /de/              every listing, tag, series, feed and post that has German words
 /assets/          one copy, shared
-/write/           one writing app, shared
 /robots.txt       one copy -- a crawler reads the origin's root and nothing else
 /sitemap.xml      one copy, naming every language and their alternates
 /stats.json …     the sidebar's data, refreshed by cron at the root
@@ -329,10 +316,6 @@ until it is written -- every language shows one of those anyway. A tag
 given an empty word is refused too; leave it out to show it as written.
 A language file that is not valid YAML stops the build of every language,
 and `check` and `doctor` both name it.
-
-The writing app is not translated this way: it is one copy for the site,
-and it speaks the site's own language, because that is the language its
-author writes in.
 
 ### What a post carries
 

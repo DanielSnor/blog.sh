@@ -265,17 +265,6 @@ module Checker
            kind: :check_failed, data: { 'check' => name.to_s, 'error' => e.class.to_s })]
   end
 
-  # Whether the build publishes the writing app. Read with YamlCompat
-  # rather than through SiteConfig, for the reason check_config gives: this
-  # module must survive the very config file it may be reporting on, and an
-  # unreadable one simply answers no here.
-  def write_app?(root)
-    data = YamlCompat.load_file(File.join(root, 'config', 'site.yml'))
-    data.is_a?(Hash) && data['write'] ? true : false
-  rescue StandardError, Psych::SyntaxError
-    false
-  end
-
   # --- reading the archive ------------------------------------------------
 
   # The archive the last `run` in this process read, or nil if none has.
@@ -683,13 +672,6 @@ module Checker
     # addresses are served at all, and where.
     languages = published_languages(root)
     in_language = []
-    # The writing app, which the build publishes at /write/ when the site
-    # asks for it (write: true) and not otherwise -- the same condition,
-    # read the same way. Left out, a post pointing people at the app, or a
-    # menu item for it, was a dead link to check and to doctor on exactly
-    # the sites where the address answers: blogsh.app carried one, error
-    # and all, through two releases.
-    paths << '/write/' if root && write_app?(root)
     # How many posts in the STREAM carry each series -- the same set the
     # build groups into SERIES_MAP, so drafts, pages and unlisted posts do
     # not count towards a series page existing.
@@ -820,9 +802,9 @@ module Checker
   # translations gets nothing added, which is what keeps a single-language
   # site exactly as it was.
   #
-  # 🪤 /write/ and /assets/ are NOT copied per language -- one writing app
-  # and one stylesheet serve the whole site (build/build_blog.rb's loc()).
-  # A link to /de/write/ is dead and has to stay dead: an address check
+  # 🪤 /assets/ is NOT copied per language -- one stylesheet and one set of
+  # pictures serve the whole site (build/build_blog.rb's loc()).
+  # A link to /de/assets/ is dead and has to stay dead: an address check
   # INVENTS is worse than one it misses, because it makes an archive read
   # sound while a reader gets a 404.
   def with_languages(paths, posts, root: nil)
@@ -853,7 +835,7 @@ module Checker
     # ...and the two files the site has ONE of: the build writes
     # robots.txt and sitemap.xml at the root alone (one sitemap names every
     # language), so /en/sitemap.xml is an address nothing answers at.
-    shared = paths.select { |path| path.start_with?('/write/', '/assets/') || %w[/robots.txt /sitemap.xml].include?(path) }
+    shared = paths.select { |path| path.start_with?('/assets/') || %w[/robots.txt /sitemap.xml].include?(path) }
     base = paths.to_a - shared.to_a
     langs.each do |lang|
       paths << "/#{lang}/"

@@ -51,7 +51,6 @@
 #   social      name, url, icon or icon_svg, (rel)
 #   tag_icons   (a list: tag with icon or icon_svg)
 #   share       (the share block: a list of network names)
-#   write       (the /write/ page: true to publish it, off by default)
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
 #   comments    (approval)
@@ -491,22 +490,6 @@ social:
 #   - bluesky
 #   - email
 # --- end of share ---
-
-# A page at /write/ to write a post on a phone: a title, the text, tags
-# and photographs, and a button that hands the lot to an iOS shortcut,
-# which carries it over SSH to scripts/receive.sh. Nothing new listens on
-# the network and the page holds no secret -- sending needs the key that
-# lives in the shortcut, on the phone.
-#
-# Off by default. It is a page for whoever runs the blog, and a site that
-# writes from a desk has no use for it. Turning it on publishes five files
-# under /write/ and nothing else changes; the page is marked noindex.
-#
-# Setting it up is in docs/operations.md, under "A post sent from the
-# phone itself" -- the key, the forced command, and the shortcut.
-#
-# write: true
-# --- end of write ---
 
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's
