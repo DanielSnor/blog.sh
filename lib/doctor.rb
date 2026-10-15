@@ -67,7 +67,14 @@ module Doctor
   # Endless method definitions would read better here and are wrong here:
   # the engine's floor is Ruby 2.7 (see site_config.rb) and they arrived
   # in 3.0.
-  Finding = Struct.new(:level, :text, :fix, keyword_init: true) do
+  # `kind` says which check a finding came from -- `trash`, `scheduler`,
+  # `banner` -- for a reader that is a program: the sentence is in the
+  # site's language and written for a person, and a program that wants to
+  # lead somebody from "the trash holds 12 posts" to the trash has nothing
+  # in it to go by. Named after the area and not after the single problem:
+  # there are a hundred and forty places a finding is made here, and
+  # nothing yet that would read them apart.
+  Finding = Struct.new(:level, :text, :fix, :kind, keyword_init: true) do
     def error?
       level == :error
     end
@@ -154,38 +161,48 @@ module Doctor
   # network, appearance, deploy.
   def run(online: false, root: ROOT)
     findings = []
-    findings.concat(check_env_sh(root))
+    findings.concat(of(:env_sh, check_env_sh(root)))
 
     data, parse_findings = load_site_yml(root)
-    findings.concat(parse_findings)
+    findings.concat(of(:site_yml, parse_findings))
     return findings unless data
 
-    findings.concat(check_language_yml(root, data))
-    findings.concat(check_identity(data))
-    findings.concat(check_placeholders(data))
-    findings.concat(check_locale(data))
-    findings.concat(check_timezone(data))
-    findings.concat(check_network(data))
-    findings.concat(check_banner(data, root))
-    findings.concat(check_colors(data))
-    findings.concat(check_fonts(data, root))
-    findings.concat(check_extra_css(data, root))
-    findings.concat(check_nav(data, root))
-    findings.concat(check_chrome_shapes(data))
-    findings.concat(check_sidebar(data))
-    findings.concat(check_widgets(data))
-    findings.concat(check_publishing(data))
-    findings.concat(check_scheduler)
-    findings.concat(check_deploy_pending)
-    findings.concat(check_media_location(root))
-    findings.concat(check_tag_icons(data))
-    findings.concat(check_social_icons(data))
-    findings.concat(check_share(data))
-    findings.concat(check_trash(root))
-    findings.concat(check_deploy(root))
-    findings.concat(check_deploy_keep(data))
-    findings.concat(check_online(data, root)) if online
+    findings.concat(of(:language_yml, check_language_yml(root, data)))
+    findings.concat(of(:identity, check_identity(data)))
+    findings.concat(of(:placeholders, check_placeholders(data)))
+    findings.concat(of(:locale, check_locale(data)))
+    findings.concat(of(:timezone, check_timezone(data)))
+    findings.concat(of(:network, check_network(data)))
+    findings.concat(of(:banner, check_banner(data, root)))
+    findings.concat(of(:colors, check_colors(data)))
+    findings.concat(of(:fonts, check_fonts(data, root)))
+    findings.concat(of(:extra_css, check_extra_css(data, root)))
+    findings.concat(of(:nav, check_nav(data, root)))
+    findings.concat(of(:chrome_shapes, check_chrome_shapes(data)))
+    findings.concat(of(:sidebar, check_sidebar(data)))
+    findings.concat(of(:widgets, check_widgets(data)))
+    findings.concat(of(:on_this_day, check_on_this_day(data)))
+    findings.concat(of(:publishing, check_publishing(data)))
+    findings.concat(of(:scheduler, check_scheduler))
+    findings.concat(of(:deploy_pending, check_deploy_pending))
+    findings.concat(of(:media_location, check_media_location(root)))
+    findings.concat(of(:tag_icons, check_tag_icons(data)))
+    findings.concat(of(:social_icons, check_social_icons(data)))
+    findings.concat(of(:share, check_share(data)))
+    findings.concat(of(:trash, check_trash(root)))
+    findings.concat(of(:pairing, check_pairing(root)))
+    findings.concat(of(:deploy, check_deploy(root)))
+    findings.concat(of(:deploy_keep, check_deploy_keep(data)))
+    findings.concat(of(:online, check_online(data, root))) if online
     findings
+  end
+
+  # Every finding of one check carries that check's name. Stamped here,
+  # where the checks are called, rather than at each of the places a
+  # finding is made: a check added to the list above is named by being
+  # added, and none can be forgotten.
+  def of(kind, findings)
+    findings.each { |finding| finding.kind ||= kind }
   end
 
   def dig(data, *keys)
@@ -279,7 +296,24 @@ module Doctor
     # A stray file is not read at all, so what text it holds shows nowhere:
     # "nothing reads it" beside "its pages show it" said both (fleet, 26. 9.).
     published = parsed.reject { |path, _| stray.any? { |finding| finding.text.include?("config/#{File.basename(path)}") } }
-    findings + stray + template_language_texts(root, published)
+    findings + stray + template_language_texts(root, published) + build_stoppers(root)
+  end
+
+  # What the build of EVERY language stops on, in the words `check` has
+  # for it. Doctor is where the build's message sends somebody and where
+  # the installer sends them after an edit by hand ("reports every problem
+  # in it at once"), and it answered "0 problems" to a language with no
+  # locale file, a key the engine does not read, a translation of a widget
+  # the site does not have, a menu that goes elsewhere, an empty tag label
+  # and the table site.yml kept before 1.9 -- with the site unable to
+  # build in any language (fleet, 8. 10. 2026). A stray file and a file
+  # that does not parse are named above already, in doctor's own words.
+  def build_stoppers(root)
+    found = Checker.check_unknown_locales(root) + Checker.check_language_key_moved(root) + Checker.check_language_files(root)
+    found.select(&:error?).reject { |finding| %i[language_file_stray language_file_syntax].include?(finding.kind) }
+         .map { |finding| error(finding.text, finding.fix) }
+  rescue StandardError
+    []
   end
 
   # The build's own rule: a file for every published language but the
@@ -291,6 +325,10 @@ module Doctor
     files.filter_map do |path|
       code = File.basename(path)[/\Asite\.(.+)\.yml\z/, 1]
       next if published.include?(code)
+      # The site's own language is published; its file is config/site.yml.
+      if code == own
+        next error(I18n.t('check.language_file_own', file: "config/#{File.basename(path)}"), I18n.t('check.language_file_own_fix'))
+      end
 
       error(I18n.t('check.language_file_stray', file: "config/#{File.basename(path)}"), I18n.t('check.language_file_stray_fix'))
     end
@@ -606,7 +644,8 @@ module Doctor
   # its approved comments and the warning is earned.
   def sidebar_ran_recently?
     stamps = [File.join(ROOT, 'public.nosync', 'comments.json'),
-              File.join(ROOT, '.stats_full_refresh_at')].filter_map do |path|
+              File.join(ROOT, '.stats_full_refresh_at'),
+              SIDEBAR_HEARTBEAT].filter_map do |path|
       File.mtime(path) if File.exist?(path)
     rescue SystemCallError
       nil
@@ -614,6 +653,44 @@ module Doctor
     return false if stamps.empty?
 
     (Time.now - stamps.max) <= SIDEBAR_STALE_AFTER
+  end
+
+  # What scripts/refresh-sidebar.sh leaves on every run since 1.10: the
+  # moment it ran. Before that the only evidence was a side effect of
+  # moderated comments (above), which a site without them does not have.
+  SIDEBAR_HEARTBEAT = File.join(ROOT, '.last-sidebar-run')
+
+  def sidebar_last_run
+    return nil unless File.exist?(SIDEBAR_HEARTBEAT)
+
+    Time.parse(File.read(SIDEBAR_HEARTBEAT).strip)
+  rescue StandardError
+    begin
+      File.mtime(SIDEBAR_HEARTBEAT)
+    rescue StandardError
+      nil
+    end
+  end
+
+  # The card of this day is the one widget that needs the cron to be
+  # TRUE rather than fresh: its file is for one date, and only
+  # refresh-sidebar turns the day over. Switched on without it, the card
+  # is there on the day of a build and gone -- heading and all -- the day
+  # after, while this report counted it among the cards and said nothing
+  # (fleet trial, 8. 10. 2026). Asked like check_scheduler asks: is there
+  # evidence the thing runs.
+  def check_on_this_day(data)
+    return [] unless SiteConfig::Chrome.map(data, 'layout').fetch('sidebar', true)
+    return [] unless SiteConfig::Chrome.widgets(data).key?('on_this_day')
+
+    last = sidebar_last_run
+    return [] if last && (Time.now - last) <= SIDEBAR_STALE_AFTER
+    # An installation whose cron ran before it left a heartbeat: the next
+    # run leaves one, and until then the older evidence stands.
+    return [] if last.nil? && sidebar_ran_recently?
+
+    note = last ? t('on_this_day_stale', ago: humanize_age(Time.now - last)) : t('on_this_day_never')
+    [warn(note, t('on_this_day_fix'))]
   end
 
   # --- appearance ----------------------------------------------------
@@ -993,6 +1070,30 @@ module Doctor
   end
 
   def check_publishing(data)
+    section = dig(data, 'publishing')
+    # A section that is not a map -- a string, a list, `publishing: true`
+    # -- holds neither slots nor the key: the engine reads both as unset,
+    # and nothing said why (third fleet, 10. 10. 2026).
+    return [error(t('publishing_shape', value: section.inspect[0, 60]), t('publishing_shape_fix'))] if !section.nil? && !section.is_a?(Hash)
+
+    publishing_partial(data) + publishing_slots(data)
+  end
+
+  # publishing.allow_partial is read as on only when it IS true. A word in
+  # quotes ("true", "yes") is a string, the engine goes on asking about
+  # every post, and nothing but this line says why. The key written with
+  # nothing after it is nil, and is said as "".
+  def publishing_partial(data)
+    section = dig(data, 'publishing')
+    return [] unless section.is_a?(Hash) && section.key?('allow_partial')
+
+    said = section['allow_partial']
+    return [] if said == true || said == false
+
+    [error(t('allow_partial_shape', value: said.nil? ? '""' : said.inspect), t('allow_partial_shape_fix'))]
+  end
+
+  def publishing_slots(data)
     slots = dig(data, 'publishing', 'slots')
     return [] unless slots
 
@@ -1276,6 +1377,26 @@ module Doctor
   # for years on the installation this engine was built around and the only
   # way to see that was `du` on the server. A note here is how somebody
   # remembers the command exists.
+  # A pairing code that nobody used leaves its line in authorized_keys
+  # when the terminal that showed it was closed rather than left to finish.
+  # sshd has refused that key since its minute passed, so nothing is open
+  # -- but it is a line in the file that decides who may log in, and
+  # somebody reading that file should not have to work out what it is.
+  # Silent when there is none, and when the file cannot be read at all:
+  # an account with no authorized_keys has no leftovers in it.
+  def check_pairing(root)
+    require_relative 'pairing'
+    count = begin
+      Pairing.leftovers(root: root)
+    rescue SystemCallError, ArgumentError, Pairing::Refused
+      # ...and a key file whose path cannot be expanded: pair says so itself.
+      0
+    end
+    return [] if count.zero?
+
+    [warn(I18n.t('doctor.pairing_leftover', count: count, path: Pairing.keys_file), I18n.t('doctor.pairing_leftover_fix'))]
+  end
+
   def check_trash(root)
     dir = File.join(root, 'trash')
     return [] unless Dir.exist?(dir)

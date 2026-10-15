@@ -50,12 +50,17 @@ from both.
    | `setup`, `style`, `wizard` | authors -- the questions in `./setup.sh` and `./style.sh`, plus the plumbing both share |
    | `cron`, `import` | authors -- scheduled publishing and `./import.sh` |
    | `lock` | authors -- what a command says when another run holds the site |
+   | `pair`, `on_this_day` | authors -- `./blog.sh pair` (the code an app connects with, the devices let in) and `./blog.sh on-this-day` (what the day holds from earlier years); the card's own words for a reader are under `chrome` and `js` |
    | `language_file` | authors -- the build's and `check`'s sentences about a `config/site.<lang>.yml` whose menu or footer links go elsewhere |
 
 2. **`templates/markdown-cheat-sheet.<lang>.md`** -- the source of the
    generated `/markdown/` syntax page. Optional: without it the page falls
    back to English wholesale. Translate the prose, keep the syntax examples
-   as they are -- they are what the page exists to show.
+   as they are -- they are what the page exists to show. Keep the
+   `::: example` and `::: end` lines too, each on a line of its own around
+   what a source becomes: they are not shown, they put the result in an
+   element a stylesheet can set apart. A sheet without them builds the
+   page it always did.
 
 3. **`write/locales/<lang>.yml`** -- the strings of the `/write/` page,
    which is a separate app: it runs in a browser with no Ruby behind it,
@@ -159,6 +164,7 @@ site:
 ```yaml
 # config/site.sk.yml -- what "this site in Slovak" means
 ui_language: cs
+language_name: "Slovenčina"
 ```
 
 The Slovak branch is then built and is Slovak in every way a reader or a
@@ -167,6 +173,14 @@ crawler can see -- `/sk/` addresses, `<html lang="sk">`, its own
 search box) is Czech. Borrowing a near language beats publishing an
 English-speaking Slovak site, and unlike the silent inheritance it is a
 decision somebody made.
+
+`language_name` is the one word a borrowed interface cannot lend: what
+the language is called in itself, which is what the language switcher
+says of the language a click leads to. The engine has it for every
+language it speaks; for one it does not, the switch would say only the
+code -- "SK" beside "English" and "Deutsch" -- and `./blog.sh check` says
+so while the line is missing. (A language the engine does speak may be
+named here too; the site's word wins.)
 
 The other two ways out are to write `locales/sk.yml` -- the engine takes
 translations, see the top of this page -- or to stop publishing the
@@ -207,8 +221,9 @@ Start one from `config/site.lang.yml.example`: copy it to
 comments. Like site.yml, these files are the site's own, not the engine's,
 and git ignores them.
 
-Two kinds of thing go in one. What the language DOES -- `fallback` and
-`ui_language`, both below -- and what the site SAYS about itself in that
+Two kinds of thing go in one. What the language DOES -- `fallback`,
+`ui_language` and `language_name`, the first two below and the third
+above -- and what the site SAYS about itself in that
 language: the same keys `config/site.yml` has for its words, only in
 other words. The build of that language lays them over site.yml; whatever
 the file leaves out stands as site.yml has it.
@@ -245,7 +260,8 @@ The keys it takes, and nothing else: `site.title`, `site.short_name`,
 `site.description`; `banner.claim`, `banner.alt`; `about.heading`,
 `about.html`; `footer.links_heading`, `footer.links`,
 `footer.note_heading`, `footer.note_html`, `footer.copyright`,
-`footer.social_heading`; `nav`; `heading` under a widget; and `tags`.
+`footer.social_heading`; `nav`; `heading` under a widget; `tags`; and
+`series`.
 Everything else in site.yml -- the picture in the banner, the author, the
 address, the colours, the widgets' accounts -- is a fact about the site,
 the same in every language, and a translation of it would be a second site.
@@ -270,10 +286,28 @@ shows as written. A word for a tag no published post carries is shown
 nowhere; `check` says so, and the build goes on -- tags come and go with
 the posts, and the build runs after every save.
 
+**A series is the same: one ID, a name per language.** A post says which
+series it belongs to once, in the site's own language, and the series has
+one address in every language -- `/cs/series/the-new-site/` is the Czech
+page of that series. The name a Czech reader sees over it, in the sentence
+that places each part and in the page's title is the one `series:` gives:
+
+```yaml
+# config/site.cs.yml
+series:
+  "The new site": "Nový web"
+```
+
+Keyed by the name as the posts write it, or by the series' slug -- both
+fold to the same thing. A series with no name here shows as written, and a
+name for a series nobody writes is shown nowhere.
+
 **A list with places in it names the same places.** The menu and the
 footer links are written out in full, the way site.yml has them, but
 every item goes where the same item goes in site.yml, in the same order;
-only the label changes. A menu that drifts apart between languages is a
+only the label changes. An item left without a label of its own -- or a
+footer link without a title -- is shown under the word the site's own
+list has for it, and `check` says which one. A menu that drifts apart between languages is a
 second site, and a reader who switches language would lose the item they
 were reaching for. The address is still the one the site's own language
 writes -- `/posts/2026/blog-sh/` above -- and the Czech build takes it to
@@ -319,6 +353,12 @@ today, so nothing has to be migrated:
 }
 ```
 
+`translations` never holds the site's own language: the post is its own
+text there. An entry filed under that code is not read, and `check` names
+it -- which is also what changing `site.lang` over an archive of
+translations leaves behind: `site.lang` says what language the posts are
+written in.
+
 A language counts as written when it has a BODY. A title with nothing
 under it is a translation somebody started: it stays in the archive and
 `check --languages` shows it as started, but the language is not offered
@@ -336,6 +376,15 @@ Write one with `./blog.sh translate <slug> --lang de` (see
 [operations.md](operations.md#writing-a-post-in-another-language)); the
 editor shows the title and the body, because that is all there is to it.
 
+A link in a translation leads where it is written. The lines of the
+original the editor shows carry the original's links, and a link to
+another post of the site copied from there -- `/posts/2026/muj-post/` --
+takes the German reader to the Czech page, though that post may have a
+German one. Nothing rewrites it and `check` has nothing to say, since
+the address is a sound one: write the address of the page in the
+translation's own language, `/de/posts/2026/mein-post/`. (An item of the
+menu is different -- it follows the piece, not the spelling.)
+
 ### What happens to a post nobody has translated
 
 It is shown, not hidden. It stays in the other language's listing, and the
@@ -352,9 +401,13 @@ title. A click anywhere on the chip moves to the next language and wraps
 around at the end -- one target, like the button, rather than a row of
 small ones to aim at.
 
-The switcher offers every language the site publishes. A language with
-nothing of the current post in it leads to that language's front page
-rather than to a page that is not there. What the `hreflang` alternates
+The switcher shows every language the site publishes, and a click leads
+to the next one the page is IN: a language with nothing of the current
+post in it is passed over (its code stays on the chip, marked
+`is-elsewhere`), so the texts a post does have reach each other however
+many languages stand between them. Only when no other language has the
+post does the click lead on, to the next language's front page rather
+than to a page that is not there. What the `hreflang` alternates
 name is narrower and on purpose: only addresses that exist. A site that
 promises a crawler an address it never wrote sends readers from a search
 result to its own 404.
@@ -435,7 +488,12 @@ what every site does today.
 
 The site's own language has no file of its own -- `config/site.yml` is
 its file -- and that is also why it cannot be given a chain: it is where
-every chain ends.
+every chain ends. Written INTO a chain it ends the chain there too:
+`fallback: [cs, de]` on a site whose own language is Czech is "Czech",
+and German after it is never reached. A chain runs only through
+languages the site publishes; one that names another, or the language
+itself, or a language after the site's own, has an entry that stands in
+for nothing, and `./blog.sh check` names it.
 
 The words and the address come from the same answer, always: Czech words
 under a link to the English page would be worse than either on its own.
@@ -468,8 +526,33 @@ and offer `--allow-partial` in the same sentence. A site that publishes
 in several languages usually means to publish in all of them at once, and
 the exceptions are worth saying out loud rather than discovering later.
 
+A site where it is the other way round -- most posts stay in one
+language, and a translation is the exception -- says so once, in
+`config/site.yml`:
+
+```yaml
+publishing:
+  allow_partial: true
+```
+
+That is `--allow-partial` for every post. `publish` and `schedule` no
+longer refuse, the wizard no longer asks, and a post sent from a phone
+with `publish: yes` is published instead of being kept as a draft. The
+post goes out in the languages it has; the others show it the way they
+show any post that was never translated (see `fallback:` above). Only
+`true` says it -- left out or `false`, nothing changes, and `./blog.sh
+doctor` names a value that is neither. A program reads the setting as
+`languages.allow_partial` in `props <slug> --json`.
+
 The cron that publishes the queue never asks: a post got there through
-`schedule`, where somebody already answered this.
+`schedule`, where somebody already answered this. That holds for a post
+scheduled while the site had its languages. One that was already in the
+queue when a language was added was never asked about it -- it goes out
+on its day in the languages it has, and rescheduling it does not ask
+either. `check --languages` shows which languages every post has, the
+queued ones among them;
+`schedule <slug> --cancel` and scheduling it again is how the question
+is put to it.
 
 ### Pages
 
@@ -515,8 +598,8 @@ the words under it and nothing else.
 
 - **Pictures in a translation.** Media belong to the post and its
   languages share them; add them with `edit`.
-- **Series names are not translated.** A series is named the way its
-  posts name it, in every language. Tags are translated -- see
+- **A post's tags and series are written once.** Both are translated by
+  the language's file, not on the post -- see
   [What a language says about itself](#what-a-language-says-about-itself);
   do not give a post a second tag in the other language, which makes two
   tag pages for one subject.

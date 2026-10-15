@@ -74,4 +74,32 @@ module PathGlob
   def literal(part)
     part.to_s.gsub(/[*?\[\]{}\\]/) { |char| "\\#{char}" }
   end
+
+  # Whether what was found at `path` is the thing called `name`, to the
+  # letter. A pattern with no wildcard in it is not looked up in a listing
+  # but asked of the volume -- and a volume that folds case (a Mac's, by
+  # default) answers yes to "Venku.json" where the file is venku.json. The
+  # caller then went on with the name it had ASKED for: a post deleted as
+  # "Venku" went to trash/2026/Venku and came back as Venku.json with the
+  # slug `venku` inside, which the same archive on Linux cannot find under
+  # either name. So the name is compared with what was found and with
+  # what the folder lists, whichever of the two the volume's answer was
+  # spelled as. An accent kept apart from its letter is still the same
+  # name: that difference a volume may make by itself, and it is none.
+  #
+  # The bytes are UTF-8 whatever they are labelled: with no LANG a name
+  # comes off the disk marked as something else, and two equal names
+  # under two labels are not equal to Ruby.
+  def named?(path, name)
+    utf8 = ->(text) { text.to_s.dup.force_encoding(Encoding::UTF_8) }
+    same = lambda do |one, other|
+      one == other || (one.valid_encoding? && other.valid_encoding? && one.unicode_normalize(:nfc) == other.unicode_normalize(:nfc))
+    end
+    asked = utf8.call(name)
+    return false unless same.call(utf8.call(File.basename(path.to_s)), asked)
+
+    Dir.children(File.dirname(path.to_s)).any? { |held| same.call(utf8.call(held), asked) }
+  rescue SystemCallError
+    false
+  end
 end

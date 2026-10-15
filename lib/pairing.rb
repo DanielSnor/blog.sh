@@ -1,0 +1,807 @@
+# frozen_string_literal: true
+
+require 'base64'
+require 'digest'
+require 'etc'
+require 'fileutils'
+require 'json'
+require 'open3'
+require 'securerandom'
+require 'socket'
+require 'time'
+require 'tmpdir'
+require 'uri'
+require_relative 'atomic_write'
+
+# lib/pairing.rb -- letting an app in by showing it a code.
+#
+# An app reaches this installation over SSH with a key of its own, held to
+# one command (scripts/remote.sh). Getting that key onto the server has
+# meant copying it out of the app and writing a line into
+# ~/.ssh/authorized_keys by hand -- options, a quoted path, sometimes a
+# PATH -- which is a fair ask of somebody who administers the machine and
+# a wall for everybody else. That way in stays exactly as it is. This is a
+# second one beside it: `./blog.sh pair` shows a code, the app reads it
+# with its camera, and that is all either side is asked to do.
+#
+# What happens under the code:
+#
+#   1. A key is made here that is good for ten minutes and for one thing.
+#      Its line in authorized_keys carries a forced command,
+#      scripts/enroll.sh, that does nothing but take a public key in --
+#      and refuses once the ten minutes are up -- and sshd's own
+#      `expiry-time` behind that. The private half goes into the code,
+#      with where to connect and the fingerprints of this server's own keys.
+#   2. The app connects with that key -- knowing from the fingerprints
+#      that it reached this machine and not something in between -- and
+#      hands over the public half of a key it made itself.
+#   3. The ten-minute line is replaced by an ordinary one for the app's
+#      key, held to scripts/remote.sh like any written by hand.
+#
+# So the secret that was on a screen stops opening anything the moment it
+# is used, or ten minutes later whichever comes first, and the key the app
+# lives on never leaves the device it was made on.
+#
+# ⚠️ This is the one place the engine writes outside its own folder into a
+# file that decides who may log in. The rules it holds to:
+#
+#   - It writes only lines that begin `restrict,` and force a command of
+#     THIS installation. It cannot be made to write a line that grants a
+#     shell: the only thing that arrives from outside is a public key, and
+#     it is taken only if it is exactly an ed25519 key and nothing else.
+#   - It touches only lines it wrote, known by their closing comment and
+#     by this installation's path in their command. Every other line is
+#     written back byte for byte, in its place.
+#   - It keeps the file as it was before each change beside it, and
+#     replaces the file whole or not at all.
+module Pairing
+  module_function
+
+  class Refused < StandardError
+    attr_reader :reason
+
+    def initialize(reason, message = nil)
+      @reason = reason
+      super(message || reason.to_s)
+    end
+  end
+
+  # How long a code is good for.
+  SECONDS = 600
+  # What the largest symbol the engine draws holds, in bytes (version 12
+  # at level L, lib/qr_code.rb). A code longer than this is still a line
+  # of text an app can be given; it is not a picture.
+  CODE_BYTES = 367
+  # The closing comment of a line written here: `blog.sh-pair:<id>` while a
+  # code is waiting, `blog.sh:<device>` once an app has come in.
+  WAITING = 'blog.sh-pair:'
+  DEVICE = 'blog.sh:'
+  # The word a device's line hands scripts/remote.sh: the fingerprint of
+  # the key on that same line. It is how a request through the door is
+  # known to be one device and not another -- sshd tells a forced command
+  # nothing about the key that was used, and what the caller says of
+  # itself is not evidence.
+  IDENTITY = '--device='
+  PRINT = %r{\A[A-Za-z0-9+/]{43}\z}.freeze
+  # An ed25519 public key as OpenSSH writes one: the type, a space, 68
+  # characters of base64. Nothing before, nothing after -- a line break,
+  # an option or a second key cannot ride in on it.
+  PUBLIC_KEY = %r{\Assh-ed25519 [A-Za-z0-9+/]{68}\z}.freeze
+  KEYGEN = 'ssh-keygen'
+
+  # --- where things are ---------------------------------------------------
+
+  # BLOG_SH_AUTHORIZED_KEYS is for an account whose sshd reads another
+  # file -- and for the tests, which must never write into a person's own.
+  def keys_file
+    return @keys_file if @keys_file
+
+    # Expanded, because the variable is usually written in env.sh, and
+    # there it is usually written in quotes: "~/.ssh/keys" reaches this
+    # line with its tilde in it. Taken as it stood, that was a folder
+    # called `~` inside the blog -- the keys went into it, and the record
+    # of the code, which did expand the path, named a different file.
+    chosen = ENV['BLOG_SH_AUTHORIZED_KEYS'].to_s
+    return File.join(Dir.home, '.ssh', 'authorized_keys') if chosen.empty?
+
+    begin
+      File.expand_path(chosen)
+    rescue ArgumentError
+      # "~nobody/..." for a user the machine does not have: a refusal with
+      # the path, where it was a backtrace (third fleet, 10. 10. 2026).
+      raise Refused.new(:keys_path, chosen)
+    end
+  end
+
+  # The file a code was opened in is the file it is closed in. The app
+  # arrives through sshd, whose forced command has none of the terminal's
+  # environment -- so a code opened in a file named by the variable above
+  # would be looked for, and locked, and found missing, in the account's
+  # default one. The record of the code says which file it was.
+  def in_keys_file(path)
+    before = @keys_file
+    @keys_file = path.to_s.empty? ? nil : path.to_s
+    yield
+  ensure
+    @keys_file = before
+  end
+
+  def host_keys_dir
+    chosen = ENV['BLOG_SH_HOST_KEYS_DIR'].to_s
+    chosen.empty? ? '/etc/ssh' : chosen
+  end
+
+  def records_dir(root)
+    File.join(root, 'tmp', 'pairing')
+  end
+
+  def record_path(root, id)
+    File.join(records_dir(root), "#{id}.json")
+  end
+
+  # --- the lines ----------------------------------------------------------
+
+  def shell_quote(text)
+    "'#{text.to_s.gsub("'") { %q('\\'') }}'"
+  end
+
+  # The command sshd runs for a key, as it stands inside command="...".
+  # PATH is the one this very process was started with: a forced command
+  # runs in the account's bare non-interactive shell, where the Ruby that
+  # a login shell finds (rbenv, Homebrew) is often not on the path at all
+  # -- and a pairing that ends in "ruby: command not found" on the app's
+  # first request is not a pairing.
+  def forced_command(root, script, *words)
+    # `env` in front, so the line is one every login shell can run. sshd
+    # hands the command to the ACCOUNT's shell, and `PATH=... script` is
+    # how sh and its kin set a variable for one command -- csh and tcsh,
+    # which is what an account on FreeBSD often has, read it as a command
+    # called PATH=... and find none.
+    ['env', "PATH=#{in_option(shell_quote(ENV['PATH'].to_s))}", script_token(root, script), *words].join(' ')
+  end
+
+  # A piece of text as it stands inside the double quotes of an option.
+  #
+  # ⚠️ The quote is escaped and NOTHING else is. sshd takes `\"` for a
+  # quote and leaves every other backslash exactly where it stands, so a
+  # backslash doubled here reached the shell doubled -- and the shell's
+  # own way of writing an apostrophe is `'\''`. A blog in a folder called
+  # "Daniel's blog" got a line sshd could not run (the app was answered
+  # "unmatched '" by a shell), while pair showed its code and waited
+  # (fleet, 8. 10. 2026; measured on OpenSSH 10.3).
+  def in_option(text)
+    text.gsub('"') { '\\"' }
+  end
+
+  # One of this installation's scripts exactly as a line names it: quoted
+  # for the shell, then for the option. Written and recognised by the same
+  # function, so a folder with a space or a quote in its name is found
+  # again by the spelling it was written with.
+  def script_token(root, script)
+    in_option(shell_quote(File.join(File.expand_path(root), 'scripts', script)))
+  end
+
+  # sshd's own clock on the line: YYYYMMDDHHMM in the server's time. A key
+  # past it is refused by sshd before anything here is asked.
+  #
+  # ⚠️ A second lock, and a coarse one -- the ten minutes are kept by the
+  # record (see `enroll`), which is asked every time because the key can
+  # do nothing but ask. sshd reads the stamp to the minute, and measured
+  # on OpenSSH 10.3 it reads it as STANDARD time: in summer the line
+  # outlives its code by an hour. The form that says UTC outright (a
+  # trailing Z) would be exact, and an sshd older than 9.1 rejects it --
+  # and with it the whole line, so the code would open nothing at all.
+  # An hour of a dead line is the cheaper of the two: what this clock is
+  # for is the line nobody ever came for and nobody tidied away.
+  def waiting_line(root, id, public_key, expires)
+    %(restrict,expiry-time="#{sshd_clock(expires)}",) +
+      %(command="#{forced_command(root, 'enroll.sh', id)}" #{public_key} #{WAITING}#{id})
+  end
+
+  # A moment as sshd will read it: on the MACHINE's clock, which is not
+  # necessarily this terminal's. Somebody whose shell says TZ=UTC on a
+  # server in Prague had the stamp written two hours behind what sshd
+  # reads it as, and the code's key was refused the moment it was made --
+  # "Permission denied" to the app, a code on the screen still waiting
+  # (fleet, 8. 10. 2026). sshd is started by the system and knows nothing
+  # of anybody's TZ, so the stamp is written with TZ put aside.
+  def sshd_clock(time)
+    said = ENV['TZ']
+    ENV.delete('TZ')
+    Time.at(time.to_i).localtime.strftime('%Y%m%d%H%M')
+  ensure
+    said.nil? ? ENV.delete('TZ') : ENV['TZ'] = said
+  end
+
+  def device_line(root, public_key, name)
+    print = public_key.to_s.match?(PUBLIC_KEY) ? fingerprint(public_key.split.last) : nil
+    words = print ? ["#{IDENTITY}#{print}"] : []
+    %(restrict,command="#{forced_command(root, 'remote.sh', *words)}" #{public_key} #{DEVICE}#{name})
+  end
+
+  # The fingerprint of the key a device's line holds -- nil for a line
+  # whose key is not one (somebody's hand has been at it). Asked of
+  # nothing, the hash answers with the fingerprint of nothing, and that
+  # was shown for such a line as if it were its key's.
+  def print_of(line)
+    key = line.scrub('?')[/ (ssh-ed25519 [A-Za-z0-9+\/]{68}) #{Regexp.escape(DEVICE)}/, 1]
+    key && fingerprint(key.split.last)
+  end
+
+  # A device's line as it is written now. One written before a line said
+  # whose it is ends its command at the script; the word is put in after
+  # it and nothing else on the line moves -- the PATH it was given on the
+  # day it was written stays the PATH it runs with. Every other line, and
+  # one whose key cannot be read, comes back as it was.
+  #
+  # Asked of the first place the script stands on the line, which is its
+  # command: the option's closing quote straight after it is what "says
+  # nothing" looks like. The same words further on are a device's name,
+  # written by somebody's hand, and a name is not rewritten.
+  def identified(line, root)
+    return line unless ours?(line, root, DEVICE)
+
+    token = script_token(root, 'remote.sh')
+    at = line.index(token)
+    print = print_of(line)
+    return line unless print && at && line[at + token.size, 2] == '" '
+
+    line.dup.insert(at + token.size, " #{IDENTITY}#{print}")
+  end
+
+  # Whether a line of the file is one this installation wrote: by its
+  # closing comment AND by this installation's own scripts in its command,
+  # so two blogs in one account each see only their own.
+  def ours?(line, root, marker)
+    script = marker == WAITING ? 'enroll.sh' : 'remote.sh'
+    line.start_with?('restrict,') && line.include?(" #{marker}") && line.include?(script_token(root, script))
+  end
+
+  # Without the carriage return a file saved with CRLF leaves on the end
+  # of every line, ours included: read_lines keeps it, because a line is
+  # given back as it was found, and read as part of the name it made a
+  # device called "Telefon\r" that --revoke could not find by its name,
+  # and a waiting code no app's answer matched.
+  #
+  # Read with whatever is not UTF-8 put aside: a name somebody retyped by
+  # hand in another encoding raised on the pattern, and one such line took
+  # every list -- and, once a list was a thing an app asks for, every
+  # device's -- down with it.
+  def comment_of(line, marker)
+    line.scrub('?')[/ #{Regexp.escape(marker)}(.*?)\r?\z/, 1].to_s
+  end
+
+  # A name for a device, as it will stand at the end of a line of
+  # authorized_keys and on this screen: letters, digits, spaces and a few
+  # marks, forty characters. Whatever else an app sends is dropped -- and
+  # a name with nothing left in it is "device".
+  def device_name(text)
+    # Every kind of space becomes a space first -- a line break or a tab in
+    # a name is two words, not one run-together -- and only then is
+    # everything that is not a letter, a digit or one of four marks dropped.
+    #
+    # Composed first, and the marks a letter carries are part of the
+    # letter: a name typed on a Mac arrives decomposed ("u" and a ring for
+    # "ů"), and dropping what is not a letter took the ring and left
+    # "Danieluv"; in a script written with vowel signs it took the vowels.
+    name = text.to_s.dup.force_encoding('UTF-8').scrub('')
+    name = name.unicode_normalize(:nfc) if name.valid_encoding?
+    name = name.gsub(/[[:space:]]+/, ' ').gsub(/[^\p{L}\p{M}\p{N} ._-]/, '').squeeze(' ').strip[0, 40].to_s.strip
+    name.empty? ? 'device' : name
+  end
+
+  # --- reading and writing the file ---------------------------------------
+
+  # The lines, each without the line feed that ended it and with whatever
+  # else it ended in: a file written on Windows keeps its carriage returns
+  # on the lines that are not ours, because they are part of what is put
+  # back. And whether the file ended in a line feed at all is remembered
+  # and kept, through every rewrite: a line of ours added to a file with
+  # none is the last line with none, so that with our line gone again the
+  # file is what it was -- "byte for byte" is what its owner was promised.
+  #
+  # delete_suffix, not chomp: chomp("\n") takes a carriage return with it.
+  def read_lines
+    return [] unless File.file?(keys_file)
+
+    text = File.read(keys_file, encoding: 'utf-8')
+    @open_ended = !text.empty? && !text.end_with?("\n")
+    text.lines.map { |line| line.delete_suffix("\n") }
+  end
+
+  # One change at a time: the terminal that is waiting and the app that
+  # has just arrived both rewrite this file, and each has to see what the
+  # other did.
+  #
+  # wait: how many seconds somebody who cannot be kept waiting gives it --
+  # a program on the far end of the door -- before it is refused as busy.
+  # The terminal waits for as long as it takes, as before.
+  def locked(wait: nil)
+    FileUtils.mkdir_p(File.dirname(keys_file), mode: 0o700)
+    File.open("#{keys_file}.blog-sh.lock", File::CREAT | File::RDWR, 0o600) do |lock|
+      if wait
+        deadline = Process.clock_gettime(Process::CLOCK_MONOTONIC) + wait
+        until lock.flock(File::LOCK_EX | File::LOCK_NB)
+          raise Refused, :busy if Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
+
+          sleep 0.1
+        end
+      else
+        lock.flock(File::LOCK_EX)
+      end
+      yield
+    end
+  end
+
+  # Where the file's bytes really are. An authorized_keys kept with
+  # somebody's dotfiles is a LINK in ~/.ssh, and replacing a file whole
+  # replaces the name: the link became a file of its own, the one in the
+  # dotfiles stayed as it was, and from then on the two said different
+  # things without anybody having been told (fleet, 8. 10. 2026). What
+  # is replaced is what the link points at; the link stays a link. One
+  # that points at nothing yet gets the file it was pointing at.
+  def keys_target
+    file = keys_file
+    return file unless File.symlink?(file)
+
+    begin
+      File.realpath(file)
+    rescue SystemCallError
+      File.expand_path(File.readlink(file), File.dirname(file))
+    end
+  end
+
+  # The file as it was goes beside it first, then the new one replaces it
+  # whole. The copy is 0600 always. The file itself keeps who may read it
+  # -- somebody who made theirs read-only (0400) gets it back read-only --
+  # and is never left writable by anybody but its owner: sshd refuses an
+  # authorized_keys others can write. A new one is 0600.
+  def write_lines(lines)
+    target = keys_target
+    mode = File.file?(target) ? File.stat(target).mode & 0o644 : 0o600
+    mode = 0o600 if (mode & 0o400).zero?
+    if File.file?(target)
+      AtomicWrite.write("#{keys_file}.blog-sh.bak", File.read(target, encoding: 'utf-8'), permissions: 0o600)
+    end
+    ending = @open_ended ? '' : "\n"
+    AtomicWrite.write(target, lines.empty? ? '' : "#{lines.join("\n")}#{ending}", permissions: mode)
+  end
+
+  # --- this machine, as an app has to find it -----------------------------
+
+  # Over SSH the session says which address and port it came in on, and
+  # that is an address this machine demonstrably answers at. At the
+  # machine's own keyboard there is no such witness, and what is offered
+  # is the machine's NUMBER on the network it is on: a phone on the same
+  # network always finds a number, and usually does not find a name -- a
+  # bare host name is known to this machine and to nobody else, which is
+  # what the first person to try this was offered and could not use
+  # (Pavel, 8. 10. 2026). The name is the fallback for a machine with no
+  # network to have a number on.
+  def guess_address
+    server = ENV['SSH_CONNECTION'].to_s.split
+    return [lan_address || Socket.gethostname, 22] unless server.size == 4
+
+    # ...unless the address the session came in on is one only this
+    # machine, or only this link, can use: `ssh localhost` to run the
+    # command, or a session over a link-local address with its interface
+    # on the end (fe80::...%en0 -- which this command's own check of an
+    # address then refused, so `pair` died on its own guess). The port is
+    # still the session's; the address is found the other way.
+    address = server[2]
+    private_to_here = address.include?('%') || address.downcase.start_with?('fe80:') || address.start_with?('127.') || address == '::1'
+    [private_to_here ? (lan_address || Socket.gethostname) : address, server[3].to_i]
+  end
+
+  # The address of the interface this machine reaches the rest of the
+  # world through. Asked of the system by pointing a datagram socket at an
+  # address nothing lives at (192.0.2.1 is reserved for documentation):
+  # nothing is sent, the system only decides which interface it WOULD use
+  # -- which on a machine with a VPN, a container bridge and a cable is
+  # the question worth asking, and a list of addresses does not answer it.
+  def lan_address
+    address = UDPSocket.open do |socket|
+      socket.connect('192.0.2.1', 9)
+      socket.addr.last
+    end
+    address.to_s.start_with?('127.') || address.to_s.empty? ? first_address : address
+  rescue SystemCallError, SocketError
+    first_address
+  end
+
+  def first_address
+    Socket.ip_address_list.find { |a| a.ipv4? && !a.ipv4_loopback? }&.ip_address
+  rescue SystemCallError, SocketError
+    nil
+  end
+
+  # The account this runs in, asked of the system: it is the account whose
+  # authorized_keys is written, so it is the one an app has to log in as.
+  # Not $USER, which is whatever the shell was told -- empty under a
+  # runner, somebody else's after `sudo -u` -- and a code naming the wrong
+  # account is a code that connects nowhere.
+  def user
+    Etc.getpwuid(Process.euid).name
+  end
+
+  # The fingerprints of this server's own keys, as `ssh-keygen -l` prints
+  # them without the prefix: the app compares what the server shows on
+  # connecting with these, so the first connection is to a machine it was
+  # told about rather than to whoever answered.
+  def host_fingerprints
+    %w[ed25519 ecdsa].map { |type| File.join(host_keys_dir, "ssh_host_#{type}_key.pub") }
+                     .select { |file| File.file?(file) && File.readable?(file) }
+                     .map { |file| fingerprint(File.read(file).split[1].to_s) }.compact
+  end
+
+  def fingerprint(blob_base64)
+    blob = Base64.strict_decode64(blob_base64)
+    Base64.strict_encode64(Digest::SHA256.digest(blob)).delete('=')
+  rescue ArgumentError
+    nil
+  end
+
+  # Whether an SSH server answers on this machine's own port: by what it
+  # SAYS, not by a connection going through. An sshd introduces itself
+  # the moment it is reached ("SSH-2.0-..."), and anything else that
+  # happens to accept a connection there -- another program, a network
+  # filter that takes every connection before deciding, a port that for a
+  # moment connects to itself -- says nothing of the kind.
+  def ssh_answers?(port)
+    Socket.tcp('127.0.0.1', port, connect_timeout: 2) do |socket|
+      return false unless IO.select([socket], nil, nil, 3)
+
+      socket.read_nonblock(8, exception: false).to_s.start_with?('SSH-')
+    end
+  rescue SystemCallError, SocketError, IOError
+    false
+  end
+
+  def keygen?
+    _, status = Open3.capture2e(KEYGEN, '-?')
+    !status.nil?
+  rescue SystemCallError
+    false
+  end
+
+  # --- a key for ten minutes ----------------------------------------------
+
+  # Made by ssh-keygen, which is on any machine that runs sshd, in a
+  # scratch folder that is gone before this returns: the private half
+  # exists afterwards only in what is handed back, for the code.
+  def one_time_key(id)
+    Dir.mktmpdir('blogsh-pair') do |scratch|
+      file = File.join(scratch, 'key')
+      out, status = Open3.capture2e(KEYGEN, '-q', '-t', 'ed25519', '-N', '', '-C', "#{WAITING}#{id}", '-f', file)
+      raise Refused.new(:keygen, out.strip) unless status.success?
+
+      public_key = File.read("#{file}.pub").split.first(2).join(' ')
+      [public_key, seed_of(File.read(file))]
+    end
+  end
+
+  # The 32 bytes an ed25519 private key IS, out of the file OpenSSH wraps
+  # them in (openssh-key-v1): a code has room for the bytes, not for the
+  # wrapping, and every SSH library builds its key from them.
+  def seed_of(private_file)
+    body = Base64.decode64(private_file.lines.reject { |line| line.start_with?('-----') }.join)
+    magic = "openssh-key-v1\0"
+    raise Refused.new(:keygen, 'not an OpenSSH private key') unless body.start_with?(magic)
+
+    at = magic.bytesize
+    take = lambda do
+      length = body[at, 4].unpack1('N')
+      value = body[at + 4, length]
+      at += 4 + length
+      value
+    end
+    raise Refused.new(:keygen, 'the key is encrypted') unless take.call == 'none'
+
+    take.call # kdf name
+    take.call # kdf options
+    at += 4   # number of keys
+    take.call # the public key
+    secret = take.call
+    inner = 8 # two check numbers
+    read = lambda do
+      length = secret[inner, 4].unpack1('N')
+      value = secret[inner + 4, length]
+      inner += 4 + length
+      value
+    end
+    read.call # key type
+    read.call # public half
+    pair = read.call
+    raise Refused.new(:keygen, 'not an ed25519 key') unless pair.bytesize == 64
+
+    pair[0, 32]
+  end
+
+  # --- the code -----------------------------------------------------------
+
+  # What the app reads: a link of its own scheme, so a camera that is not
+  # the app's offers to open the app, and so the same text can be pasted
+  # where there is no camera to point.
+  def code(host:, port:, user:, seed:, fingerprints:, site:)
+    query = { 'v' => '1', 'h' => host, 'p' => port.to_s, 'u' => user,
+              'k' => Base64.urlsafe_encode64(seed, padding: false) }
+    # In the alphabet a link carries as it stands (- and _ for + and /),
+    # with a dot between two: a code is drawn module by module, and three
+    # characters for every one that needed escaping is a larger code.
+    query['f'] = fingerprints.map { |print| print.tr('+/', '-_') }.join('.') unless fingerprints.empty?
+    # The site's name is for the eye -- "connect to Sean.cz?" -- and is the
+    # one part that may be shortened: twenty-four characters, and no more
+    # of them than leave the code drawable. In a script that takes three
+    # bytes a letter and nine in a link, twenty characters of a name made
+    # a code no symbol holds, and nothing was drawn (CODE_BYTES).
+    wanted = site.to_s.strip[0, 24].to_s
+    until wanted.empty? || "blogsh://pair?#{URI.encode_www_form(query.merge('n' => wanted))}".bytesize <= CODE_BYTES
+      wanted = wanted[0...-1]
+    end
+    query['n'] = wanted unless wanted.strip.empty?
+    "blogsh://pair?#{URI.encode_www_form(query)}"
+  end
+
+  # --- starting, finishing, giving up -------------------------------------
+
+  # Opens the door: a key, its line, a record of when it closes. Answers
+  # with what the terminal needs to show and to wait on.
+  def start(root:, host:, port:, site: nil, now: Time.now)
+    raise Refused.new(:keygen, 'ssh-keygen is not on the PATH') unless keygen?
+
+    id = SecureRandom.hex(8)
+    # sshd reads the line's clock to the minute, so the minute is rounded
+    # up: ten minutes are promised and a little more is given, never less.
+    expires = Time.at(((now.to_i + SECONDS) / 60.0).ceil * 60)
+    public_key, seed = one_time_key(id)
+    locked do
+      kept = read_lines.reject { |line| expired_waiting?(line, root, now) }
+      write_lines(kept + [waiting_line(root, id, public_key, expires)])
+    end
+    FileUtils.mkdir_p(records_dir(root))
+    AtomicWrite.write_json(record_path(root, id), { 'id' => id, 'state' => 'waiting', 'expires' => expires.utc.iso8601,
+                                                    'keys_file' => File.expand_path(keys_file) }, permissions: 0o600)
+    { id: id, expires: expires,
+      code: code(host: host, port: port, user: user, seed: seed, fingerprints: host_fingerprints, site: site) }
+  end
+
+  def record(root, id)
+    data = JSON.parse(File.read(record_path(root, id), encoding: 'utf-8'))
+    data.is_a?(Hash) ? data : nil
+  rescue SystemCallError, JSON::ParserError
+    nil
+  end
+
+  # A waiting line whose code has run out: by the record where there is
+  # one, and otherwise by the line's own clock.
+  def expired_waiting?(line, root, now = Time.now)
+    return false unless ours?(line, root, WAITING)
+
+    known = record(root, comment_of(line, WAITING))
+    return Time.parse(known['expires']) <= now if known && known['expires']
+
+    stamp = line[/expiry-time="(\d{12})"/, 1]
+    stamp.nil? || Time.strptime(stamp, '%Y%m%d%H%M') <= now
+  rescue ArgumentError
+    true
+  end
+
+  # What scripts/enroll.sh comes to: the app's own key in, the ten-minute
+  # line out. Every refusal leaves the file as it was.
+  def enroll(root:, id:, key:, name:, now: Time.now)
+    raise Refused, :unknown_code unless id.to_s.match?(/\A[0-9a-f]{16}\z/)
+
+    # One line: the type and the key, and after them at most the comment a
+    # public key file carries. A line break or any other control character
+    # anywhere in what was sent is not a key with something extra, it is
+    # not a key -- nothing past the second word would be written either
+    # way, but what is refused here is never looked at twice.
+    sent = key.to_s
+    raise Refused, :bad_key if sent.match?(/[[:cntrl:]]/) || !sent.valid_encoding?
+
+    public_key = sent.split(' ').first(2).join(' ')
+    raise Refused, :bad_key unless sent.lstrip.start_with?(public_key) && public_key.match?(PUBLIC_KEY) && ed25519?(public_key)
+
+    device = device_name(name)
+    opened = record(root, id)
+    raise Refused, :unknown_code unless opened
+
+    in_keys_file(opened['keys_file']) { enroll_locked(root, id, public_key, device, now) }
+    device
+  end
+
+  def enroll_locked(root, id, public_key, device, now)
+    locked do
+      known = record(root, id)
+      raise Refused, :unknown_code unless known
+      raise Refused, :used unless known['state'] == 'waiting'
+      raise Refused, :expired if Time.parse(known['expires'].to_s) <= now
+
+      lines = read_lines
+      at = lines.index { |line| ours?(line, root, WAITING) && comment_of(line, WAITING) == id }
+      raise Refused, :unknown_code unless at
+      # The same device coming in again -- a reinstalled app, a second try
+      # -- is the same device: its old line goes, so a list of devices is a
+      # list of devices and not of attempts.
+      taken = lines.each_index.select { |i| i != at && ours?(lines[i], root, DEVICE) && lines[i].include?(" #{public_key} ") }
+      # The same key on a line that is NOT this blog's -- another blog of
+      # the account, or a line somebody wrote -- is a key sshd already
+      # knows what to do with: it runs the first line that has it and
+      # never looks at a second. Written again here, both blogs said "ok"
+      # and one of them was never reached.
+      # Asked of the line as sshd reads it. A line that is a comment holds
+      # no key -- one commented out by hand refused the same app for ever
+      # -- and a foreign line is whatever bytes its owner wrote: one old
+      # comment in Latin-2 raised here on the pattern, and pairing failed
+      # for the whole account.
+      elsewhere = lines.each_index.any? do |i|
+        next false if i == at || taken.include?(i)
+
+        line = lines[i].scrub('?')
+        !line.lstrip.start_with?('#') && line.match?(/(\A|\s)#{Regexp.escape(public_key)}(\s|\z)/)
+      end
+      raise Refused, :key_in_use if elsewhere
+      # In the file's own line ending: a line that stood with a carriage
+      # return is replaced by one that has it too.
+      lines[at] = device_line(root, public_key, device) + (lines[at].end_with?("\r") ? "\r" : '')
+      taken.reverse_each { |i| lines.delete_at(i) }
+      write_lines(lines)
+      AtomicWrite.write_json(record_path(root, id), known.merge('state' => 'paired', 'device' => device,
+                                                                'fingerprint' => fingerprint(public_key.split.last)), permissions: 0o600)
+    end
+  end
+
+  # The bytes really are an ed25519 key: the type's name with its length,
+  # then thirty-two bytes with theirs. The pattern says the text has the
+  # right shape; this says the shape holds what it claims to.
+  def ed25519?(public_key)
+    blob = Base64.strict_decode64(public_key.split.last)
+    blob.bytesize == 51 && blob[0, 4].unpack1('N') == 11 && blob[4, 11] == 'ssh-ed25519' && blob[15, 4].unpack1('N') == 32
+  rescue ArgumentError
+    false
+  end
+
+  # Closes a door nobody came through.
+  #
+  # Answers the device's name when somebody DID come through: the app
+  # hands its key in under the same lock, and a Ctrl-C -- or the code's
+  # last second -- that falls in the same moment used to find the line
+  # gone, tidy nothing and say "cancelled" about a device that was in.
+  def cancel(root:, id:)
+    opened = record(root, id)
+    came = in_keys_file(opened && opened['keys_file']) { cancel_locked(root, id) }
+    FileUtils.rm_f(record_path(root, id)) unless came
+    came
+  end
+
+  def cancel_locked(root, id)
+    locked do
+      known = record(root, id)
+      next known['device'].to_s if known && known['state'] == 'paired'
+
+      lines = read_lines
+      kept = lines.reject { |line| ours?(line, root, WAITING) && comment_of(line, WAITING) == id }
+      write_lines(kept) unless kept == lines
+      nil
+    end
+  end
+
+  # Doors left open by a terminal that was closed: their lines and their
+  # records. sshd has refused those keys since their minute passed; this
+  # is the tidying.
+  def sweep(root:, now: Time.now)
+    removed = 0
+    # Looked at before anything is locked: with nothing to take out there
+    # is nothing to write, and a command that only lists devices has no
+    # business making a ~/.ssh for an account that has none, or failing
+    # beside one it may not write into.
+    if leftovers(root: root, now: now).positive?
+      locked do
+        lines = read_lines
+        kept = lines.reject { |line| expired_waiting?(line, root, now) }
+        removed = lines.size - kept.size
+        write_lines(kept) unless removed.zero?
+      end
+    end
+    # A record outlives its code only as long as the terminal that asked
+    # might still be reading it: gone once the code has run out.
+    Dir.glob(File.join(records_dir(root), '*.json')).each do |file|
+      known = record(root, File.basename(file, '.json'))
+      over = begin
+        known.nil? || Time.parse(known['expires'].to_s) <= now
+      rescue ArgumentError
+        true
+      end
+      FileUtils.rm_f(file) if over
+    end
+    removed
+  end
+
+  # Waiting lines of this installation that are past their time.
+  def leftovers(root:, now: Time.now)
+    read_lines.count { |line| expired_waiting?(line, root, now) }
+  end
+
+  # --- the devices --------------------------------------------------------
+
+  # Every app this installation let in by a code, as [name, fingerprint].
+  # A line written by hand is not here: it has no closing comment of ours,
+  # and what somebody wrote into that file themselves is theirs.
+  #
+  # `line` is the line itself, for whoever has to say WHICH device and
+  # cannot say it by a key: one whose key cannot be read has no
+  # fingerprint, and a name is not always one device's.
+  def devices(root:)
+    read_lines.select { |line| ours?(line, root, DEVICE) }.map do |line|
+      { 'name' => comment_of(line, DEVICE), 'fingerprint' => print_of(line).to_s, 'line' => line }
+    end
+  end
+
+  # Brings the lines of devices let in before a line said whose it is up
+  # to date, so that each of them can be told from the others through the
+  # door. Answers how many it rewrote.
+  #
+  # Looked at before anything is locked, like the sweep: with nothing to
+  # bring up to date -- which is every run but the first after an upgrade
+  # -- nothing is written and no folder is made.
+  #
+  # And only in a file that is this user's own. A file replaced whole
+  # belongs to whoever replaced it: one run of `sudo ./blog.sh pair --list`
+  # would hand the account's authorized_keys to root, 0600, and sshd --
+  # which reads it as the account -- would let nobody in by a key again.
+  def identify(root:)
+    return 0 unless read_lines.any? { |line| identified(line, root) != line }
+    return 0 unless File.stat(keys_target).uid == Process.euid
+
+    changed = 0
+    locked do
+      lines = read_lines
+      fresh = lines.map { |line| identified(line, root) }
+      changed = lines.zip(fresh).count { |was, now| was != now }
+      write_lines(fresh) unless changed.zero?
+    end
+    changed
+  end
+
+  # Takes out the device whose key has this fingerprint, and only by that:
+  # what a device asks of itself through the door, where a name -- which
+  # two devices may share, and which anybody can read off the list -- is
+  # not a way to say which one. Answers the device, or nil when no line of
+  # this installation holds that key.
+  def revoke_key(root:, print:, wait: nil)
+    gone = nil
+    locked(wait: wait) do
+      lines = read_lines
+      kept = lines.reject do |line|
+        match = ours?(line, root, DEVICE) && print.to_s.match?(PRINT) && print_of(line) == print
+        gone ||= { 'name' => comment_of(line, DEVICE), 'fingerprint' => print } if match
+        match
+      end
+      write_lines(kept) if gone
+    end
+    gone
+  end
+
+  # Takes a device out, by its name or by its key's fingerprint -- or by
+  # its line, whole, which is how one is said that has no key to say it
+  # by. Answers the devices removed -- more than one when two were given
+  # one name. Nothing said is nobody: an empty word used to be the name of
+  # a device that has none.
+  def revoke(root:, which:)
+    gone = []
+    return gone if which.to_s.empty?
+
+    locked do
+      lines = read_lines
+      kept = lines.reject do |line|
+        next false unless ours?(line, root, DEVICE)
+
+        match = line == which || comment_of(line, DEVICE) == which || print_of(line) == which.to_s.sub(/\ASHA256:/, '')
+        gone << comment_of(line, DEVICE) if match
+        match
+      end
+      write_lines(kept) unless gone.empty?
+    end
+    gone
+  end
+end

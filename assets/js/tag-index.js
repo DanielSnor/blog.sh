@@ -34,6 +34,8 @@
     var frag = document.createDocumentFragment();
     for (var i = 0; i < wanted.length; i++) frag.appendChild(wanted[i]);
     list.appendChild(frag);
+    // The row of letters leads to the bands, and count order has none.
+    if (jump) jump.hidden = order === 'count';
     for (var j = 0; j < buttons.length; j++) {
       var on = buttons[j].getAttribute('data-order') === order;
       buttons[j].setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -61,7 +63,12 @@
     button('count', i18n.tags_sort_count || '#')
   ];
   for (var k = 0; k < buttons.length; k++) bar.appendChild(buttons[k]);
-  list.parentNode.insertBefore(bar, list);
+  // Above the row of letters where there is one: the row belongs to one of
+  // the two orders, so it stands under the switch that chooses between them.
+  // A page built before the row existed has none, and the switch stands
+  // directly over the list as it did.
+  var jump = document.getElementById('tag-index-jump');
+  list.parentNode.insertBefore(bar, jump || list);
 
   var saved = null;
   try { saved = localStorage.getItem(KEY); } catch (e) { saved = null; }

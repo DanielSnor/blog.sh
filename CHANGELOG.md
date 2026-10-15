@@ -11,6 +11,115 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.10 -- 2026-10-15
+
+The release that opens a door for programs. Every screen read before acting, and every action it
+offers, also answers as data; a program on another machine reaches them over the SSH the server
+already has, through one forced command that runs one engine command and nothing else; and
+`./blog.sh pair` lets it in by a code, with no key or address typed. Around it, the archive says more
+about itself, a Mac gets an icon instead of a terminal, and the second language from 1.9 grows up.
+The `/write/` page and its shortcut are on their way out. Nothing to migrate; the first deploy
+sends nearly every page once.
+
+### Added
+
+- **Every screen as data.** `list`, `props`, `queue`, `edit`, `doctor` and the new `drafts` take `--json`; a refusal exits 0.
+- **The actions of those screens, for a program.** `schedule --at`, `delete --yes`, `props --set` and the rest, under `--json`.
+- **A post's text comes back from a file.** `edits: <slug>` and `base:` in a file for `add`; a changed post is refused.
+- **A translation comes back the same way.** `translate --json` hands it out, `lang:` beside `edits:` brings it back.
+- **`scripts/remote.sh`: a door for programs.** One whitelisted engine command per request, or one delivery.
+- **`version --json`.** The engine, the receiver's ceiling, and the site's name, languages and colours.
+- **A program may say which language it reads.** `check`, `doctor` and what `pair` refuses answer in it.
+- **`./blog.sh pair`: an app is let in by reading a code.** Good once, for ten minutes; `--list`, `--revoke`.
+- **A paired device sees the list and takes itself out.** Through the door -- itself and no other.
+- **A launcher on a Mac.** An icon in Applications that opens the site in Terminal; `./setup.sh --launcher`.
+- **On this day.** A sidebar card with posts from this day in earlier years; `on_this_day:` under `widgets:`.
+- **`./blog.sh on-this-day [--date MM-DD] [--json]`.** The same selection in the terminal.
+- **The sidebar cron turns the day over.** The card wants `refresh-sidebar.sh` in cron; `doctor` says when it does not run.
+- **`/series/`: the index of series.** Each with its parts and the years they span.
+- **The archive says what its shading means.** And a year's page jumps to a month.
+- **The tag index jumps to a letter.**
+- **`./blog.sh list --search="words"`.** The search `browse` runs, for a caller with no screen.
+- **The search in the terminal keeps its index.** `.search_index.json`; a query reads only the posts that changed.
+- **The queue says whether anything publishes it.** On a blog with no cron, a post past its time says to publish it by hand.
+- **A series has a name per language.** `series:` in `config/site.<lang>.yml`.
+- **An old address can belong to a translation.** `translations.<lang>.former_slugs`, redirected into that language.
+- **`site.author_name`.** The author's name as it stands alone, for a language that inflects names.
+- **`publishing.allow_partial`.** A site that publishes one language first is no longer asked about every post.
+- **`banner.show_image: false`.** The banner's words without its picture.
+- **`layout.lead_card`.** The front page's first card leads with its picture, and is marked with or without one.
+- **`check --languages --json`.** The table of languages as data.
+
+### Changed
+
+- **The card of a picture post carries the picture, and a video post's the video.** With nothing set.
+- **A part of a series names the series first.** "Nový Sean.cz — part 3 of 19".
+- **A page of a listing says the days it covers.** "page 663 · Sep 12–18, 2026".
+- **A listing's heading says how many it holds.**
+- **The 404 page offers a search filled with the words of the address,** and the way back.
+- **A thread reads as a conversation.** An answer to a comment stands set in under it.
+- **The search marks why a result is there.**
+- **The cheat sheet shows a picture and a gallery.**
+- **One thing, one word, in the terminal.** The queue says "reschedule" and "cancel the schedule", as a post does.
+- **What a skin could not select is marked.** `docs/skinning.md`, "What the markup marks for you".
+- **The first deploy after the upgrade sends nearly every page once.** Listings, cards and headings say more.
+- **A cold build costs a few percent more than 1.9's.** A cached rebuild costs what it did.
+
+### On its way out
+
+- **`/write/` and the `SendPost` shortcut leave in 1.11.** Native apps for iOS and Android, in preparation, take over.
+- **So do the `publish.txt` and `drafts.txt` requests.** In 1.10 everything works as before; `receive.sh` stays.
+
+### Fixed
+
+- **The skinning guide's selector for the first card matched no card.** It says `:first-of-type`.
+- **A second language's build called a post's own page "already taken"**, on every run.
+- **The cheat sheet's contents list left out the teaser and the link card.**
+- **An export left a post's other languages behind.** An import of it brings them home.
+- **A second language's search, cheat sheet and 404 named the first language's page as their own.**
+- **`doctor` said "0 problems" about a language configuration no language builds on.**
+- **The advice for a language with no locale file sent `ui_language` where it is refused.**
+- **`preview` on a port already in use printed "Serving at" and a stack trace.**
+- **`translate` closed without a change kept the empty template as rescued text.**
+- **Saving a post dropped what an import gave its blocks.** A block the text left alone is kept as stored.
+- **Two deliveries arriving together could swap pictures.** The receiver takes one at a time.
+- **A translation given another address left the old one dead.** It gets a redirect.
+- **A `//` note in a file handed to `add` was published.**
+- **A second language's sitemap and switcher named a listing by type it never wrote.**
+- **A page and a post of one year translated to one slug stopped every language.**
+- **A menu item pointing at part of a page lost its way in another language.**
+- **A language with a borrowed interface said `og:locale="en_US"` on every page.**
+- **The build said what it had to about `config/site.yml` once per language.** Once now, in the site's own.
+- **A `redirect_from` into a language's folder was written by one build and deleted by the next.**
+- **A paragraph beginning `//` was dropped by the next edit of its post.**
+- **A fallback chain ran past the site's own language.** `fallback: [cs, en]` showed a German reader English.
+- **The Jekyll importer cut an image's caption at its first `)`**, and lost one with a straight quote.
+- **`list --tag cats` and `list --tag=` answered with the whole archive.** `--type=` too.
+- **`translate` counted as taken an address only a post with no text in that language had.**
+- **`check --repair` offered to rewrite a relative link in a translation and then could not.**
+- **Saving a translation dropped what markdown has no words for, and kept no version.**
+- **`check --repair` wrote a `redirect_from` into a language's folder.** It rewrites the link instead.
+- **Markdown the engine refuses was refused in English**, and `add <file> --json` answered it in prose.
+- **A paragraph with an unclosed `**` and backslashes after it hung the save.**
+- **`translate` without `--lang` suggested `--lang de` on every site.** It names one the site publishes.
+- **Three pieces of advice in `check` could not be taken.** A `redirect_from` under `/posts/` among them.
+- **The language switch on a later page of a listing by type could lead to a 404.**
+- **A cron wrapper's refusal went to standard output**, which the cron line throws away.
+- **`./style.sh` wrote a sidebar card whose one necessary answer was left empty.**
+- **`./setup.sh --help` said every question can be skipped.** Five cannot while they hold the example.
+- **A slug typed into a picker could not be corrected past its first letter.**
+- **On a site of three languages the switch could not get from one text of a post to the other.**
+- **A language with a borrowed interface was called by its code.** `language_name:` names it.
+- **A moved installation lost its teasers.** An import reads `<!--more-->` as the end of one.
+- **A file named with parentheses, `IMG (1).jpg`, was no picture.**
+- **On a volume that folds case, a post asked for as `Venku` was found as `venku`.**
+- **A new picture in `incoming/` under a name the post already has was ignored without a word.**
+- **Saving a translation dropped its `excerpt`.** And one with only a title opened without the original.
+- **`check` and the build disagreed about which addresses exist.** A slash before or after one, `/en/robots.txt`.
+- **A text filed in `translations` under the site's own language was read by the build.**
+- **A language's file lost a menu item with no word of its own**, and an empty title left its pages untitled.
+- **`docs/install.md` updated a site in two languages halfway.** The recipe is `./blog.sh rebuild`.
+
 ## 1.9 -- 2026-09-28
 
 The release about publishing in more than one language. A post keeps one set of metadata and a

@@ -42,7 +42,34 @@ RECENT_LIST_COUNT = 50
 
 case ARGV.first
 when 'version', '--version', '-v'
-  puts "blog.sh #{BlogSh::VERSION}"
+  if ARGV.include?('--json')
+    # The identity block as data: what an app shows above every screen,
+    # the way the terminal shows it. From the raw file, like the language
+    # above, so a broken config still answers with what it can.
+    require 'json'
+    locales = Array(data.is_a?(Hash) ? data.dig('site', 'locales') : nil).map(&:to_s).reject(&:empty?)
+    # The receiver's ceiling, as the forced command's environment sets it,
+    # so an app can measure a delivery before sending it.
+    max_mb = ENV.fetch('BLOGSH_MAX_MB', '24').to_i
+    # The accent the site wears, per scheme, resolved the way colors.css
+    # resolves it -- a palette the site never set answers with the shipped
+    # one -- so an app can wear the blog's colour, as /write/ does.
+    require_relative '../lib/colors_css'
+    colors = data.is_a?(Hash) ? data['colors'] : nil
+    accent = %w[light dark].to_h { |mode| [mode, ColorsCss.color_for(colors, mode, 'accent')] }
+    # ...and the rest of what its pages are set in -- the ground, the text
+    # on it, the text beside it, the rules -- resolved the same way, so an
+    # app can wear the blog's whole look and not its accent alone.
+    palette = %w[light dark].to_h do |mode|
+      [mode, %w[bg text meta_text border].to_h { |key| [key, ColorsCss.color_for(colors, mode, key)] }]
+    end
+    puts JSON.pretty_generate('ok' => true, 'engine' => BlogSh::VERSION,
+                              'max_mb' => max_mb.positive? ? max_mb : 24,
+                              'site' => SiteHeader.identity.merge('lang' => I18n.lang.to_s, 'locales' => locales,
+                                                                  'accent' => accent, 'palette' => palette))
+  else
+    puts "blog.sh #{BlogSh::VERSION}"
+  end
 else
   puts SiteHeader.render
   puts

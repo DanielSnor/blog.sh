@@ -203,6 +203,22 @@ details.server .field{margin:.8rem 0 .2rem}
 .result pre{white-space:pre-wrap;word-break:break-all;font-size:.8rem;background:var(--sunk);
   padding:.5rem .6rem;border-radius:6px;margin:.4rem 0}
 .result .close{margin-top:.6rem;font-size:.85rem;padding:.5rem .8rem}
+/* Opening a draft from the blog: the request is a link, quiet until it is
+   wanted; the drafts come back as a list of choices in the answer box, and
+   while one is being edited a band above the form says which. */
+.opener{margin:-.2rem 0 .6rem;text-align:right;font-size:.88rem}
+.result ul.drafts{list-style:none;padding:0;margin:.3rem 0 0;color:var(--text)}
+.result ul.drafts li{margin:.35rem 0}
+.result button.draft{display:flex;flex-direction:column;align-items:flex-start;gap:.15rem;width:100%;
+  font:inherit;text-align:left;padding:.6rem .7rem;border:1px solid var(--border);border-radius:7px;
+  background:var(--surface);color:var(--text);cursor:pointer}
+.result button.draft:disabled{opacity:.6;cursor:not-allowed}
+.result button.draft[data-arm="yes"]{border-color:var(--warn)}
+.result .draft-title{font-weight:600}
+.result .draft-meta{font-size:.8rem;color:var(--meta)}
+.editing{border:1px solid var(--accent);background:var(--accent-soft);border-radius:var(--radius);
+  padding:.6rem .8rem;margin:0 0 1rem;display:flex;flex-direction:column;gap:.2rem}
+.shot.existing img{opacity:.9}
 [hidden]{display:none !important}
 @media (prefers-reduced-motion:reduce){*{transition:none !important}}
 </style>
@@ -224,7 +240,14 @@ details.server .field{margin:.8rem 0 .2rem}
     <span class="kept" id="kept" hidden></span>
   </header>
 
+  <p class="opener"><button type="button" class="link" id="open-drafts" data-t="app.open_drafts"></button></p>
+
   <div class="result" id="result" hidden></div>
+
+  <div class="editing" id="editing" hidden>
+    <strong id="editing-what"></strong>
+    <span class="hint" id="editing-note"></span>
+  </div>
 
   <div class="field">
     <label for="title" data-t="app.title_label"></label>

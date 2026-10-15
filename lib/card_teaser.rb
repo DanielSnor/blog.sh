@@ -43,7 +43,11 @@ module CardTeaser
   # block is always kept: a card with nothing in it is not a shorter card,
   # it is a broken one -- and a photograph taller than the whole budget is
   # still what the post IS.
-  def blocks(content, budget: BUDGET)
+  #
+  # `first_height:` is for a caller who knows the first block will be
+  # drawn smaller than its own dimensions say -- a card that caps a tall
+  # picture -- so what follows is weighed against the room really left.
+  def blocks(content, budget: BUDGET, first_height: nil)
     # The same blocks the renderer will draw, which means WITHOUT the
     # tracking pixels it drops. Counted here, a 1x1 gif claims the full
     # width of the card (534 px by the model below) and a 1x100 spacer
@@ -57,6 +61,7 @@ module CardTeaser
     used = 0
     all.each do |block|
       h = height(block)
+      h = [h, first_height].min if first_height && kept.empty?
       break if kept.any? && used + h > budget
 
       kept << (kept.empty? && h > budget ? trimmed(block, budget) : block)

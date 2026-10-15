@@ -97,14 +97,17 @@ could have one.
 Since 1.3.2 a listing's `<body>` says which it is:
 
 ```css
-.page-first .post-list-item:first-child { /* the lead card */ }
-.page-cont  .archive-note { /* only on the continuations */ }
+.page-first .post-list-item:first-of-type { /* the first card */ }
+.page-cont  .listing-heading { /* only on the continuations */ }
 ```
 
 `page-first` is the page that lives at the listing's own address, `page-cont`
 is everything under `/page/N/`, and both are emitted for every listing --
 the front page, a tag, a series, a content type. A post page carries a bare
 `<body>`, so a rule scoped to either class cannot leak onto one.
+`:first-of-type`, not `:first-child`: the listing's heading stands first in
+`<main>`, and the cards are the `div`s after it -- `:first-child` matches
+no card at all.
 
 Two of them exist rather than one on purpose: a single mark on the
 continuations would force you to write the first page's look
@@ -112,9 +115,194 @@ unconditionally and then take it back property by property, and a rule that
 undoes another is the kind a later change quietly stops undoing. Scope
 positively instead.
 
+One card can be more than first by position. With `layout.lead_card` on
+in `config/site.yml`, the card that opens the front page is marked for
+you -- and handed its post's first picture, placed before its words
+whatever the height budget would have cut, when the post has one:
+
+```css
+.post-list-item--lead .content figure img { width: 100%; }
+```
+
+The mark goes with the place, not with the picture. A post with nothing to
+lead with keeps the body its card would have had -- a video post its video,
+with `post-list-item--media` beside the mark -- and is the lead all the
+same, so the card you dressed does not vanish the day the post that opens
+the front page has no picture. Write the lead's rules so that they hold
+without a picture too. Without the setting no card carries the class, and a rule scoped to
+it does nothing; `.page-first .post-list-item:first-of-type` alone cannot
+do this, because the picture is usually not in the card to be styled.
+
+A card of a picture post or a video post opens with its medium on every
+listing, setting or no setting, and says so: `.post-list-item--media`. One
+whose medium is taller than wide, or square, is also
+`.post-list-item--media-tall`, and `site.css` holds that medium to
+`max-height: 22rem` so it does not take a screen to itself:
+
+```css
+.post-list-item--media .content > figure:first-child img { border-radius: 8px; }
+.post-list-item--media-tall .content > figure:first-child img { max-height: 28rem; }
+```
+
+The build charges the card's height budget those same 22rem, so a much
+smaller cap leaves room the card does not use and a much larger one lets
+the card run long; neither breaks anything. A lead card that leads with
+its picture stays `--lead` alone; a video post's lead with no picture to
+lead with is the media card it would have been, with `--lead` beside its
+marks.
+
 The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
 listing names itself.
+
+## What the markup marks for you
+
+A stylesheet can only style what it can select. Each of these was one run
+of text, or one element among identical ones, until a skin needed to tell
+the parts apart -- so each is marked. Most look exactly as they did
+until a rule of yours says otherwise; the page dates and the count are
+new words on the page, and `site.css` styles those two.
+
+**The parts of the series sentence.** "Nový Sean.cz — part 3 of 19" is
+three spans: `.series-note__name`, `.series-note__sep` and
+`.series-note__part`. On the series' own listing every card repeats the
+name the heading has just said:
+
+```css
+.listing-heading--series ~ .post-list-item .series-note__name,
+.listing-heading--series ~ .post-list-item .series-note__sep { display: none; }
+```
+
+The joiner is a span of its own so that hiding the name does not leave a
+dash opening the line.
+
+**The year of an archive page.** Its heading says a kind and a value, as
+a tag's and a series' do: `.listing-heading__kind` is the word "Archive",
+`.listing-heading__value` is the year, and the year alone is the link
+back to the map of years. Whatever sets the value apart on
+`.listing-heading--tag` now works on `.listing-heading--archive` too.
+
+**A listing's own tag.** On `/tag/hills/` every card has "hills" among
+its pills. That pill is `.tag-pill.tag-pill-own` there, and an ordinary
+`.tag-pill` on every other page:
+
+```css
+.tag-pill-own { opacity: 0.5; }
+```
+
+**A count of nothing.** The three numbers under a post -- favourites,
+boosts, replies -- are `.post-stat`; one that is zero is
+`.post-stat.post-stat--zero` as well. The zero is still written, so the
+row keeps its three places; whether it is worth reading is yours to say:
+
+```css
+.post-stat--zero { visibility: hidden; }
+```
+
+The numbers are filled in by a script after the page loads, so this is a
+class you will not find by reading the built HTML.
+
+**A mention and a hashtag in a post's text.** A link whose whole text is
+"@somebody" or "#something" -- in a post, or in a text the site says
+about itself (`about.html`) -- is `a.mention`, a hashtag `a.mention.hashtag`
+as well -- the classes Mastodon's own markup gives them, which is what
+the comments under a post and the toots in the sidebar already carry. One
+rule now reaches all three:
+
+```css
+a.mention { text-decoration: none; }
+```
+
+**The author among the replies.** A reply from the account that announced
+the post is `.comment.comment--author`. The script tells it by the
+address of the announcement, so it works for a live thread, a moderated
+one and a Bluesky one alike.
+
+**An answer to a comment.** A reply that answers another reply, rather
+than the post, is `.comment.comment--reply`, and `site.css` sets it in by
+the width of a picture (`margin-left`, less below 700px). One step
+whatever the depth: the list is in thread order, so an answer already
+stands under what it answers. To have the thread flat again, set the
+margin to zero. In a live thread the page reads the answer off the
+thread; on a moderated site the cron that writes `comments.json` marks
+it (`reply: true`), so the indent appears with the next refresh.
+
+**The search's count and its matches.** The status over the results is
+`<span class="search-count">4</span> <span class="search-unit">results</span>`,
+so a skin can keep the number and drop the word. In a result's title and
+excerpt the words that were asked for are `<mark>`; `site.css` gives it
+the pills' ground instead of the browser's yellow
+(`.search-result mark`).
+
+**The days a page covers.** Under a listing, the label between the two
+links is `page 12` -- the word in `.pagination-word`, the number in
+`.pagination-number` -- followed by `.pagination-sep` (the dot) and
+`.pagination-dates`; on the page the numbering starts from,
+`.pagination-start` stands where the link to older posts would.
+`site.css` hides the dot and puts the dates on a line of their own under
+the number; to have them on one line, show the dot and make the dates
+inline -- and then look at it on a phone, where two links and a range
+across a new year do not fit beside each other.
+
+**How many a listing holds.** The number after a heading's name is
+`<sup class="listing-heading__count">` -- on the first page of a tag's or
+a type's listing, on every page of a series, on an archive year and on
+the map of years, and on the two lists of lists: `/tag/` (how many tags)
+and `/series/` (how many series). It is not on `/page/N/` of a tag, so do
+not build a layout that needs it there -- and a skin that hides it has
+those two pages to hide it on as well.
+
+**The archive's cells, three times.** A month is `.archive-month` with one
+of `.is-l1` to `.is-l4` or `.is-empty`, and it is drawn in three places
+from the same markup: the map on `/archive/`, the legend that is the map's
+last row (`<li class="archive-legend">`, its two words
+`.archive-legend__word`), and the row at the top of a year
+(`<p class="archive-jump">`, its label `.archive-jump__label`). Repaint
+`.archive-month.is-l3` and all three follow; that is the point of sharing
+it. The legend's cells are empty and are not links.
+
+**The row of letters on the tag index.** `<p class="tag-index-jump">`
+holds a label, `.tag-index-jump__label`, and a link per letter. The
+switch hides it with the `hidden` attribute while the list is in count
+order, so if your skin gives the row a `display`, keep
+`.tag-index-jump[hidden] { display: none; }` after it -- `site.css` has to
+say the same thing for the same reason.
+
+**The index of series.** `/series/` is `<ul class="series-index">` with a
+`<li class="series-index-item">` per series: the name
+(`a.series-index-name`), the number of parts (`sup.series-index-count`)
+and the years (`span.series-index-years`). Its heading is
+`.listing-heading--series-index`.
+
+**The ways on from the 404 page.** Under its sentence the page has a
+search field and a row of pills. Both are things you have styled already,
+with a class added: the field is the bar's `<form class="search-form">`
+and is also `.not-found-search`; the pills are a post's tag pills, in
+`<div class="tags not-found-links">`, each `.tag-pill.not-found-link`
+and one of `--back`, `--archive`, `--year`, `--tags`. So a skin gets them
+dressed without a rule -- and usually wants two anyway, because a 404
+that centres its sentence will want these centred with it:
+
+```css
+.not-found-search { margin-inline: auto; }
+.not-found-links  { text-align: center; }
+```
+
+`site.css` gives the field a border (the bar's field has none: it is a
+light patch on a coloured strip) and makes the input fill its form with
+`main .not-found-search input` -- one step heavier than the bar's rule on
+purpose, so the width your skin gave the field in the bar does not shrink
+this one. A year's pill carries `hidden` until the page's script shows
+it; if you give `.not-found-link` a `display`, keep
+`.not-found-link[hidden] { display: none; }` after it.
+
+**A result on the cheat sheet.** On `/markdown/` what a source becomes
+stands in `<div class="md-example">`, right under the `<pre>` that shows
+the source. Without a rule it is invisible, which is the default look:
+
+```css
+.md-example { border-left: 2px solid var(--accent); padding-left: 1rem; }
+```
 
 ## Structures the engine leans on
 
@@ -175,8 +363,10 @@ row is wider than the button alone, and a menu that ran up to the button
 will run under the chip.
 
 The chip is ONE link, not a link per language: a click anywhere on it
-moves to the next language the site publishes and wraps around at the
-end, the way the button beside it cycles light → dark → system. The codes
+moves to the next language the page is in and wraps around at the
+end, the way the button beside it cycles light → dark → system (a
+language that has nothing of the page is passed over, and carries
+`.is-elsewhere`). The codes
 inside it are spans, so style `.lang-switch__item` for how a language
 looks and `a.lang-switch` for how the control behaves.
 
@@ -202,6 +392,33 @@ The chip is a `<nav>`, so the menu's own rules reach it -- gap, minimum
 height, borders. Its rule says all of them again; if you restyle it from
 scratch, say them again too, or it will quietly grow into a menu bar.
 
+### A header without its picture is the same header
+
+With `banner.show_image: false` the markup is the banner's with the `<img>`
+taken out and nothing else moved:
+
+```
+.banner-wrap.banner-wrap--plain
+  a.banner-link        empty, named by aria-label; laid over the whole header
+  .banner-overlay      as before
+    .banner-title
+    .banner-claim
+  .banner-tools / #theme-toggle
+```
+
+The stylesheet's own rules for it all hang on `:where(.banner-wrap--plain)`,
+which weighs nothing: each is exactly as heavy as the rule it replaces, and
+your `.banner-overlay`, `.banner-title` or `.banner-claim` wins as it always
+has. The scrims are excluded the same way, so
+`.banner-wrap:has(.banner-claim)::after { content: none; }` in a skin still
+switches one off on a site that shows its picture.
+
+A skin that already draws its own header -- `.banner { display: none; }`,
+its own layout for the overlay -- loses nothing by the setting and has
+nothing to change: the site looks the same, and its readers stop downloading
+a picture nobody showed them. If your skin leaves the header to the engine,
+`.banner-wrap--plain` is the class to hang a plain header's look on.
+
 ### The excerpt is a positioning context
 
 `.content.excerpt` is `max-height: 500px; overflow: hidden; position:
@@ -225,6 +442,40 @@ Cap the children instead:
 
 ```css
 .content > * { max-width: 62ch; }
+```
+
+### Something sticky is as wide as its column, and letters are not
+
+A `position: sticky` heading with a background covers what scrolls under
+it -- across its own width, which is the column's. Type does not stay
+inside the column: the hook of a "j", an italic's lean, a hanging quote
+all reach a pixel or two past the edge, and those pixels scroll by beside
+the bar, uncovered. It reads as a rendering fault and is not one.
+
+Carry the background past the column instead of trimming the text:
+
+```css
+.archive-section h2 {
+  position: sticky; top: 0;
+  background: var(--card-bg);
+  margin-inline: -0.5rem; padding-inline: 0.5rem;
+}
+```
+
+### A link stretched over a row needs the whole row to stand in
+
+Making a row one target usually means stretching its link over it:
+`position: absolute; inset: 0` on the link, `position: relative` on the
+row. In a row that is laid out as a grid this covers one cell, not the
+row. An absolutely positioned child of a grid container that is placed in
+a grid area takes that AREA as its containing block, and a link you put in
+the title column is placed in one.
+
+Take the placement off the stretched box:
+
+```css
+.archive-list li { display: grid; position: relative; }
+.archive-list li a::after { content: ""; position: absolute; inset: 0; grid-area: auto; }
 ```
 
 ## Checking a skin
@@ -261,6 +512,23 @@ Three traps in browser tooling, all of which have cost an afternoon here:
 - The preview cache outlives a reload. A different origin
   (`127.0.0.1` instead of `localhost`) gets you one clean look; after
   that, version the stylesheet's address in the built page.
+- `:focus` and `:focus-visible` do not match in a headless browser unless
+  the page is told it has focus -- a window nobody is looking at has
+  none. A focus ring that "does not work" there may be fine, and one that
+  was never drawn may pass; turn focus emulation on before judging either,
+  and then press Tab for real once.
+
+And one in the engine's own tooling. `./blog.sh rebuild` does not wait for
+a run that is already going -- a scheduled publish, a sidebar refresh. It
+says so, marks the site as owing a deploy and leaves; the next scheduled
+run sends what you changed. So "I rebuilt and the site looks the same" is
+sometimes the truth for another minute. Before deciding a rule does not
+work, compare the stylesheet the live site serves with the one you wrote:
+
+```bash
+curl -s https://YOUR-BLOG/assets/css/skin.css | shasum -a 256
+shasum -a 256 assets/css/skin.css
+```
 
 ## Two skins that exist
 

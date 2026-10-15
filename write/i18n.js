@@ -23,7 +23,11 @@ window.I18N = {
       "no_cd": "Server nedokázal vstoupit do adresáře instalace.",
       "no_reply": "Server neodpověděl. Příspěvek se přesto mohl uložit — než ho pošleš znovu, mrkni na blog.",
       "bad_reference": "Obrázek se smí odkazovat jenom jménem, bez cesty. Tyhle ji mají:",
-      "name_taken": "V incoming/ je pod tím jménem něco, co není obyčejný soubor -- složka nebo symbolický odkaz. Nic se nepřepsalo. Přejmenuj obrázek, nebo na serveru ukliď, co pod tím jménem leží."
+      "name_taken": "V incoming/ je pod tím jménem něco, co není obyčejný soubor -- složka nebo symbolický odkaz. Nic se nepřepsalo. Přejmenuj obrázek, nebo na serveru ukliď, co pod tím jménem leží.",
+      "changed": "Koncept se na blogu mezitím změnil, takže se nic nepřepsalo. Otevři ho znovu a začni od toho, co v něm je teď.",
+      "not_a_draft": "Ten příspěvek už je publikovaný. Z telefonu jde upravit jen koncept.",
+      "not_found": "Takový koncept na blogu není.",
+      "content_lost": "Uložením by se ztratila část obsahu, kterou markdown neumí, takže se nic nezapsalo."
     },
     "app": {
       "mode_draft": "Koncept",
@@ -113,7 +117,24 @@ window.I18N = {
       "saved_instead": "Tenhle prohlížeč soubory předat neumí, takže jsou uložené v jednom archivu. ROZBAL ho a zkratce předej soubory z něj -- blog bere soubory, ne archivy.",
       "share_cancelled": "Předáno. Až zkratka doběhne, otevře se tu odpověď -- pokud jsi místo toho zavřel panel sdílení, neodešlo nic.",
       "share_retry_txt": "Tenhle prohlížeč soubor .md nesdílí, tak klepni znovu: text pak půjde jako .md.txt a blog mu jméno vrátí.",
-      "not_saved": "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj."
+      "not_saved": "Nepodařilo se to uložit do zařízení — došlo místo. Pošli to hned, nebo si text někam zkopíruj.",
+      "open_drafts": "Otevřít koncept z blogu",
+      "drafts_asking": "Předáno zkratce. Seznam konceptů přijde jako odpověď.",
+      "drafts_failed": "Žádost o koncepty se nepodařilo předat zkratce.",
+      "drafts_saved": "Tenhle prohlížeč neumí sdílet, žádost se uložila jako drafts.txt. Pošli ji zkratkou ručně.",
+      "drafts_title": "Koncepty na blogu",
+      "drafts_none": "Na blogu teď žádný koncept není.",
+      "drafts_scheduled": "naplánovaný na {when}",
+      "drafts_omitted": "text přijde po klepnutí",
+      "drafts_problem_content_lost": "z telefonu nejde upravit: markdown by část obsahu ztratil",
+      "drafts_problem_missing_media": "z telefonu nejde upravit: chybí obrázek, který jmenuje",
+      "drafts_problem_unreadable": "z telefonu nejde upravit: text nejde přečíst zpět",
+      "drafts_replace": "Přepsat rozepsaný text?",
+      "draft_loaded": "Koncept je načtený. Uprav ho a odešli, na blogu se přepíše.",
+      "editing": "Upravuješ koncept „{title}“",
+      "editing_note": "Odeslání ho na blogu přepíše. Obrázek, který text přestane jmenovat, se ze serveru smaže.",
+      "existing_image": "na blogu",
+      "drop_existing_send": "Text už nejmenuje {names}, po odeslání se ze serveru smaže. Klepni znovu, jestli je to tak."
     }
   },
   "de": {
@@ -138,7 +159,11 @@ window.I18N = {
       "no_cd": "Der Server konnte das Installationsverzeichnis nicht betreten.",
       "no_reply": "Der Server hat nicht geantwortet. Der Beitrag kann trotzdem gespeichert sein — sieh im Blog nach, bevor du ihn erneut schickst.",
       "bad_reference": "Ein Bild darf nur mit seinem Namen angegeben werden, ohne Pfad. Diese haben einen:",
-      "name_taken": "Unter diesem Namen liegt in incoming/ etwas, das keine gewöhnliche Datei ist -- ein Ordner oder ein Link. Es wurde nichts ersetzt. Benenne das Bild um, oder entferne auf dem Server, was dort unter diesem Namen liegt."
+      "name_taken": "Unter diesem Namen liegt in incoming/ etwas, das keine gewöhnliche Datei ist -- ein Ordner oder ein Link. Es wurde nichts ersetzt. Benenne das Bild um, oder entferne auf dem Server, was dort unter diesem Namen liegt.",
+      "changed": "Der Entwurf hat sich im Blog inzwischen geändert, deshalb wurde nichts überschrieben. Öffne ihn erneut und fang bei dem an, was jetzt darin steht.",
+      "not_a_draft": "Dieser Beitrag ist schon veröffentlicht. Vom Telefon lässt sich nur ein Entwurf bearbeiten.",
+      "not_found": "Diesen Entwurf gibt es im Blog nicht.",
+      "content_lost": "Beim Speichern ginge ein Teil des Beitrags verloren, den Markdown nicht fassen kann, deshalb wurde nichts geschrieben."
     },
     "app": {
       "mode_draft": "Entwurf",
@@ -228,7 +253,24 @@ window.I18N = {
       "saved_instead": "Dieser Browser gibt keine Dateien weiter, also liegen sie in einem Archiv. PACKE es aus und gib dem Kurzbefehl die Dateien darin -- das Blog nimmt Dateien, keine Archive.",
       "share_cancelled": "Übergeben. Sobald der Kurzbefehl fertig ist, erscheint die Antwort auf dieser Seite -- wurde stattdessen das Teilen-Menü geschlossen, ist nichts abgeschickt.",
       "share_retry_txt": "Dieser Browser gibt eine .md-Datei nicht weiter, also noch einmal tippen: der Text geht dann als .md.txt, das Blog stellt den Namen wieder her.",
-      "not_saved": "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin."
+      "not_saved": "Konnte nicht auf dem Gerät gesichert werden -- kein Platz mehr. Schicke es jetzt oder kopiere den Text woandershin.",
+      "open_drafts": "Entwurf aus dem Blog öffnen",
+      "drafts_asking": "An den Kurzbefehl übergeben. Die Liste der Entwürfe kommt als Antwort.",
+      "drafts_failed": "Die Anfrage nach Entwürfen ließ sich nicht an den Kurzbefehl übergeben.",
+      "drafts_saved": "Dieser Browser kann nicht teilen, die Anfrage wurde als drafts.txt gespeichert. Schick sie von Hand mit dem Kurzbefehl.",
+      "drafts_title": "Entwürfe im Blog",
+      "drafts_none": "Im Blog gibt es gerade keinen Entwurf.",
+      "drafts_scheduled": "geplant für {when}",
+      "drafts_omitted": "der Text kommt beim Antippen",
+      "drafts_problem_content_lost": "vom Telefon nicht bearbeitbar: Markdown würde einen Teil verlieren",
+      "drafts_problem_missing_media": "vom Telefon nicht bearbeitbar: ein genanntes Bild fehlt",
+      "drafts_problem_unreadable": "vom Telefon nicht bearbeitbar: der Text lässt sich nicht zurücklesen",
+      "drafts_replace": "Den angefangenen Text ersetzen?",
+      "draft_loaded": "Der Entwurf ist offen. Bearbeite ihn und schick ihn ab, dann wird er im Blog ersetzt.",
+      "editing": "Du bearbeitest den Entwurf „{title}“",
+      "editing_note": "Das Senden ersetzt ihn im Blog. Ein Bild, das der Text nicht mehr nennt, wird vom Server gelöscht.",
+      "existing_image": "im Blog",
+      "drop_existing_send": "Der Text nennt {names} nicht mehr, nach dem Senden wird es vom Server gelöscht. Tippe noch einmal, wenn das so stimmt."
     }
   },
   "en": {
@@ -253,7 +295,11 @@ window.I18N = {
       "no_cd": "The server could not enter the installation directory.",
       "no_reply": "The server said nothing. It may still have saved the post -- check the blog before sending it again.",
       "bad_reference": "A picture must be referenced by name alone, without a path. These have one:",
-      "name_taken": "Something of that name in incoming/ is not an ordinary file -- a folder, or a link. Nothing was replaced. Rename the picture, or clear that name on the server."
+      "name_taken": "Something of that name in incoming/ is not an ordinary file -- a folder, or a link. Nothing was replaced. Rename the picture, or clear that name on the server.",
+      "changed": "The draft changed on the blog in the meantime, so nothing was overwritten. Open it again and start from what it says now.",
+      "not_a_draft": "That post is already published. Only a draft can be edited from the phone.",
+      "not_found": "There is no such draft on the blog.",
+      "content_lost": "Saving would lose part of the post that markdown cannot hold, so nothing was written."
     },
     "app": {
       "mode_draft": "Draft",
@@ -343,7 +389,24 @@ window.I18N = {
       "saved_instead": "This browser will not hand files over, so they are saved as one archive. UNPACK it, then give the files inside to the shortcut -- the blog takes files, not archives.",
       "share_cancelled": "Handed over. The answer opens on this page once the shortcut is done -- if you closed the sheet instead, nothing was sent.",
       "share_retry_txt": "This browser will not share a file called .md, so tap again: the text then goes as .md.txt and the blog puts the name back.",
-      "not_saved": "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe."
+      "not_saved": "Could not keep this on the device -- it is out of room. Send it now, or copy the text somewhere safe.",
+      "open_drafts": "Open a draft from the blog",
+      "drafts_asking": "Handed to the shortcut. The list of drafts comes back as its answer.",
+      "drafts_failed": "The request for drafts could not be handed to the shortcut.",
+      "drafts_saved": "This browser cannot share, so the request was saved as drafts.txt. Send it with the shortcut by hand.",
+      "drafts_title": "Drafts on the blog",
+      "drafts_none": "There are no drafts on the blog right now.",
+      "drafts_scheduled": "scheduled for {when}",
+      "drafts_omitted": "its text comes when you tap",
+      "drafts_problem_content_lost": "not editable from the phone: markdown would lose part of it",
+      "drafts_problem_missing_media": "not editable from the phone: a picture it names is missing",
+      "drafts_problem_unreadable": "not editable from the phone: its text does not read back",
+      "drafts_replace": "Replace what you are writing?",
+      "draft_loaded": "The draft is open. Edit it and send it, and it is replaced on the blog.",
+      "editing": "Editing the draft “{title}”",
+      "editing_note": "Sending replaces it on the blog. A picture the text stops naming is deleted from the server.",
+      "existing_image": "on the blog",
+      "drop_existing_send": "The text no longer names {names}, and it will be deleted from the server. Tap again if that is right."
     }
   }
 };

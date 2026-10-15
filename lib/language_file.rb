@@ -20,7 +20,7 @@
 # says the same thing about an archive without building it. One answer for
 # both, so neither can pass what the other refuses.
 module LanguageFile
-  SETTINGS = %w[fallback ui_language].freeze
+  SETTINGS = %w[fallback ui_language language_name].freeze
 
   # The chrome a language may translate: each section of site.yml and the
   # keys under it that are WORDS. Everything else in those sections -- the
@@ -47,6 +47,10 @@ module LanguageFile
   # its word here. The tag itself -- its address, its page, the posts that
   # carry it -- is one ID in every language; only the label is translated.
   TAG_LABELS = 'tags'
+  # ...and for a series, the same way: `series:` maps a series to its name
+  # here. Its address and its parts are one in every language.
+  SERIES_LABELS = 'series'
+  LABEL_TABLES = [TAG_LABELS, SERIES_LABELS].freeze
 
   # The lists with places in them. A translation says the same places in
   # the same order with other words: a menu that drifts apart between the
@@ -57,13 +61,35 @@ module LanguageFile
     %w[footer links] => ->(entry) { entry['url'].to_s.strip }
   }.freeze
 
-  module_function
+# Sidebar cards with nothing to set up but their name. Kept here rather
+# than beside SiteConfig::Chrome::CARDS because this file is required BY
+# site_config.rb and needs the same answer: a heading given for
+# `on_this_day:` written bare is a heading for a card the site has.
+BARE_CARDS = %w[on_this_day].freeze
 
-  # Every key a language file may carry, as the one-line list a refusal
+module_function
+
+# Whether the site's own config has this card at all, in any shape the
+# engine draws.
+def own_card?(data, name)
+  widgets = dig(data, 'widgets')
+  return false unless widgets.is_a?(Hash) && widgets.key?(name)
+
+  conf = widgets[name]
+  conf.is_a?(Hash) || (BARE_CARDS.include?(name) && (conf.nil? || conf == true))
+end
+
+# Every key a language file may carry, as the one-line list a refusal
   # names.
   def known
     SETTINGS + TEXTS.flat_map { |section, keys| keys.map { |key| "#{section}.#{key}" } } +
-      %w[nav] + WIDGET_TEXTS.map { |key| "widgets.<name>.#{key}" } + [TAG_LABELS]
+      %w[nav] + WIDGET_TEXTS.map { |key| "widgets.<name>.#{key}" } + LABEL_TABLES
+  end
+
+  # Whether a key `problems` names -- "series.Nový Sean.cz" -- is a row of
+  # the table of series, for a caller that has a sentence for each table.
+  def series_key?(key)
+    key.to_s.start_with?("#{SERIES_LABELS}.")
   end
 
   # The chrome of one language laid over the site's own config: sections
@@ -79,14 +105,25 @@ module LanguageFile
       next unless given.is_a?(Hash)
 
       merged[section] = {} unless merged[section].is_a?(Hash)
-      keys.each { |key| merged[section][key] = given[key] if given.key?(key) }
+      keys.each do |key|
+        next unless given.key?(key)
+        # A title given as nothing is not a title: the pages of that
+        # language came out with an empty <title> and an empty heading.
+        # The site's own stands, and `check` says the line is empty.
+        next if section == 'site' && key == 'title' && given[key].to_s.strip.empty?
+
+        merged[section][key] = given[key]
+      end
     end
-    merged['nav'] = lang_data['nav'] if lang_data.key?('nav')
-    merged[TAG_LABELS] = lang_data[TAG_LABELS] if lang_data[TAG_LABELS].is_a?(Hash)
+    merged['nav'] = worded(lang_data['nav'], own.is_a?(Hash) ? own['nav'] : nil, 'label') if lang_data.key?('nav')
+    links = dig(lang_data, 'footer', 'links')
+    merged['footer']['links'] = worded(links, dig(own, 'footer', 'links'), 'title') if links.is_a?(Array) && merged['footer'].is_a?(Hash)
+    LABEL_TABLES.each { |table| merged[table] = lang_data[table] if lang_data[table].is_a?(Hash) }
     widgets = lang_data['widgets'].is_a?(Hash) ? lang_data['widgets'] : {}
     widgets.each do |name, conf|
-      next unless conf.is_a?(Hash) && dig(merged, 'widgets', name).is_a?(Hash)
+      next unless conf.is_a?(Hash) && own_card?(merged, name)
 
+      merged['widgets'][name] = {} unless merged['widgets'][name].is_a?(Hash)
       WIDGET_TEXTS.each { |key| merged['widgets'][name][key] = conf[key] if conf.key?(key) }
     end
     merged
@@ -104,13 +141,76 @@ module LanguageFile
   #                with nothing on it
   #   :mismatch -- a list with places in it that names other places than
   #                the site's own does, or the same ones in another order
+  # What a language calls itself, as its own file says it: the name a
+  # reader looking for it recognises ("Slovenčina"). The engine has one
+  # for every language it speaks (`language_name` in locales/<code>.yml);
+  # a language that borrows its interface from another has no such file,
+  # and without this line the switch that leads to it said "SK". '' when
+  # the file says none -- or says something that is not a word.
+  def own_name(lang_data)
+    name = lang_data.is_a?(Hash) ? lang_data['language_name'] : nil
+    name.is_a?(String) ? name.strip : ''
+  end
+
+  # The word an entry of a placed list is shown by.
+  WORD_OF = { %w[nav] => 'label', %w[footer links] => 'title' }.freeze
+
+  # A list of a language with the site's own word wherever the language
+  # gave none. The lists go to the same places item by item (PLACED_LISTS),
+  # "only the label changes" -- so an item with no label of its own is the
+  # same item under the label the site has for it. Left wordless it fell
+  # out of that language's menu, and the build blamed config/site.yml.
+  def worded(theirs, mine, key)
+    return theirs unless theirs.is_a?(Array) && mine.is_a?(Array)
+
+    theirs.each_with_index.map do |entry, i|
+      next entry unless entry.is_a?(Hash) && entry[key].to_s.strip.empty? && mine[i].is_a?(Hash) && !mine[i][key].to_s.strip.empty?
+
+      entry.merge(key => mine[i][key])
+    end
+  end
+
+  # What a file says that the build lives with and its author would not
+  # have meant: [kind, key, detail]. Nothing here stops a build; `check`
+  # says each of them once.
+  # With the site's own data given, an item without a word is remarked on
+  # only where the site's own word IS shown in its place. An item with no
+  # word in either list is in no menu at all -- the site's own mistake,
+  # which doctor names -- and was said to be "shown under the word the
+  # site's own list has for it" (third fleet, 10. 10. 2026).
+  def remarks(lang_data, own = nil)
+    return [] unless lang_data.is_a?(Hash)
+
+    found = []
+    found << [:blank, 'site.title', nil] if written?(lang_data, %w[site title]) && dig(lang_data, 'site', 'title').to_s.strip.empty?
+    WORD_OF.each do |path, key|
+      theirs = dig(lang_data, *path)
+      next unless theirs.is_a?(Array)
+
+      mine = own.is_a?(Hash) ? dig(own, *path) : nil
+      theirs.each_with_index do |entry, i|
+        next unless entry.is_a?(Hash) && entry[key].to_s.strip.empty?
+        next if own && !(mine.is_a?(Array) && mine[i].is_a?(Hash) && !mine[i][key].to_s.strip.empty?)
+
+        found << [:wordless, path.join('.'), i + 1]
+      end
+    end
+    found
+  end
+
   def problems(own, lang_data)
     return [] unless lang_data.is_a?(Hash)
 
     own = {} unless own.is_a?(Hash)
     found = []
     lang_data.each do |key, value|
-      if SETTINGS.include?(key) || key == 'nav'
+      if key == 'language_name' && !value.nil? && !value.is_a?(String)
+        # `language_name: no` is false to YAML and `2026` a number: the
+        # switch then said the code, and check asked for the line that was
+        # there (third fleet, 10. 10. 2026). The same mistake a label can
+        # make, said the same way.
+        found << [:not_text, key, value]
+      elsif SETTINGS.include?(key) || key == 'nav'
         next
       elsif TEXTS.key?(key)
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
@@ -122,19 +222,23 @@ module LanguageFile
 
           found << [:orphan, name, nil] if dig(own, key, sub).to_s.strip.empty?
         end
-      elsif key == TAG_LABELS
+      elsif LABEL_TABLES.include?(key)
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
         value.each do |tag, label|
           next if label.is_a?(String) && !label.strip.empty?
 
-          found << [label.nil? || label.is_a?(String) ? :empty : :unknown, "#{key}.#{tag}", nil]
+          # A word YAML did not read as text -- `ne: no` is false, `palm:
+          # 2019` a number -- is its own mistake: called an unknown key it
+          # was blamed on `tags`, which the same sentence then listed among
+          # the keys the engine knows.
+          found << (label.nil? || label.is_a?(String) ? [:empty, "#{key}.#{tag}", nil] : [:not_text, "#{key}.#{tag}", label])
         end
       elsif key == 'widgets'
         next found << [:unknown, key, nil] unless value.is_a?(Hash)
 
         value.each do |name, conf|
-          next found << [:orphan, "widgets.#{name}", nil] unless dig(own, 'widgets', name).is_a?(Hash)
+          next found << [:orphan, "widgets.#{name}", nil] unless own_card?(own, name)
           next found << [:unknown, "widgets.#{name}", nil] unless conf.is_a?(Hash)
 
           conf.each_key { |sub| found << [:unknown, "widgets.#{name}.#{sub}", nil] unless WIDGET_TEXTS.include?(sub) }
@@ -175,14 +279,24 @@ module LanguageFile
   # engine folds every spelling of a tag into, so `Filozofie:` and
   # `filozofie:` name the one page. The slug is the caller's to compute
   # (Slug.slugify), which keeps this file free of it.
-  def tag_labels(data)
-    given = data.is_a?(Hash) ? data[TAG_LABELS] : nil
+  def tag_labels(data, &slug)
+    labels_of(data, TAG_LABELS, &slug)
+  end
+
+  # The names a language gives its series, by the series' slug -- which is
+  # its address, the same in every language.
+  def series_labels(data, &slug)
+    labels_of(data, SERIES_LABELS, &slug)
+  end
+
+  def labels_of(data, table)
+    given = data.is_a?(Hash) ? data[table] : nil
     return {} unless given.is_a?(Hash)
 
-    given.each_with_object({}) do |(tag, label), labels|
+    given.each_with_object({}) do |(name, label), labels|
       next unless label.is_a?(String) && !label.strip.empty?
 
-      labels[yield(tag.to_s)] = label.strip
+      labels[yield(name.to_s)] = label.strip
     end
   end
 

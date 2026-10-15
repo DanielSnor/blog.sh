@@ -35,7 +35,11 @@ require_relative 'feeds'
 require_relative 'output'
 require_relative 'discovery'
 require_relative 'cards'
+require_relative 'languages'
+require_relative 'tags'
+require_relative 'archive'
 require_relative '../lib/series'
+require_relative '../lib/on_this_day'
 
 # ⚠️ Before moving a method out of this file: the templates in templates/
 # are rendered against this script's binding, so every helper they call
@@ -168,6 +172,72 @@ def cheat_sheet_source
 end
 CHEAT_SHEET_SOURCE = cheat_sheet_source
 CHEAT_SHEET_PATH = '/markdown/'
+# The pictures the sheet's own examples show: a section about pictures
+# that draws none leaves the reader to imagine a caption and a gallery.
+# Two drawings of a few hundred bytes each, drawn rather than photographed
+# so the page that explains pictures does not open with a download.
+#
+# They are assets, and live among them: everything under assets/ is
+# copied onto the site as it stands, so nothing here has to publish them,
+# and one copy serves the sheet of every language. To the parser the
+# folder is the sheet's media -- a bare file name in an example is found
+# there and keeps its name, exactly as a post's picture does on a second
+# save.
+CHEAT_SHEET_MEDIA_DIR = File.join(ROOT, 'assets', 'cheat-sheet')
+CHEAT_SHEET_MEDIA_PATH = '/assets/cheat-sheet/'
+
+# The sheet's picture blocks, each with its file's size written in, so the
+# page reserves the room and a gallery can lay its row out. A picture the
+# sheet names and the engine does not ship is left out: a translation in
+# progress, or a sheet somebody edited, then shows no result where it
+# would have shown a broken picture.
+def cheat_sheet_pictures(blocks)
+  blocks.filter_map do |block|
+    next block unless block.is_a?(Hash) && block['type'] == 'image'
+
+    media = (block['media'] || []).first || {}
+    name = media['url'].to_s
+    file = File.join(CHEAT_SHEET_MEDIA_DIR, name)
+    next nil unless !name.empty? && File.basename(name) == name && File.file?(file)
+
+    root = File.read(file, encoding: 'utf-8')[/<svg\b[^>]*>/].to_s
+    width = root[/\swidth="(\d+)"/, 1]
+    height = root[/\sheight="(\d+)"/, 1]
+    size = width && height ? { 'width' => width.to_i, 'height' => height.to_i } : {}
+    block.merge('media' => [media.merge(size)])
+  end
+end
+
+# The sheet shows a source and, under it, what that source becomes. The
+# second half came out as bare paragraphs, lists and quotes, in the same
+# column and the same type as the sentences explaining them -- so a reader
+# could not tell "this is the result" from "this is the next remark", and a
+# stylesheet had nothing to set the result apart with.
+#
+# Which blocks ARE a result cannot be worked out: a remark sometimes stands
+# between a source and its result, and a result is sometimes deliberately
+# not what the source says (six heading levels shown, three drawn). So the
+# sheet says it itself, with a line of its own before and after:
+#
+#     ::: example
+#     ...
+#     ::: end
+#
+# Not syntax -- nothing outside this one file reads it, and the sheet does
+# not teach it. Each marker is a paragraph by the time it gets here, and
+# the two become the opening and the closing of one element. A sheet that
+# opens one and never closes it (a translation in progress) gets the
+# markers taken out and no element at all, rather than a page whose every
+# following block is nested in the one that was left open.
+def cheat_sheet_examples(html)
+  marks = html.scan(%r{<p>::: (example|end)</p>}).flatten
+  paired = marks.each_slice(2).all? { |pair| pair == %w[example end] }
+  html.gsub(%r{<p>::: (example|end)</p>}) do
+    next '' unless paired
+
+    Regexp.last_match(1) == 'example' ? '<div class="md-example">' : '</div>'
+  end
+end
 
 # Everything that used to be hardcoded in templates and here lives in
 # config/site.yml. SITE_BASE_URL may be overridden by env.sh -- it's the one
@@ -177,6 +247,19 @@ SITE_TITLE = SiteConfig.fetch('site', 'title')
 SITE_SHORT_NAME = SiteConfig.fetch('site', 'short_name')
 SITE_DESCRIPTION = SiteConfig.fetch('site', 'description')
 SITE_AUTHOR = SiteConfig.fetch('site', 'author')
+# The author's name as a name. `site.author` is the name as the site's own
+# sentences need it, and in a language that inflects names that is not the
+# name: a Czech site says "na osobním webu Daniela Šnora", so `author` is
+# written in the genitive -- and then stood, in the genitive, alone under a
+# hero title, in the structured data as the Person's name, and in English
+# on that site's /en/ pages ("on Daniela Šnora's personal site").
+# `site.author_name` is the form that stands alone. Optional: without it
+# `author` is the name everywhere, as it always was, so a site that never
+# heard of this key builds exactly what it built.
+SITE_AUTHOR_NAME = begin
+  own = SiteConfig.get('site', 'author_name', default: nil).to_s.strip
+  own.empty? ? SITE_AUTHOR : own
+end
 # Stylesheets loaded after the site's own, so a skin can live in a file of
 # the site's own rather than in an edited template. Local paths only, and
 # the refusal is loud: every page carries style-src 'self', so a
@@ -272,11 +355,16 @@ LOCALE_FOR_LANG = { 'cs' => 'cs_CZ', 'de' => 'de_DE', 'en' => 'en_US' }.freeze
 # variable set": `rebuild` sets BLOG_SH_LANG for every run, the site's own
 # included, so asking about the variable threw away a pinned en_GB/pt_BR
 # the day a site added its second language.
-SITE_LOCALE = if I18n.lang.to_s == SiteConfig.get('site', 'lang', default: 'en').to_s
-                SiteConfig.get('site', 'locale',
-                               default: LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US'))
+#
+# A language the engine has no locale for -- one that borrows its interface
+# (ui_language) -- has no territory this table knows, and the fallback for
+# it used to be en_US: every page of a Slovak branch said <html lang="sk">
+# and og:locale="en_US". Unknown is said as nothing; a site that wants one
+# for its own language names it (site.locale), as before.
+SITE_LOCALE = if SITE_LANG == SiteConfig.get('site', 'lang', default: 'en').to_s
+                SiteConfig.get('site', 'locale', default: LOCALE_FOR_LANG[SITE_LANG])
               else
-                LOCALE_FOR_LANG.fetch(I18n.lang.to_s, 'en_US')
+                LOCALE_FOR_LANG[SITE_LANG]
               end
 # Where THIS run's content goes, and the addresses it carries.
 #
@@ -294,277 +382,26 @@ LANG_ROOT = SITE_LANG == SITE_OWN_LANG ? '' : "/#{SITE_LANG}"
 CONTENT_ROOT = LANG_ROOT.empty? ? PUBLIC_DIR : File.join(PUBLIC_DIR, SITE_LANG)
 SHARED_ROOTS = %w[/assets/ /write/].freeze
 
-# An address inside this run's language.
+# Everything about languages -- addresses inside this run's language, the
+# stand-in for a missing text, the sweep's share of the tree, alternates,
+# the switcher and the checks a language configuration has to pass --
+# lives in build/languages.rb. The templates call two of its answers by
+# name, so those two keep a name here.
 def loc(path)
-  return path if LANG_ROOT.empty?
-
-  text = path.to_s
-  return text unless text.start_with?('/')
-  return text if SHARED_ROOTS.any? { |root| text.start_with?(root) }
-
-  "#{LANG_ROOT}#{text}"
+  Languages.loc(path)
 end
 
-# Whether this run has a text of its own for the post. In the site's own
-# language always: that text IS the post.
-def translated_here?(post)
-  LANG_ROOT.empty? || Translations.languages(post).include?(SITE_LANG)
-end
-
-# Where a link to the post goes from a page of this language. A post with
-# no text here keeps the one address it has, and gets no page of its own:
-# the same words standing at two addresses is what would otherwise need a
-# canonical, and what hreflang must never be told about (Daniel, 20. 9.
-# 2026 -- the listing carries it, the link goes where the piece really is).
 def post_href(post)
-  lang = stand_in_lang(post)
-  "#{lang_root_for(lang)}#{address_of(post, lang)}"
+  Languages.post_href(post)
 end
 
-# Which languages this site publishes, the site's own first. Absent -- and
-# it is absent on every site today -- means one, and then nothing below
-# renders at all: no switcher and no alternates, because there is nothing
-# to offer and nothing to compare.
-SITE_LOCALES = begin
-  named = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
-  all = ([SITE_OWN_LANG] + named.reject(&:empty?)).uniq
-  # 🪤 A code with no locale file used to be met far from here, in the
-  # language switcher, where `I18n.load_locale` aborts -- and it aborts
-  # with SystemExit, which the rescue there does not catch. So a typo in
-  # `site.locales` stopped the build of EVERY language, including the
-  # site's own, with a sentence telling the reader to change `site.lang`.
-  # A language the engine has no words for is refused -- unless the site
-  # says where to borrow them from, which is what `site.ui_language` is
-  # for. Publishing Slovak with Czech furniture is a decision somebody can
-  # make; inheriting English by accident is not.
-  missing = all.reject do |code|
-    I18n.locale_file?(code) || I18n.locale_file?(SiteConfig.language_data(code)['ui_language'].to_s)
-  end
-  abort(I18n.t('build.unknown_locale', langs: missing.join(', '))) unless missing.empty?
+# Which languages this site publishes, the site's own first -- checked
+# before a single page is written, and aborting on a configuration no
+# run could render (Languages.site_locales says which, and why).
+SITE_LOCALES = Languages.site_locales
 
-  # What a language says about itself lives in config/site.<lang>.yml, and
-  # three things about that are worth stopping for rather than ignoring.
-  #
-  # A table keyed by language inside site.yml is the shape these keys had
-  # before 1.9 shipped: two places to say one thing is how a site ends up
-  # with two answers, so the old one is refused by name rather than read.
-  %w[fallback ui_language].each do |key|
-    next unless SiteConfig.key?('site', key)
-
-    abort(I18n.t('build.language_key_moved', key: key, file: File.basename(SiteConfig.language_path('cs'))))
-  end
-  # A file for a language nothing publishes -- a typo in the name, or a
-  # language taken out of site.locales and its file left behind. Nothing
-  # would ever read it, and a file that does nothing looks like work done.
-  stray = SiteConfig.language_files.keys - (all - [SITE_OWN_LANG])
-  unless stray.empty?
-    abort(I18n.t('build.language_file_stray', files: stray.map { |code| "site.#{code}.yml" }.join(', ')))
-  end
-  # ...and what is wrong inside one (lib/language_file.rb): a key the
-  # engine does not read, a translation of something site.yml does not
-  # have, and a menu or footer list that goes to other places than the
-  # site's own. Each of them silently does nothing, or does something the
-  # site never said -- so every language is asked, not only this run's.
-  #
-  # Read against the file as WRITTEN: by now this run's own config has the
-  # chrome of its language laid over it, and comparing a Czech menu with
-  # itself would find nothing.
-  own_config = SiteConfig.load_yaml(SiteConfig::PATH)
-  sentences = (all - [SITE_OWN_LANG]).flat_map do |code|
-    file = "site.#{code}.yml"
-    LanguageFile.problems(own_config, SiteConfig.language_data(code)).group_by(&:first).flat_map do |kind, found|
-      case kind
-      when :unknown
-        [I18n.t('build.language_key_unknown', file: file, keys: found.map { |f| f[1] }.join(', '),
-                                              known: LanguageFile.known.join(', '))]
-      when :orphan
-        [I18n.t('build.language_key_orphan', file: file, keys: found.map { |f| f[1] }.join(', '))]
-      when :empty
-        [I18n.t('build.language_label_empty', file: file, keys: found.map { |f| f[1] }.join(', '))]
-      else
-        found.map do |_, key, detail|
-          I18n.t('build.language_list_mismatch', file: file, key: key,
-                                                 detail: LanguageFile.describe(detail, file) { |k, **v| I18n.t(k, **v) })
-        end
-      end
-    end
-  end
-  abort(sentences.join("\n")) unless sentences.empty?
-  all.freeze
-end
-
-# Which part of the tree this run's sweep owns.
-#
-# The sweep takes down whatever the build did not write, and two languages
-# are two runs -- so without this the second one carries off the first
-# one's site. A run in another language owns its own root and nothing else;
-# the site's own run owns the tree except the roots that belong to the
-# other languages. Everything else about the sweep is unchanged: an orphan
-# inside a language still goes on the next build OF THAT LANGUAGE.
-def prune_root
-  LANG_ROOT.empty? ? PUBLIC_DIR : CONTENT_ROOT
-end
-
-def foreign_language_roots
-  @foreign_language_roots ||= (SITE_LOCALES - [SITE_LANG]).reject { |lang| lang == SITE_OWN_LANG }
-                                                          .map { |lang| File.join(PUBLIC_DIR, lang) }
-end
-
-def outside_this_language?(path)
-  foreign_language_roots.any? { |root| path == root || path.start_with?("#{root}/") }
-end
-
-# What stands in for this language when a post has nothing in it, nearest
-# first. Only languages the site actually publishes, and never this one:
-# a chain that named a language nobody builds would point readers at a
-# tree that does not exist.
-#
-# 🪤 The site's own language is where every chain ENDS, so it never starts
-# one: a table written symmetrically (`cs: [de]` next to `de: [cs]`) reads
-# as the obvious thing to write and used to take the site apart, because
-# the run that builds the root then rendered the other language's words at
-# the other language's address -- and the permalink every link in the world
-# points at was gone.
-FALLBACK_CHAIN = begin
-  named = LANG_ROOT.empty? ? [] : Array(SiteConfig.language_data(SITE_LANG)['fallback'])
-  (named.map { |code| code.to_s.strip } & SITE_LOCALES) - [SITE_LANG]
-end.freeze
-
-# Which language a post is SHOWN in here: its own words when it has them,
-# then the chain, and the site's own language at the end of it. The words
-# and the address come from this one answer together -- Czech words under
-# a link to the English page is worse than either of them alone.
-def stand_in_lang(post)
-  return SITE_LANG if LANG_ROOT.empty?
-
-  written = Translations.languages(post)
-  return SITE_LANG if written.include?(SITE_LANG)
-
-  FALLBACK_CHAIN.find { |lang| written.include?(lang) } || SITE_OWN_LANG
-end
-
-def lang_root_for(lang)
-  lang.to_s == SITE_OWN_LANG ? '' : "/#{lang}"
-end
-
-# The address without this run's language on it, so another one can be put
-# there instead.
-def bare_path(path)
-  return path.to_s if LANG_ROOT.empty?
-
-  text = path.to_s
-  text.start_with?("#{LANG_ROOT}/") ? text.delete_prefix(LANG_ROOT) : text
-end
-
-# Every language this page can be offered in, and where each one goes.
-#
-# 🪤 For a POST the answer comes from the post, never from rewriting the
-# address: a language it has no words in has no page, so the offer leads to
-# that language's front page instead of a 404 -- and `has` is false, which
-# is what keeps it out of the alternates below. Listings, tags, the archive
-# and the feed are built in every language and carry no per-language name,
-# so for those the language on the address is simply swapped.
-def language_links(path, post: nil)
-  return [] if SITE_LOCALES.length < 2
-
-  bare = bare_path(path)
-  SITE_LOCALES.map do |lang|
-    root = lang_root_for(lang)
-    has = post.nil? || lang == SITE_OWN_LANG || Translations.languages(post).include?(lang)
-    href = if !has
-             "#{root}/"
-           elsif post
-             # 🪤 Asked of the POST, never worked out from the address being
-             # read: the other language serves it under a slug of its own
-             # (lib/translations.rb), so rewriting this one would offer an
-             # address in the right language and the wrong words.
-             "#{root}#{address_of(post, lang)}"
-           else
-             bare == '/' ? "#{root}/" : "#{root}#{bare}"
-           end
-    { 'lang' => lang, 'href' => href, 'has' => has }
-  end
-end
-
-# A post's address in one language, without the language on it. The post's
-# own language answers with the post's own slug, which is what a post that
-# was never translated has everywhere.
-def address_of(post, lang)
-  entry = post['translations'].is_a?(Hash) ? post['translations'][lang.to_s] : nil
-  named = entry.is_a?(Hash) ? entry[Translations::ADDRESS_KEY].to_s.strip : ''
-  PostAddress.path(post.merge('address_slug' => (named.empty? ? post['slug'] : named)),
-                   year: post_time(post).year)
-end
-
-# What a crawler is told about the other languages of THIS page -- built
-# from the ones that exist, never from the list of languages the site
-# publishes. A site that promises an address it never wrote is a site that
-# sends readers to its own 404.
-def alternates_head(links)
-  offered = links.select { |link| link['has'] }
-  return '' if offered.length < 2
-
-  rows = offered.map do |link|
-    %(\n  <link rel="alternate" hreflang="#{h(link['lang'])}" href="#{h(SITE_BASE_URL + link['href'])}">)
-  end
-  own = offered.find { |link| link['lang'] == SITE_OWN_LANG }
-  rows << %(\n  <link rel="alternate" hreflang="x-default" href="#{h(SITE_BASE_URL + own['href'])}">) if own
-  rows.join
-end
-
-# A language's name in its own language, which is the only name a reader
-# looking for it can recognise: somebody who reads German is looking for
-# "Deutsch", not for "nemecky".
-LANGUAGE_NAMES = Hash.new do |cache, code|
-  # Only for a language that has a file: `I18n.load_locale` aborts on one
-  # that has none, and an abort is a SystemExit that no `rescue` here
-  # would catch. SITE_LOCALES refuses those long before this runs.
-  cache[code] = begin
-    I18n.locale_file?(code) ? I18n.load_locale(code.to_s)['language_name'].to_s : ''
-  rescue StandardError
-    ''
-  end
-end
-
-# A language's name, or its code when the engine has no name for it.
-def language_label(code)
-  name = LANGUAGE_NAMES[code]
-  name.empty? ? code.to_s.upcase : name
-end
-
-# The chip in the banner's corner, and it works the way the button beside
-# it works: ONE target, and a click anywhere on it moves you on. The
-# button cycles light → dark → system; this cycles to the next language
-# the site publishes and wraps around at the end.
-#
-# 🪤 It was a row of separate links at first, which looked the same and
-# behaved differently -- a reader had to hit two letters rather than the
-# chip (Daniel, 21. 9. 2026: "ne abych se musel trefovat"). Two controls
-# side by side that take a click differently are one control too many.
-#
-# The face still shows every language it publishes, with the one being
-# read marked, because that is what says where you are; what changed is
-# that the whole chip, not the code inside it, is the thing you click.
-def language_switcher_html(links)
-  return '' if links.length < 2
-
-  here = links.index { |link| link['lang'] == SITE_LANG } || 0
-  nxt = links[(here + 1) % links.length]
-  items = links.map do |link|
-    classes = ['lang-switch__item']
-    classes << 'is-current' if link['lang'] == SITE_LANG
-    classes << 'is-elsewhere' unless link['has']
-    current = link['lang'] == SITE_LANG ? ' aria-current="true"' : ''
-    %(<span class="#{classes.join(' ')}"#{current}>#{h(link['lang'].to_s.upcase)}</span>)
-  end
-  # The name of the language the click LEADS TO -- a label saying "English"
-  # on a control that takes you to Czech is the one thing worse than no
-  # label at all. The same division the button keeps: codes on the face,
-  # the sentence in the title and to a screen reader.
-  name = language_label(nxt['lang'])
-  %(<a class="lang-switch" href="#{h(nxt['href'])}" hreflang="#{h(nxt['lang'])}" ) +
-    %(title="#{h(name)}" aria-label="#{h(name)}">#{items.join}</a>)
-end
+# What stands in for this run's language when a post has nothing in it.
+FALLBACK_CHAIN = Languages.fallback_chain
 
 BANNER = SiteConfig.fetch('banner')
 # Independently optional -- a banner image busy enough on its own (or a
@@ -578,21 +415,28 @@ BANNER = SiteConfig.fetch('banner')
 # per visual property would turn config/site.yml into a stylesheet written
 # in YAML.
 LAYOUT_SIDEBAR = SiteConfig.get('layout', 'sidebar', default: true)
-# The column is only worth reserving when something would stand in it. A site
-# with no about text and no widgets kept an empty <aside> and the grid kept
-# its 260px beside it, so the content sat in a narrowed column with a blank
-# strip alongside -- held space for furniture that was never coming.
-ASIDE_CARDS = %w[toots pixelfed commits bluesky rss].freeze
 # The lead image lifted out of the text and shown above the title. Off
 # unless a site asks for it, because it reshapes every post page it
 # touches -- and a site is entitled to have had the shape it has.
 LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
+# The first card on the front page opened with its post's picture, and
+# marked as the lead whether or not there was one (build/cards.rb). Off
+# unless a site asks for it: a card is cut by height, so a picture that
+# stands after the opening paragraph usually falls outside it, and a
+# front page that suddenly leads with one is a front page reshaped.
+LAYOUT_LEAD_CARD = SiteConfig.get('layout', 'lead_card', default: false) == true
 # The menu repeated under the content. It carries no search field, so with
 # an empty `nav:` there would be nothing left in it to show -- but a site
 # with a menu may still not want it twice.
 
 BANNER_SHOW_TITLE = SiteConfig.get('banner', 'show_title', default: true)
 BANNER_SHOW_CLAIM = SiteConfig.get('banner', 'show_claim', default: true)
+# A header without its picture: the name and the claim stand on the page
+# itself. Only a plain `false` asks for it -- the picture is what every
+# site has had, so anything else in that key leaves it where it was.
+# `banner.src` stays what it is either way: a page with no picture of
+# its own is still shared with that one (DEFAULT_OG_IMAGE).
+BANNER_SHOW_IMAGE = SiteConfig.get('banner', 'show_image', default: true) != false
 ANALYTICS = SiteConfig.get('analytics')
 SITE_COLORS = SiteConfig.get('colors', default: {})
 # The browser chrome around the page (address bar on phones, title bar in
@@ -622,20 +466,35 @@ SOCIAL = SiteConfig::Chrome.list(SiteConfig.data, 'social')
 # inside an ERB line. Names outside the list and wrong shapes are named by
 # the warning above and by doctor -- they do not also get to stop the build.
 WIDGETS = SiteConfig::Chrome.widgets(SiteConfig.data)
-# ...so the switch that decides the column asks both questions: does the
-# author want a sidebar, and is there anything to put in it.
 # Anything the config says that the engine cannot use is said here, once,
 # at the start of the build -- and it is the SAME list doctor reports, read
 # from the same function, so the two cannot name different keys. Read as
 # empty rather than fatal: a build that refuses to run leaves the site
 # standing on whatever was deployed last, which helps nobody.
+#
+# In the SITE's language, whichever branch is being built: these are said
+# to the author, like everything else the build narrates, and the words
+# are doctor's only because doctor says the same thing. Taken from the
+# language of the branch, one mistake in the menu was reported three
+# times in three languages by one rebuild.
 SiteConfig::Chrome.complaint_sentences(SiteConfig.data,
-                                       ->(key, what) { I18n.t("doctor.#{key}", key: what, name: what, index: what) })
+                                       ->(key, what) { I18n.narrate("doctor.#{key}", key: what, name: what, index: what) })
                   .each { |sentence| warn "config/site.yml: #{sentence}" }
 
+# The column is only worth reserving when something would stand in it. A site
+# with no about text and no widgets kept an empty <aside> and the grid kept
+# its 260px beside it, so the content sat in a narrowed column with a blank
+# strip alongside -- held space for furniture that was never coming.
+# ...so the switch that decides the column asks both questions: does the
+# author want a sidebar, and is there anything to put in it.
 SIDEBAR_SHOWN = LAYOUT_SIDEBAR &&
                 (!ABOUT['html'].to_s.strip.empty? ||
                  SiteConfig::Chrome.widgets(SiteConfig.data).any?)
+# The on-this-day card is the one widget whose data is this language's
+# own -- titles and addresses in the language being rendered -- so it is
+# decided here once and read by the aside, the client strings and the
+# file written near the end of the run.
+ON_THIS_DAY = SIDEBAR_SHOWN && WIDGETS.key?('on_this_day')
 MASTODON_INSTANCE = SiteConfig.get('mastodon', 'instance')
 # Computed once, here, because both halves it needs (the instance and the
 # social links) exist by this line and not before it.
@@ -675,7 +534,19 @@ def client_i18n_json
              lang_root: LANG_ROOT
            }
          end
-  root.merge(
+  # The on-this-day card's words only on a site that shows the card: this
+  # script is inline on every page, and three strings nobody reads would
+  # change the whole archive on the upgrade that introduced them.
+  card = if ON_THIS_DAY
+           {
+             on_this_day_ago_one: t('js.on_this_day_ago_one'),
+             on_this_day_ago_other: t('js.on_this_day_ago_other'),
+             on_this_day_all: t('js.on_this_day_all')
+           }
+         else
+           {}
+         end
+  root.merge(card).merge(
     date_locale: t('js.date_locale'),
     tags_sort_alpha: t('tags.sort_alpha'),
     tags_sort_count: t('tags.sort_count'),
@@ -1506,6 +1377,26 @@ def tag_label(tag)
   TAG_LABELS.fetch(tag_slug(tag), tag)
 end
 
+# A series is the same: one ID -- its slug, which is its address in every
+# language -- and a name the posts write once, in the site's own language.
+# On a second language's pages that name stood untranslated over translated
+# posts ("Part 3 of 20 — Nový Sean.cz"), because there was nowhere to say
+# another. `series:` in config/site.<lang>.yml is that place, keyed like
+# `tags:` by the name as the posts write it or by its slug.
+SERIES_LABELS = if SITE_LANG == SITE_OWN_LANG
+                  {}
+                else
+                  LanguageFile.series_labels(SiteConfig.data) { |name| Slug.slugify(name) }
+                end.freeze
+
+# What this language calls the series: its own word where it has one, the
+# name the posts spell out otherwise. Every place a reader sees the name
+# asks here, so the heading, the sentence on a part and the page's title
+# cannot disagree.
+def series_name(slug)
+  SERIES_LABELS.fetch(slug) { SERIES_NAMES[slug].to_s }
+end
+
 def tags_html(post)
   return '' if post['tags'].nil? || post['tags'].empty?
 
@@ -1616,18 +1507,6 @@ end
 # identical on the post's own page and in every listing it appears in.
 def post_content_html(post)
   CONTENT_CACHE[post] ||= Blocks.render_content(post['content'], post_href(post), lifted: link_title_block(post))
-end
-
-def plain_text_length(post)
-  post['content'].sum do |b|
-    case b['type']
-    when 'text', 'code' then b['text'].to_s.length
-    when 'chat' then Array(b['lines']).sum { |l| l['text'].to_s.length }
-    when 'list' then (b['items'] || []).sum { |it| it['text'].to_s.length }
-    when 'table' then ((b['header'] || []) + (b['rows'] || []).flatten).sum { |c| c['text'].to_s.length }
-    else 0
-    end
-  end
 end
 
 # Lives in lib/post_text.rb, shared with the CLI's archive browser -- the
@@ -1758,6 +1637,12 @@ def hero_for(post)
   wanted = setting.nil? ? LAYOUT_HERO : !%w[false no 0].include?(setting.to_s.strip.downcase)
   return nil unless wanted
 
+  first_usable_image(post)
+end
+
+# A post's first picture worth showing large, with the file it shows --
+# the question the hero asks of a post and the lead card asks too.
+def first_usable_image(post)
   block = (post['content'] || []).find do |b|
     b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
   end
@@ -1852,6 +1737,49 @@ def toc_html(entries)
   %(<nav class="toc" aria-label="#{h(t('post.toc_label'))}"><p class="toc-heading">#{h(t('post.toc_heading'))}</p><ol>#{items}</ol></nav>\n                )
 end
 
+# The sentence that places a part: the series by name, then which part of
+# how many. One function, because two places say it -- the head of the
+# post's own page and its card on the series' listing -- and a reader who
+# met it in one has to recognise it in the other.
+#
+# Three spans, and the words between them exactly what the sentence always
+# was: the name, what joins it to the rest, and the part. As one run of text
+# a stylesheet could do nothing with it -- on the series' own listing every
+# card repeats the name the heading above has just said, and neither hiding
+# it nor setting the number apart was possible. The joiner is a span of its
+# own so that hiding the name does not leave a dash opening the line.
+#
+# Cut out of the one translated sentence rather than out of three new keys:
+# whatever stands between the name and the first letter or digit is the
+# joiner, in whichever order a language puts the two.
+def series_part_label(slug, in_series, index)
+  before, after = t('post.series_part', name: "\u0000", number: index + 1, total: in_series.size)
+                  .split("\u0000", 2)
+  return series_note_span('part', before.to_s) if after.nil?
+
+  lead = before.match(/\A(.*?)([^\p{L}\p{N}]*)\z/m)
+  tail = after.match(/\A([^\p{L}\p{N}]*)(.*)\z/m)
+  series_note_span('part', lead[1]) + series_note_span('sep', lead[2]) +
+    series_note_span('name', h(series_name(slug))) +
+    series_note_span('sep', tail[1]) + series_note_span('part', tail[2])
+end
+
+def series_note_span(role, text)
+  text.empty? ? '' : %(<span class="series-note__#{role}">#{text}</span>)
+end
+
+# The same sentence on a card, for the one listing where it is the point:
+# the series' own. Every row there is a part, and without this the page
+# said which posts belong and not which comes when -- the date beside each
+# is when it was written, which a part numbered by hand need not follow.
+# Not a link: the listing it would lead to is the page it stands on.
+def series_card_note(post)
+  slug, in_series, index = Series.series_context(post)
+  return '' if slug.nil? || in_series.size < 2
+
+  %(<p class="series-note">#{series_part_label(slug, in_series, index)}</p>)
+end
+
 # Where a post sits in its series, and the way on. Only ever within the
 # series: chronological neighbours across a whole archive are usually
 # unrelated -- on an archive assembled from twenty-two sources, "next" is
@@ -1872,7 +1800,12 @@ def series_nav_html(slug, in_series, index, position, post = nil)
     draft_slug = Series.series_slug_of(post)
     published = defined?(SERIES_PUBLISHED) ? (SERIES_PUBLISHED[draft_slug] || []) : []
     label = if published.any?
-              spelled = (defined?(SERIES_NAMES) && SERIES_NAMES[draft_slug]) || name
+              # The name this LANGUAGE gives the series, as the published
+              # parts say it (series_name): the preview of a draft said the
+              # series by the name the posts carry, on a page whose every
+              # other word was the other language's.
+              spelled = defined?(SERIES_NAMES) ? series_name(draft_slug) : ''
+              spelled = name if spelled.empty?
               # The number is the one the POST PAGE will print once this
               # is published, so it is asked of the function that decides
               # that -- the same one the listing and the prev/next chain
@@ -1912,7 +1845,7 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   return '' if slug.nil? || in_series.size < 2
 
   if position == :top
-    label = t('post.series_part', name: h(SERIES_NAMES[slug].to_s), number: index + 1, total: in_series.size)
+    label = series_part_label(slug, in_series, index)
     # A link only where the listing is written. A series whose name will
     # not fit an address gets no page (Slug.pageable?, refused out loud
     # further down), and every part still linked to it: a 404 in the head
@@ -2094,8 +2027,15 @@ end
 # unchanged, and the landing is decided in landing_page? instead -- page 1
 # for a series, the flexible page for a timeline -- with labels that speak
 # of parts rather than of time (pagination_html).
+# How many fixed pages a listing of `count` posts has -- the pages under
+# /page/N/. Its own method because another language's listing is asked the
+# same question without being built here (TYPE_PAGES_BY_LANGUAGE).
+def fixed_pages(count)
+  count < 2 * PAGE_SIZE ? 0 : (count / PAGE_SIZE) - 1
+end
+
 def anchored_pages(posts, oldest_first: false)
-  fixed = posts.length < 2 * PAGE_SIZE ? 0 : (posts.length / PAGE_SIZE) - 1
+  fixed = fixed_pages(posts.length)
   flexible_length = posts.length - fixed * PAGE_SIZE
   return [[[fixed + 1, posts]], fixed] if fixed.zero?
 
@@ -2127,10 +2067,64 @@ def page_url(number, fixed, base_path, oldest_first: false)
   "#{base_path}/page/#{number}/"
 end
 
+# The days a page of a timeline covers, oldest to newest, with whatever
+# the two ends share said once: "12.–18. 9. 2026", "28. 8. – 3. 9. 2026",
+# "30. 12. 2025 – 2. 1. 2026", or the one day when it is one. How much is
+# shared decides the shape and each language writes its own (the
+# pagination.dates_* keys); the full date is the site's ordinary one.
+def page_dates_label(posts)
+  days = posts.map { |post| post_display_time(post) }
+  from = days.min
+  to = days.max
+  return nil unless from
+
+  full = t('date_format')
+  if from.year != to.year
+    t('pagination.dates_year', from: from.strftime(full), to: to.strftime(full))
+  elsif from.month != to.month
+    t('pagination.dates_year', from: from.strftime(t('pagination.dates_year_from')), to: to.strftime(full))
+  elsif from.day != to.day
+    t('pagination.dates_month', from: from.strftime(t('pagination.dates_month_from')),
+                                to: to.strftime(t('pagination.dates_month_to')))
+  else
+    to.strftime(full)
+  end
+end
+
 # No "x / total" counter: the total changes whenever a new page is created,
 # which would put a differing byte on every single page again -- the very
 # churn the oldest-anchored slicing above exists to avoid.
-def pagination_html(number, fixed, base_path = '', oldest_first: false)
+#
+# What a number without a total cannot say is WHERE the page is. Pages are
+# counted from the oldest post, so the continuation right behind the front
+# page carries the highest number there is, and "page 663" reads as deep in
+# the archive when it is last week. So a page of a timeline says the days
+# it covers beside its number -- which answers the question the total was
+# wanted for, and is as fixed as the page: it is read off the page's own
+# posts, and those are the one thing about it that does not change.
+#
+# And the page the numbering starts from says that it is the start. It
+# had a link back and nothing where the link on stood, which is also what
+# a page whose link failed to draw looks like.
+#
+# `posts:` are the page's own; without them the label is the number alone.
+#
+# "page 663" is a word and a number, and they are a span each: a skin that
+# makes the label a heading wants the number in its accent and the word in
+# ink, the way "Archive 2026" is. Cut from the one translated phrase, like
+# the series sentence -- the space between the two stays where it was.
+def page_label_html(number)
+  before, after = t('pagination.page', number: "\u0000").split("\u0000", 2)
+  return h(before.to_s) if after.nil?
+
+  word = lambda do |text|
+    lead, core, trail = text.match(/\A(\s*)(.*?)(\s*)\z/m).captures
+    core.empty? ? h(text) : %(#{lead}<span class="pagination-word">#{h(core)}</span>#{trail})
+  end
+  %(#{word.call(before)}<span class="pagination-number">#{number}</span>#{word.call(after)})
+end
+
+def pagination_html(number, fixed, base_path = '', oldest_first: false, posts: nil)
   return '' if fixed.zero?
 
   # A series reads forwards. Its pages are numbered in reading order, the
@@ -2141,13 +2135,25 @@ def pagination_html(number, fixed, base_path = '', oldest_first: false)
     last = fixed + 1
     back = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path, oldest_first: true)}">#{h(t('pagination.series_previous'))}</a>) : ''
     on = number < last ? %(<a href="#{page_url(number + 1, fixed, base_path, oldest_first: true)}">#{h(t('pagination.series_next'))}</a>) : ''
-    return %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{back}<span>#{h(t('pagination.page', number: number))}</span>#{on}</nav>)
+    return %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{back}<span>#{page_label_html(number)}</span>#{on}</nav>)
   end
 
   newer = number <= fixed ? %(<a href="#{page_url(number + 1, fixed, base_path)}">#{h(t('pagination.newer'))}</a>) : ''
-  older = number > 1 ? %(<a href="#{page_url(number - 1, fixed, base_path)}">#{h(t('pagination.older'))}</a>) : ''
-  label = number > fixed ? t('pagination.latest') : t('pagination.page', number: number)
-  %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{newer}<span>#{h(label)}</span>#{older}</nav>)
+  older = if number > 1
+            %(<a href="#{page_url(number - 1, fixed, base_path)}">#{h(t('pagination.older'))}</a>)
+          else
+            %(<span class="pagination-start">#{h(t('pagination.start'))}</span>)
+          end
+  # The front of the listing is "latest" and needs no dates: what it holds
+  # is whatever is newest, and it says so.
+  label = if number > fixed
+            h(t('pagination.latest'))
+          else
+            dates = posts && page_dates_label(posts)
+            page_label_html(number) +
+              (dates ? %(<span class="pagination-sep"> · </span><span class="pagination-dates">#{h(dates)}</span>) : '')
+          end
+  %(<nav class="pagination" aria-label="#{h(t('pagination.nav_label'))}">#{newer}<span>#{label}</span>#{older}</nav>)
 end
 
 # Templates only contain their own <main>; the header, nav, sidebar and
@@ -2264,7 +2270,7 @@ end
 # again further down.
 def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_type: 'website',
            extra_head: '', frame_origins: [], comment_origins: [], body_class: nil, post: nil)
-  links = language_links(path, post: post)
+  links = Languages.language_links(path, post: post)
   LAYOUT.result_with_hash(
     # Pre-rendered as the whole attribute, so a page without one keeps a bare
     # <body> rather than an empty class="" on every page of every site.
@@ -2276,8 +2282,8 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     nav_active: nav_active_for(path),
     og_image: image,
     og_type: og_type,
-    extra_head: alternates_head(links) + extra_head,
-    lang_switcher: language_switcher_html(links),
+    extra_head: Languages.alternates_head(links) + extra_head,
+    lang_switcher: Languages.language_switcher_html(links),
     # The players a page carries decide its frame-src, so the policy is
     # computed here rather than widened for the whole site (csp_content).
     page_frame_origins: frame_origins,
@@ -2305,7 +2311,18 @@ end
 # to the index of tags, a year to the map of years. The same address the
 # "back" link at the foot carries -- a reader who has scrolled to the top
 # of a long year should not have to scroll to the bottom to leave it.
-def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil, value_href: nil)
+# `icon_first:` is for the one heading whose kind is READ rather than hidden:
+# a year of the archive says "Archive 2026", the word and the year side by
+# side, and the icon opens the line as it always did instead of landing
+# between the two.
+# `count:` is how many the listing holds -- posts under a tag, parts of a
+# series, posts of a year -- as a bare number after the value, the way the
+# index of tags writes it beside each tag. A number and not a phrase: the
+# heading has said what is being counted, and "35 posts" would need three
+# forms of the word in one of the three languages for what the eye takes in
+# as "35" either way.
+def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: nil, value_href: nil,
+                         icon_first: false, count: nil)
   value = value.to_s
   kind = kind.to_s
   return '' if value.empty? && kind.empty?
@@ -2324,10 +2341,11 @@ def listing_heading_html(value, kind: nil, variant: nil, value_id: nil, icon: ni
   # its natural size instead of the heading's, and a screen reader read it
   # out as a graphic nobody had named.
   icon_svg = icon.is_a?(String) ? heading_icon_dress(icon) : LISTING_HEADING_ICONS[icon]
-  parts << icon_svg unless icon_svg.to_s.empty?
+  parts.insert(icon_first ? 0 : -1, icon_svg) unless icon_svg.to_s.empty?
   id_attr = value_id ? %( id="#{h(value_id)}") : ''
   inner = value_href ? %(<a class="listing-heading__link" href="#{h(value_href)}">#{h(value)}</a>) : h(value)
   parts << %(<span class="listing-heading__value"#{id_attr}>#{inner}</span>)
+  parts << %(<sup class="listing-heading__count">#{count.to_i}</sup>) if count
   # h1, not h2. This is what the page is about -- the tag being listed, the
   # search being run -- and the posts under it are h2 already, so at h2 it
   # was a sibling of the things it introduces rather than their heading. A
@@ -2484,11 +2502,29 @@ LISTING_HEADING_ICONS = {
                  '<line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="13" y2="17"/></svg>'
 }.freeze
 
+# On a tag's own listing every card carries that tag among its pills: the
+# one thing all of them have in common, said again in each row under a
+# heading that has said it already. It stays -- it is one of the post's
+# tags, and a row with it taken out would read as a post that lacks it --
+# but it is marked, so a stylesheet can quieten it.
+#
+# Marked on the finished page rather than in the card: a card is rendered
+# once and shown on every listing its post appears in (Cards::LIST_ITEM_CACHE),
+# and a copy per tag would render each post as many times as it has tags.
+# The whole opening tag is matched, so nothing an author wrote can be taken
+# for a pill.
+def mark_own_tag(list_html, slug)
+  href = loc("/tag/#{slug}/")
+  list_html.gsub(%(<a class="tag-pill" href="#{href}">)) do
+    %(<a class="tag-pill tag-pill-own" href="#{href}">)
+  end
+end
+
 def write_listing(posts, template, out_root, base_path: '', heading: nil,
                   heading_kind: nil, heading_variant: nil, heading_icon: nil,
                   heading_href: nil, feed_path: nil,
                   title: SITE_TITLE, description: SITE_DESCRIPTION, pinned: nil,
-                  oldest_first: false)
+                  oldest_first: false, lead: false, own_tag: nil)
   pages, fixed = anchored_pages(posts, oldest_first: oldest_first)
   pages.each do |number, page_posts|
     # The landing page is the newest slice for a timeline and part one for
@@ -2514,9 +2550,24 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # rebuilt. Measured on one archive: 766 files for a post dated 2003
     # against 12 for one dated today.
     lifted = pinned && number > fixed ? pinned : nil
+    # How many the listing holds, said in its heading -- but only where
+    # saying it is free. The heading stands on every page of the listing,
+    # and a count on all of them would rewrite every page of a tag each
+    # time a post takes that tag: the churn the anchored pages exist to
+    # avoid, bought back for a number. The page at the listing's own
+    # address is rewritten by a new post anyway, so it carries the count
+    # and the continuations do not. A series is the exception that costs
+    # nothing: its cards say "part 3 of 19", so a new part already
+    # rewrites every page of it.
+    heading_count = heading && (landing || oldest_first) ? posts.size : nil
     key = Digest::SHA256.hexdigest([
       base_path, number, fixed, oldest_first, heading, heading_kind, heading_variant,
       heading_icon, heading_href, feed_path, title, description,
+      # A series' cards say "part 3 of 19", so a page whose own posts did
+      # not change is still out of date the day a twentieth part arrives.
+      oldest_first ? posts.size : '',
+      heading_count.to_s,
+      lead ? 'lead' : '', own_tag,
       lifted ? POST_DIGEST[lifted['__path']] : '',
       page_posts.map { |post| POST_DIGEST[post['__path']] }.join(',')
     ].map(&:to_s).join('|'))
@@ -2530,18 +2581,30 @@ def write_listing(posts, template, out_root, base_path: '', heading: nil,
     # rather than duplicated. Anchored pagination is unaffected either
     # way -- the landing page is the only flexible one, and lifting keeps
     # its item count identical, so no /page/N/ boundary moves.
+    # layout.lead_card: the card that opens the landing page -- the pinned
+    # post where there is one, since that is what stands first -- is the
+    # lead: marked as such, and opening with its picture when it has one.
+    # Never a card further down, and never a page under /page/N/: those are
+    # written once and left alone.
+    leads = lead && landing
     if pinned && number > fixed
       rest = page_posts.reject { |post| post.equal?(pinned) }
-      list_html = ([Cards.render_list_item(pinned, pinned: true)] +
+      list_html = ([Cards.render_list_item(pinned, pinned: true, lead: leads)] +
                    rest.map { |post| Cards.render_list_item(post) }).join("\n")
     else
-      list_html = page_posts.map { |post| Cards.render_list_item(post) }.join("\n")
+      # oldest_first is the series' listing and nothing else (see
+      # anchored_pages), which is where a card says which part it is.
+      list_html = page_posts.each_with_index.map do |post, i|
+        Cards.render_list_item(post, series: oldest_first, lead: leads && i.zero?)
+      end.join("\n")
     end
-    pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first)
+    list_html = mark_own_tag(list_html, own_tag) if own_tag
+    pagination = pagination_html(number, fixed, base_path, oldest_first: oldest_first, posts: page_posts)
     # Without this distinction, every listing page would share one identical <title>.
     page_title = landing ? title : "#{title} – #{t('pagination.page', number: number)}"
     heading_html = listing_heading_html(heading, kind: heading_kind, variant: heading_variant,
-                                        icon: heading_icon, value_href: heading_href)
+                                        icon: heading_icon, value_href: heading_href,
+                                        count: heading_count)
     # Tags, series and content types all name themselves; the landing page is
     # the only listing that arrives here with nothing, and it is the only one
     # that would otherwise have no h1 (see home_heading_html).
@@ -2592,7 +2655,6 @@ WRITTEN = {}
 # served holes. Reported from an install doing exactly that.
 # Defined in lib/public_file.rb, not here: the build is not the only writer
 # into public/ and a rule kept in the build is a rule the cron cannot read.
-PUBLIC_READABLE = PublicFile::READABLE
 PUBLIC_TRAVERSABLE = PublicFile::TRAVERSABLE
 
 # Where the site keeps its favicon. Above the writing layer rather than
@@ -2653,6 +2715,7 @@ end
 
 Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
      ColorsCss.generate(colors: SITE_COLORS,
+                        plain_banner: !BANNER_SHOW_IMAGE,
                         fonts: SiteConfig.get('fonts', default: {}),
                         fonts_dir: File.join(ROOT, 'assets', 'fonts')))
 ico = build_favicon_ico
@@ -2686,7 +2749,20 @@ posts = PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map do |f|
   # Which text this run renders, decided at the same door the shape is
   # settled at, so nothing downstream has to ask: the metadata stay the
   # post's, only the words change with the language (lib/translations.rb).
-  parsed = Translations.for_lang(parsed, SITE_LANG, chain: FALLBACK_CHAIN)
+  #
+  # The blocks the post has in its own words are kept beside the ones this
+  # run reads, when the two differ: what KIND of post it is in another
+  # language is read off that language's blocks, and for a language the
+  # post was never written in those are the post's own (Languages.type_in).
+  # In the site's own language the post is the post: a text filed under
+  # that language's code in `translations` is a mistake -- made by hand, or
+  # left by changing `site.lang` over an archive that has translations --
+  # and reading it served that text at that entry's slug, with the post's
+  # own words on the site nowhere and `check` counting the address the
+  # post itself has. Not read; `check` names it (translation_own_language).
+  in_this_language = LANG_ROOT.empty? ? parsed : Translations.for_lang(parsed, SITE_LANG, chain: FALLBACK_CHAIN)
+  in_this_language = in_this_language.merge('__own_content' => parsed['content']) unless in_this_language.equal?(parsed)
+  parsed = in_this_language
 
   # Which year's DIRECTORY the file sits in -- the same key the checker,
   # the exporter and stats already carry. A post whose date was corrected
@@ -2763,7 +2839,7 @@ collisions = {}
 # counting it stopped the whole language dead on a collision that does not
 # exist, with `check` calling the archive sound because it asks the same
 # question of the posts that are really built.
-posts.select { |p| translated_here?(p) }.each do |p|
+posts.select { |p| Languages.translated_here?(p) }.each do |p|
   PostAddress.collision_keys(p, year: post_time(p).year).each { |key| (collisions[key] ||= []) << p }
 end
 duplicates = collisions.select { |_, v| v.size > 1 }
@@ -2954,6 +3030,28 @@ TAG_PAGES = posts.each_with_object({}) do |post, acc|
 end.freeze
 
 PRESENT_TYPES = CONTENT_TYPES.select { |t| posts.any? { |p| dominant_content_type(p) == t } }
+# The same question for every OTHER language the site publishes. A post's
+# type is read off the blocks a language shows it with, so a photo post
+# translated in words alone is a text post there -- and a language whose
+# every photo post is like that has no /type/image/ at all. The sitemap,
+# the hreflang of a type listing and the language switcher on it all said
+# it had one, because each assumed that a listing built here is built
+# everywhere (fleet, 8. 10. 2026): three promises of a page nobody wrote.
+# Asked once per run, of the posts this run already holds.
+TYPES_BY_LANGUAGE = SITE_LOCALES.to_h do |lang|
+  [lang, lang == SITE_LANG ? PRESENT_TYPES : CONTENT_TYPES & posts.map { |post| Languages.type_in(post, lang) }.uniq]
+end.freeze
+# ...and how many PAGES each of those listings has there. Having the
+# listing was all that was asked, and /type/<t>/page/N/ was offered in the
+# other language by swapping the language on the address: one post that
+# is text here and a photo there puts the two listings a page apart, and
+# the page past the shorter one's end promised a crawler and the switcher
+# an address nobody wrote (second fleet, 9. 10. 2026 -- one page of a
+# real archive of 6 593 posts, and a different one every tenth post).
+TYPE_PAGES_BY_LANGUAGE = SITE_LOCALES.to_h do |lang|
+  kinds = posts.map { |post| lang == SITE_LANG ? dominant_content_type(post) : Languages.type_in(post, lang) }
+  [lang, kinds.tally.transform_values { |count| fixed_pages(count) }]
+end.freeze
 NAV_TYPE_ITEMS = PRESENT_TYPES.map do |type|
   key = { 'text' => 'text', 'quote' => 'quotes', 'chat' => 'chat', 'image' => 'images',
           'video' => 'video', 'audio' => 'audio', 'link' => 'links',
@@ -2999,16 +3097,22 @@ def nav_url(url)
   return url if LANG_ROOT.empty? || !url.start_with?('/')
   return url if SHARED_ROOTS.any? { |root| url.start_with?(root) }
 
-  known = NAV_POSTS_BY_ADDRESS[url] || NAV_POSTS_BY_ADDRESS["#{url}/"]
-  return post_href(known) if known
+  # The address is the part before `#` and `?`; what follows names a place
+  # ON the page and travels with it. Asked about whole, `/about/#contact`
+  # was no address the site knows, so an item pointing at a part of a
+  # page was never moved to that page's own slug in this language -- and
+  # one pointing at a part of a post led to an address nothing is at.
+  path, rest = url.match(/\A([^?#]*)(.*)\z/m).captures
+  known = NAV_POSTS_BY_ADDRESS[path] || NAV_POSTS_BY_ADDRESS["#{path}/"]
+  return "#{post_href(known)}#{rest}" if known
   # 🪤 The front page and the feed are this language's too, but they are
   # not directories, so the ROOT_DIRS rule below never reached them: `url:
   # /` -- the first item of most hand-written menus -- sent a Czech reader
   # to the English front page, and the Czech one never marked its own item.
-  return loc(url) if ['/', '/rss.xml'].include?(url)
+  return "#{loc(path)}#{rest}" if ['/', '/rss.xml'].include?(path)
 
-  first = url.split('/').reject(&:empty?).first.to_s
-  PostAddress::ROOT_DIRS.include?(first) ? loc(url) : url
+  first = path.split('/').reject(&:empty?).first.to_s
+  PostAddress::ROOT_DIRS.include?(first) ? "#{loc(path)}#{rest}" : url
 end
 
 def configured_nav_items
@@ -3038,7 +3142,7 @@ end
 # partitioned off, so all three lists are asked. Not drafts: one is served
 # under a token, and a menu item pointing into a token is not a menu item.
 NAV_POSTS_BY_ADDRESS = (pages + posts + unlisted_posts)
-                       .to_h { |p| [address_of(p, SITE_OWN_LANG), p] }.freeze
+                       .to_h { |p| [Languages.address_of(p, SITE_OWN_LANG), p] }.freeze
 NAV_ITEMS = (configured_nav_items || ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 
@@ -3107,9 +3211,15 @@ def timezone_fact
   [zone, rules].join(':')
 end
 TIMEZONE_FACT = timezone_fact
+# ...and which kinds of post the OTHER languages have: a listing by type
+# says in its head and in its switcher whether that language has the same
+# listing, and the post that decides it need not be one this listing
+# shows.
 BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
-                 SITE_BASE_URL, TIMEZONE_FACT)
+                 SITE_BASE_URL, TIMEZONE_FACT,
+                 TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG },
+                 TYPE_PAGES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG })
 
 # A media file's own name, ready to be put in an attribute. Two things go
 # wrong without this, and both arrive through an ordinary import of
@@ -3224,7 +3334,7 @@ def post_page_key(post, source_media_dir)
   # a handful of posts, so the cost of rebuilding all of them when one
   # changes is a handful of pages.
   series_bit = if slug
-                 "#{slug}/#{SERIES_NAMES[slug]}:" +
+                 "#{slug}/#{series_name(slug)}:" +
                    in_series.map { |p| "#{post_path(p)}=#{POST_DIGEST[p['__path']]}" }.join(',')
                elsif draft?(post) && !post['series'].to_s.strip.empty?
                  # A draft is not in SERIES_MAP -- "part 3 of 7" is a fact
@@ -3243,7 +3353,7 @@ def post_page_key(post, source_media_dir)
                  # the count, and the cached preview would have kept the old
                  # one.
                  draft_slug = Series.series_slug_of(post)
-                 ['draft', post['series'], draft_slug, SERIES_NAMES[draft_slug],
+                 ['draft', post['series'], draft_slug, series_name(draft_slug),
                   Array(SERIES_PUBLISHED[draft_slug]).map { |p| POST_DIGEST[p['__path']] }.join(',')].join('/')
                else
                  ''
@@ -3265,7 +3375,7 @@ end
   # Nothing of a post this language has no words for: no page, and no copy
   # of its media either -- both belong to the address it does have, which
   # is where every link to it from this language points.
-  next unless translated_here?(post)
+  next unless Languages.translated_here?(post)
 
   year = post_time(post).year
   dir = output_dir(post)
@@ -3319,7 +3429,22 @@ end
 # widgets would be a second copy of the site chrome to keep in sync for a
 # page whose entire job is to leave. noindex keeps it out of search
 # results in favour of the canonical target.
-def redirect_stub_html(post)
+# `to:` and `lang:` are for an address that belonged to one language's text
+# (Translations.former_slugs): the stub then leads to that language's page
+# and says so in that language's title, wherever it stands.
+# The one sentence of a stub, in the language the stub says it is in. A
+# stub for a text of another language carries that language's code and
+# title wherever it stands -- and said "this post has moved" in the
+# language of the tree it was written into: an English page with a Czech
+# sentence on it. The language's own words, or the ones it borrows
+# (ui_language); a language with neither keeps this run's.
+REDIRECT_SENTENCES = Hash.new do |known, lang|
+  code = I18n.locale_file?(lang) ? lang.to_s : SiteConfig.language_data(lang.to_s)['ui_language'].to_s
+  said = I18n.locale_file?(code) ? I18n.load_locale(code).dig('redirect', 'moved').to_s : ''
+  known[lang] = said.empty? ? t('redirect.moved') : said
+end
+
+def redirect_stub_html(post, to: nil, lang: nil)
   # Escaped in every attribute it appears in, not only in the text of the
   # link. The address is built out of the post's slug or its draft token,
   # which are values from a post file -- the writer refuses the shapes
@@ -3327,19 +3452,20 @@ def redirect_stub_html(post)
   # close the attribute to put markup on the page. draft_banner, forty
   # lines up, has always done it this way; this stub had three places
   # where it did not.
-  url = h("#{SITE_BASE_URL}#{post_href(post)}")
+  url = h("#{SITE_BASE_URL}#{to || post_href(post)}")
+  title = lang ? post_title_for(Translations.for_lang(post, lang)) : post_title_for(post)
   <<~HTML
     <!doctype html>
-    <html lang="#{SITE_LANG}">
+    <html lang="#{lang || SITE_LANG}">
     <head>
     <meta charset="utf-8">
     <meta http-equiv="refresh" content="0; url=#{url}">
     <link rel="canonical" href="#{url}">
     <meta name="robots" content="noindex">
-    <title>#{h(post_title_for(post))}</title>
+    <title>#{h(title)}</title>
     </head>
     <body>
-    <p>#{h(t('redirect.moved'))} <a href="#{url}">#{url}</a></p>
+    <p>#{h(lang && lang.to_s != SITE_LANG.to_s ? REDIRECT_SENTENCES[lang.to_s] : t('redirect.moved'))} <a href="#{url}">#{url}</a></p>
     </body>
     </html>
   HTML
@@ -3400,18 +3526,52 @@ def written_already?(dest)
   @written_folded.key?(fold_path(dest))
 end
 
-# The longest a single path segment may be. POSIX NAME_MAX is 255 bytes on
-# macOS and Linux alike, and mkdir_p raises ENAMETOOLONG past it -- which
-# killed the build at its very LAST stage, after the whole site had already
-# been written, with a backtrace naming no post. An imported permalink is
-# where such a segment comes from: 36 Japanese characters percent-encode to
-# 333 bytes, and importers put the source URL's path straight into
-# redirect_from. The three collisions below are already guarded on the
-# stated grounds that one bad imported entry must not kill the build; a
-# name the filesystem refuses is the fourth.
-NAME_MAX_BYTES = 255
+# Whether two paths are one file on this volume: the same question
+# written_already? asks, of two names instead of a name and the index.
+def same_output?(one, other)
+  one == other || (case_folding_public? && fold_path(one) == fold_path(other))
+end
 
 (posts + pages + unlisted_posts).each do |post|
+  # The page this run wrote for the post. An old address that IS that page
+  # is not a debt and not a collision -- it is the post, answering. That
+  # happens the moment a translation keeps the slug of the post it was
+  # merged from: /en/posts/2019/that-slug/ is both the English page and,
+  # by the post's former_slugs, an address owed a redirect in this tree.
+  # The build used to say "already taken" once per such post on every run
+  # of that language, naming a fault where there was none.
+  own_page = File.join(output_dir(post), 'index.html')
+  # What this post has already stood a stub at in this run. An address
+  # written in both lists -- the post's and a translation's -- is one debt,
+  # paid once, to the language that says it is its own; the second mention
+  # is not another post in the way.
+  stood = []
+  # A translation's own old addresses. Served in two trees and no others:
+  # the site's root, where the text stood when it was a post of its own,
+  # and this language's, where it stands now -- both leading to this
+  # language's page. The root one is written by the run of the site's own
+  # language, which is the run that writes the root.
+  Translations.former_slugs(post, only: SITE_LOCALES - [SITE_OWN_LANG]).each do |lang, former|
+    next unless LANG_ROOT.empty? || lang == SITE_LANG
+
+    unless PostAddress.former_slug_refusal(former).nil?
+      warn t('build.former_slug_unusable', slug: post['slug'], entry: former.inspect)
+      next
+    end
+
+    dest = File.join(CONTENT_ROOT, 'posts', *former.split('/').reject(&:empty?), 'index.html')
+    next if same_output?(dest, own_page)
+
+    if written_already?(dest)
+      warn t('build.former_slug_taken', slug: post['slug'], former: former)
+      next
+    end
+
+    target = "#{Languages.lang_root_for(lang)}#{Languages.address_of(post, lang)}"
+    Output.emit(dest, redirect_stub_html(post, to: target, lang: lang))
+    stood << dest
+  end
+
   Array(post['former_slugs']).each do |former|
     # Asked of PostAddress, which is where redirect_from's own refusal
     # already lived. The rule was written out here and nowhere else, so
@@ -3427,6 +3587,8 @@ NAME_MAX_BYTES = 255
     parts = former.to_s.split('/').reject(&:empty?)
 
     dest = File.join(CONTENT_ROOT, 'posts', *parts, 'index.html')
+    next if same_output?(dest, own_page) || stood.any? { |one| same_output?(dest, one) }
+
     if written_already?(dest)
       warn t('build.former_slug_taken', slug: post['slug'], former: former)
       next
@@ -3450,42 +3612,12 @@ end
 # Czech front page paged into the English /page/N/ and named the English
 # front page as its canonical address -- a search engine then files /cs/
 # as a copy of /. Empty on the site's own language, where nothing changes.
-page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post)
+page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post,
+                           lead: LAYOUT_LEAD_CARD)
 
-tags_map = {}
-overlong_tags = []
-posts.each do |post|
-  # Folded by SLUG before anything is appended, because the map groups by
-  # slug while the loop walked tag STRINGS: "sci-fi" and "Sci Fi", "Praha"
-  # and "praha", "Cesko" and "Česko" -- or the same tag simply typed twice
-  # -- are one page, and the post was appended to it once per spelling. The
-  # listing then showed the post twice in a row, the tag's feed carried two
-  # <item>s with the same guid, and the index said 2 beside a tag that one
-  # post carries. First spelling wins, matching how the map already picks a
-  # display name across posts.
-  (post['tags'] || []).uniq { |tag| tag_slug(tag) }.each do |tag|
-    slug = tag_slug(tag)
-    next if slug.empty?
-
-    # An address that will not fit a filename: mkdir died on it with a raw
-    # ENAMETOOLONG, partway through writing the site. The tag stays on its
-    # posts (as a pill that is not a link); only the listing page is
-    # refused, and refused with a sentence.
-    unless Slug.pageable?(slug)
-      overlong_tags << tag.to_s[0, 60] unless overlong_tags.include?(tag.to_s[0, 60])
-      next
-    end
-
-    # The name the pages and the index show: this language's word for the
-    # tag where it has one (tag_label), so the listing, its title, its feed
-    # and the index cannot disagree with the pills.
-    tags_map[slug] ||= { name: tag_label(tag), posts: [] }
-    tags_map[slug][:posts] << post
-  end
-end
-overlong_tags.each do |name|
-  warn t('build.tag_too_long', name: name)
-end
+# Which tags the posts carry, by address (build/tags.rb). Early, because
+# the writing app below counts them too; the sitemap reads the map at the end.
+tags_map = Tags.collect(posts)
 
 # What the writer page knows about the blog it belongs to, written beside
 # it as site.js: the name and claim for its header, the palette so it is
@@ -3593,100 +3725,40 @@ FEED_TAG_SLUGS = NAV_ITEMS.filter_map { |href, _|
   bare[%r{\A/tag/([^/]+)/\z}, 1]
 }.freeze
 
-tags_map.each do |slug, data|
-  if FEED_TAG_SLUGS.include?(slug)
-    Output.emit(File.join(CONTENT_ROOT, 'tag', slug, 'rss.xml'),
-         Feeds.render_rss(data[:posts], path: loc("/tag/#{slug}/rss.xml"),
-                    title: t('tag.feed_title', name: data[:name], site_title: SITE_TITLE),
-                    description: t('tag.description', name: data[:name], author: SITE_AUTHOR),
-                    # The page this feed belongs to, in the language the
-                    # feed is written in -- the site root was every
-                    # language's answer, which sent a German subscriber
-                    # to the Czech page.
-                    link: "#{SITE_BASE_URL}#{loc("/tag/#{slug}/")}"))
-  end
-  write_listing(data[:posts], index_template, File.join(CONTENT_ROOT, 'tag', slug),
-                base_path: loc("/tag/#{slug}"), heading: data[:name],
-                heading_kind: t('tag.kind'), heading_variant: 'tag',
-                # The page's own slug, not its display name: the name is
-                # whichever spelling the archive used first, and looking
-                # the icon up by that made the heading depend on which
-                # post happened to come first.
-                heading_icon: TAG_ICONS[slug] || :tag,
-                # Only when there IS an index to go back to: a site whose
-                # tags all live on drafts builds no /tag/, and a heading
-                # linking there would be the dead menu item doctor refuses.
-                heading_href: (tags_map.empty? ? nil : loc('/tag/')),
-                feed_path: FEED_TAG_SLUGS.include?(slug) ? loc("/tag/#{slug}/rss.xml") : nil,
-                title: t('tag.title', name: data[:name], short_name: SITE_SHORT_NAME),
-                description: t('tag.description', name: data[:name], author: SITE_AUTHOR))
-end
+# A listing, and for a tag in the menu a feed, per tag (build/tags.rb).
+Tags.write_pages(tags_map, index_template)
 
-# --- The tag index ------------------------------------------------------
+# The index of every tag (build/tags.rb).
+Tags.write_index(tags_map)
+
+# The index of series at /series/, as /tag/ is the index of tags. A series
+# could be reached only from a post that belongs to it: nothing on the site
+# showed them side by side, and /series/ itself answered 404 with every
+# address under it alive.
 #
-# /tag/ was a dead address: the site built a listing per tag and nothing
-# that showed them all, so the only complete list of a site's own subjects
-# lived in the terminal. Asked for by a site whose tags are subjects rather
-# than provenance, where the list is short enough to read at a glance.
-#
-# Every tag that has a page, and no others: a tag carried only by a draft,
-# a page or an unlisted post is drawn under its post as a flat pill with no
-# link, and listing it here would point at a 404.
-#
-# Sorted by the FOLDED name, not the raw one. Ruby sorts strings by bytes,
-# which puts every accented tag after z -- on one real archive that is
-# fifty-two of them, and the last six in byte order are `skoleni`,
-# `skolitel`, `sumava`, `svihov`, `zelnava`, `zivotvkorporatu` (with their
-# diacritics). A reader looking for one between `sirky` and `sport` would
-# not find it there. `browse` in the CLI already folds for this reason.
-unless tags_map.empty?
-  tag_index_rows = tags_map.map { |slug, data| [slug, data[:name].to_s, data[:posts].length] }
-                           .sort_by { |_, name, _| [Slug.fold(name), name] }
-  # Names and counts are the whole page, so that is the whole key.
-  tag_index_dest = File.join(CONTENT_ROOT, 'tag', 'index.html')
-  tag_index_key = Digest::SHA256.hexdigest(tag_index_rows.map { |row| row.join(':') }.join(','))
-  # A letter above each run of names, so seven hundred tags read as a
-  # dictionary rather than as a wall. Taken from the FOLDED name, because
-  # that is the order the list is in: `škola` belongs under S, where the
-  # reader looking between `sirky` and `sport` will be. Anything that is
-  # not a letter -- a tag that starts with a digit -- goes under `#`.
-  #
-  # Emitted as list items rather than as headings between lists: the list
-  # is one <ul> and breaking it into twenty-seven of them would break the
-  # wrapping with it -- a band is a full-width item in the same flow, the
-  # way the archive's month is. The switch to count order takes them back
-  # out (see assets/js/tag-index.js).
-  last_letter = nil
-  build_tag_index_items = lambda do
-    tag_index_rows.flat_map do |slug, name, count|
-    letter = Slug.fold(name).to_s[0].to_s.upcase
-    letter = '#' unless letter.match?(/[A-Z]/)
-    head = if letter == last_letter
-             []
-           else
-             last_letter = letter
-             [%(<li class="tag-index-letter" aria-hidden="true">#{h(letter)}</li>)]
-           end
-    # The count travels in an attribute as well as in the text: the switch
-    # reorders these in the DOM, and reading a number back out of rendered
-    # markup is how a sort starts depending on how a number is punctuated.
-    # Name and count in ONE pill, one link, one target: the count is what
-    # makes the index a diagnostic rather than a menu (`pacmam 1` beside
-    # `pacman 12` says on sight what a list of names alone never would),
-    # and hung outside the pill it detached from its own name -- with the
-    # list wrapped into lines, a number between two pills reads as easily
-    # for the one that follows it.
-    head + [%(<li class="tag-index-item" data-count="#{count}">) +
-            %(<a class="tag-pill" href="#{loc("/tag/#{h(slug)}/")}">#{h(name)}) +
-            %(<sup class="tag-index-count">#{count}</sup></a></li>)]
-    end
+# Every series that has a page, and no others -- the same condition the
+# listings below are written under, so a name here is a page that exists.
+# The one being written now comes first: ordered by the newest part, so a
+# series still growing stands above one finished years ago. A line is the
+# name, how many parts, and the years they span; a series is too few and
+# too different in size for anything a tag's pill does.
+SERIES_PAGES = SERIES_MAP.select { |slug, _| Slug.pageable?(slug) }.freeze
+
+unless SERIES_PAGES.empty?
+  series_index_rows = SERIES_PAGES.sort_by { |slug, parts| [-parts.map { |part| post_time(part).to_i }.max, slug] }
+                                  .map do |slug, parts|
+    # The years a reader sees on the parts themselves: the displayed date.
+    years = parts.map { |part| post_display_time(part).year }.minmax.uniq.join("–")
+    %(<li class="series-index-item"><a class="series-index-name" href="#{loc("/series/#{h(slug)}/")}">#{h(series_name(slug))}</a>) +
+      %(<sup class="series-index-count">#{parts.size}</sup><span class="series-index-years">#{h(years)}</span></li>)
   end
-  Output.cached_emit(tag_index_dest, tag_index_key) do
-    layout(listing_heading_html(t('tags.title'), variant: 'tags', icon: :tag) +
-           %(\n<ul class="tag-index" id="tag-index">\n#{build_tag_index_items.call.join("\n")}\n</ul>),
-           title: "#{t('tags.title')} \u2013 #{SITE_SHORT_NAME}",
-           description: t('tags.description', site_title: SITE_TITLE),
-           path: loc('/tag/'))
+  # Names, counts and years are the whole page, so the rows are the whole key.
+  Output.cached_emit(File.join(CONTENT_ROOT, 'series', 'index.html'), Digest::SHA256.hexdigest(series_index_rows.join)) do
+    layout(listing_heading_html(t('series.index_title'), variant: 'series-index', icon: :series, count: SERIES_PAGES.size) +
+           %(\n<ul class="series-index">\n#{series_index_rows.join("\n")}\n</ul>),
+           title: "#{t('series.index_title')} – #{SITE_SHORT_NAME}",
+           description: t('series.index_description', site_title: SITE_TITLE),
+           path: loc('/series/'))
   end
 end
 
@@ -3695,7 +3767,7 @@ end
 # start. Only for a series with more than one post, which SERIES_MAP
 # already guarantees -- a "series" of one is a post.
 SERIES_MAP.each do |slug, in_series|
-  name = SERIES_NAMES[slug].to_s
+  name = series_name(slug)
   # Read from part one, and paged from part one: see anchored_pages.
   #
   # An overlong name is refused the same way a tag's is (Slug.pageable?),
@@ -3712,9 +3784,12 @@ SERIES_MAP.each do |slug, in_series|
                 oldest_first: true,
                 base_path: loc("/series/#{slug}"), heading: name,
                 heading_kind: t('series.kind'), heading_variant: 'series',
-                heading_icon: :series,
+                # The name is the way back to the index of series, as a
+                # tag's name is the way back to the index of tags. A series
+                # with a page of its own is in that index by construction.
+                heading_icon: :series, heading_href: loc('/series/'),
                 title: t('series.title', name: name, short_name: SITE_SHORT_NAME),
-                description: t('series.description', name: name, author: SITE_AUTHOR))
+                description: t('series.description', name: name, author: SITE_AUTHOR, author_name: SITE_AUTHOR_NAME))
 end
 
 PRESENT_TYPES.each do |type|
@@ -3724,7 +3799,7 @@ PRESENT_TYPES.each do |type|
                 base_path: loc("/type/#{type}"), heading: label, heading_variant: 'type',
                 heading_icon: :"type_#{type}",
                 title: t('type.title', label: label, short_name: SITE_SHORT_NAME),
-                description: t('type.description', label: label.downcase, author: SITE_AUTHOR))
+                description: t('type.description', label: label.downcase, author: SITE_AUTHOR, author_name: SITE_AUTHOR_NAME))
 end
 
 
@@ -3782,165 +3857,8 @@ def searchable_tags(post)
   (tags + tags.map { |tag| tag_label(tag) }).uniq
 end
 
-# --- The archive index -------------------------------------------------
-#
-# A map of the whole archive in two levels and no more. /archive/ is a row
-# per year with a strip of twelve months; /archive/<year>/ is one line per
-# post. No excerpts and no pictures: this is an index, not another listing,
-# and the point of it is that a reader can see the shape of twenty-three
-# years at once -- which nothing on the site could show before. Pagination
-# cannot: it is anchored from the oldest post, so /page/128/ says nothing
-# about whether it is 2009 or 2014.
-#
-# Grouped by the year of the post's ADDRESS, not of its displayed date.
-# Those two can differ by one for a post published either side of midnight
-# on 31 December, and the address is what this is a map OF -- the checker
-# compares paths, and a row pointing at a year the post does not live in
-# would be a dead link the moment it happened.
-#
-# Cheap by construction, which is why the year pages are safe to have: a
-# new post rewrites the map and the current year and nothing else. 2014 has
-# not changed since new year's eve 2014 and never will, so a deploy that
-# compares content has nothing to upload for it.
-ARCHIVE_PATH = loc('/archive/')
-# Longer than any blog, shorter than a typo. 200 years of empty rows is
-# already nonsense to look at; 18,000 is a page nobody can open.
-ARCHIVE_SPAN_MAX = 200
-archive_by_year = posts.group_by { |post| post_time(post).year }
-
-unless archive_by_year.empty?
-  # Every year between the first and the last, including the ones with
-  # nothing in them -- sean.cz has a silent 2025 between 2024 and 2026, and
-  # a map that skipped it would draw an axis that lies about the gap.
-  #
-  # ...up to a point. The span was unbounded, and one mistyped year is all
-  # it takes: 20226 for 2026 parses, gives the post a real address, and
-  # draws 18,201 rows -- a 12.8 MB page that hangs a browser and that
-  # deploy then uploads, while the build's summary says "posts: 2" and both
-  # check and doctor call the archive sound. Past the bound the map falls
-  # back to the years that actually hold something, so a typo costs the
-  # empty-year axis rather than the whole page, and it is said out loud.
-  span_from = archive_by_year.keys.min
-  span_to = archive_by_year.keys.max
-  archive_span = if span_to - span_from >= ARCHIVE_SPAN_MAX
-                   warn t('build.archive_span_absurd', from: span_from, to: span_to)
-                   archive_by_year.keys.sort.reverse
-                 else
-                   span_to.downto(span_from).to_a
-                 end
-
-  month_cells = lambda do |year, by_month|
-    (1..12).map do |m|
-      count = (by_month[m] || []).length
-      label = CGI.escapeHTML(m.to_s)
-      if count.zero?
-        %(<span class="archive-month is-empty">#{label}</span>)
-      else
-        # Four steps of shading, because "has posts / has none" is not the
-        # thing worth seeing: on this archive a month holds anywhere from
-        # one post to eighty-seven, and a map that draws those the same
-        # answers a question nobody asked. The thresholds are read off a
-        # real archive rather than picked round: most months sit under
-        # fifteen, and the handful above forty are the bursts.
-        level = if count < 5 then 1
-                elsif count < 15 then 2
-                elsif count < 40 then 3
-                else 4
-                end
-        %(<a class="archive-month is-l#{level}" href="#{loc("/archive/#{year}/#m#{format('%02d', m)}")}" ) +
-          %(title="#{count}">#{label}</a>)
-      end
-    end.join
-  end
-
-  rows = archive_span.map do |year|
-    in_year = archive_by_year[year] || []
-    by_month = in_year.group_by { |post| post_time(post).month }
-    name = in_year.empty? ? %(<span class="archive-year-name">#{year}</span>) : %(<a class="archive-year-name" href="#{loc("/archive/#{year}/")}">#{year}</a>)
-    %(<li class="archive-year#{in_year.empty? ? ' is-empty' : ''}">#{name}) +
-      %(<span class="archive-year-count">#{in_year.length}</span>) +
-      %(<span class="archive-months">#{month_cells.call(year, by_month)}</span></li>)
-  end
-
-  # Keyed on the digest of the rows themselves, not on a summary of them.
-  # The summary was "year:count" -- and the map draws MONTHS: a cell per
-  # month, shaded in four steps by how many posts it holds, linking to an
-  # anchor on the year page. So a post whose date moved from March to
-  # January changed the cells at both ends, the shading of one of them and
-  # the anchor the other pointed at, while the year's count sat exactly
-  # where it was and the key never moved. The map then disagreed with the
-  # year page it links to, and kept disagreeing.
-  #
-  # The rows are built above whatever the cache decides, so this costs one
-  # hash of a few kilobytes -- and, unlike a summary, it cannot drift from
-  # what is drawn: anything added to a cell is in the key the same day it
-  # is on the page.
-  #
-  # The YEAR pages below are what this buys something on anyway: 2014 has
-  # not changed since new year's eve 2014 and never will.
-  Output.cached_emit(File.join(CONTENT_ROOT, 'archive', 'index.html'),
-              Digest::SHA256.hexdigest(rows.join)) do
-    layout(listing_heading_html(t('archive.title'), variant: 'archive', icon: :calendar) +
-           %(\n<ul class="archive-map">\n#{rows.join("\n")}\n</ul>),
-           title: "#{t('archive.title')} – #{SITE_SHORT_NAME}",
-           description: t('archive.description', site_title: SITE_TITLE),
-           path: ARCHIVE_PATH)
-  end
-
-  archive_span.each do |year|
-    in_year = archive_by_year[year] || []
-    # A year nobody wrote in gets a row on the map but no page of its own:
-    # there is nothing to put on it, and an empty page is an invitation to
-    # a dead end.
-    next if in_year.empty?
-
-    year_dest = File.join(CONTENT_ROOT, 'archive', year.to_s, 'index.html')
-    year_key = Output.posts_digest(in_year)
-    if BuildCache.page_fresh?(year_dest, year_key)
-      Output.keep(year_dest)
-      next
-    end
-
-    sections = in_year.group_by { |post| post_time(post).month }.sort.map do |month, in_month|
-      # The month heading is a number, the way this site writes dates: two
-      # of the three shipped languages spell months with digits anyway, and
-      # spelling them out would mean thirty-six new translations for the
-      # one language that does not.
-      # Its own copy of the key above, and it has to say the same thing:
-      # the year page's stated contract is date order inside the month.
-      lines = in_month.sort_by { |post| [post_time(post), post['slug']] }.map do |post|
-        # The attribute and the text are the same date said twice, one for
-        # a machine and one for a reader -- that is what <time> means. The
-        # attribute used to carry the STORED date while the text showed the
-        # local day, so a post filed at a year's turn read
-        # `<time datetime="2025-12-31">1.</time>`: a value and a rendering
-        # of it that disagree. Which year the post is FILED under is a
-        # separate decision and stays as it was -- the address year, so the
-        # page and /posts/<year>/ agree.
-        %(<li><time datetime="#{h(post_display_time(post).strftime('%Y-%m-%d'))}">) +
-          %(#{post_display_time(post).day}.</time> ) +
-          %(<a href="#{h(post_href(post))}">#{h(post_title_for(post))}</a></li>)
-      end
-      %(<section class="archive-section" id="m#{format('%02d', month)}">) +
-        %(<h2>#{month}</h2>\n<ul class="archive-list">\n#{lines.join("\n")}\n</ul></section>)
-    end
-
-    BuildCache.remember_page(year_dest, year_key)
-    Output.emit(year_dest,
-         layout(listing_heading_html(t('archive.year_title', year: year),
-                                     variant: 'archive', icon: :calendar,
-                                     value_href: ARCHIVE_PATH) + "\n" +
-                sections.join("\n") +
-                # Below the list and on the left, which is where a post's own
-                # "back" link has always sat. A way out belongs at the end of
-                # the thing you are reading, not above it.
-                %(\n<nav class="pagination back" aria-label="#{h(t('pagination.nav_label'))}">) +
-                %(<a href="#{ARCHIVE_PATH}">#{h(t('archive.back'))}</a></nav>),
-                title: "#{t('archive.year_title', year: year)} – #{SITE_SHORT_NAME}",
-                description: t('archive.year_description', year: year, site_title: SITE_TITLE),
-                path: loc("/archive/#{year}/")))
-  end
-end
+# The map of the archive and a page per year (build/archive.rb).
+ARCHIVE_YEARS = Archive.write(posts).freeze
 
 # posts is sorted newest-first, so splitting into "first N" / "the rest" is
 # also the split into recent / archive -- no further sorting needed.
@@ -3964,7 +3882,12 @@ Output.emit(File.join(CONTENT_ROOT, 'search', 'index.html'),
      layout(search_template.result(binding),
             title: t('search.page_title', site_title: SITE_TITLE),
             description: t('search.page_description'),
-            path: '/search/'))
+            # loc(), like every listing: the page of a second language is
+            # at /en/search/, and said `/search/` -- so its canonical and
+            # og:url named the OTHER language's page while its hreflang, two
+            # lines below, named itself. The cheat sheet and the 404 did
+            # the same.
+            path: loc('/search/')))
 
 # The page a mistyped or long-dead address lands on. Every supported host
 # serves /404.html for a path it has nothing at -- until now that was the
@@ -4000,26 +3923,86 @@ NOT_FOUND_SIGN =
   %(<line x1="46" y1="98" x2="74" y2="98"/>) +
   %(</svg>)
 
+# The page said where to go -- "the menu above and the search box" -- and
+# offered nothing to go with: under the sentence there was no field and no
+# link, and on a phone the menu it pointed at is folded behind a button. A
+# reader who landed here had been told there is a way on and left to find
+# it.
+#
+# So the two things the sentence names stand under it. A search field, the
+# bar's own form with a class added, which the page's script fills with
+# the words of the address that was not found: this file is one page for
+# every missing address and cannot know which, but the browser showing it
+# does (assets/js/not-found.js). And a row of the ways out a menu need not
+# have -- back to the front, the map of the archive, the index of tags --
+# written as the pills a post's tags are, so every skin already dresses
+# them. Each only where the site has the page it leads to.
+#
+# A year the missing address names gets a pill of its own, straight to
+# that year of the archive. All of them are written here, hidden, and the
+# script shows the one that matches: the page then changes once a year,
+# when a new year gets a page, and never names one that has none.
+#
+# No word here is new. The labels are the ones their destinations carry
+# already -- the post page's own "back to list", the archive's heading and
+# its years', the tag index's heading.
+def not_found_search_html
+  %(        <form class="search-form not-found-search" action="#{loc('/search/')}" method="get" role="search">\n) +
+    %(          <input type="search" name="q" id="not-found-q" placeholder="#{h(t('nav.search_placeholder'))}" ) +
+    # The languages this site publishes, for the script that reads the
+    # missing address: `/en/posts/2019/` holds no word to look for, and
+    # without being told that `en` is a language it offered "en" as one.
+    # Only where there is more than one -- a site in one language has no
+    # such folder, and its page stays byte for byte what it was.
+    (SITE_LOCALES.length > 1 ? %(data-langs="#{h(SITE_LOCALES.join(' '))}" ) : '') +
+    %(aria-label="#{h(t('nav.search_label'))}" autocomplete="off">\n) +
+    %(          <button type="submit" aria-label="#{h(t('nav.search_label'))}">\n) +
+    %(            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">) +
+    %(<circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>\n) +
+    %(          </button>\n        </form>\n)
+end
+
+def not_found_links_html(archive_years, tag_index)
+  pill = lambda do |kind, href, label, extra = ''|
+    %(<a class="tag-pill not-found-link not-found-link--#{kind}" href="#{h(href)}"#{extra}>#{h(label)}</a>)
+  end
+  pills = [pill.call('back', loc('/'), t('post.back_to_list'))]
+  unless archive_years.empty?
+    pills << pill.call('archive', loc('/archive/'), t('archive.title'))
+    archive_years.each do |year|
+      pills << pill.call('year', loc("/archive/#{year}/"), t('archive.year_title', year: year),
+                         %( data-year="#{year}" hidden))
+    end
+  end
+  pills << pill.call('tags', loc('/tag/'), t('tags.title')) if tag_index
+  %(        <div class="tags not-found-links">#{pills.join}</div>\n)
+end
+
 Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:not_found]),
      layout(%(        #{listing_heading_html(t('not_found.heading'))}\n) +
             %(        #{NOT_FOUND_SIGN}\n) +
-            %(        <p class="search-tagline">#{t('not_found.body')}</p>\n),
+            %(        <p class="search-tagline">#{t('not_found.body')}</p>\n) +
+            not_found_search_html +
+            not_found_links_html(ARCHIVE_YEARS, !tags_map.empty?),
             title: t('not_found.page_title', site_title: SITE_TITLE),
             description: t('not_found.page_description'),
-            path: '/404.html',
-            extra_head: %(\n  <meta name="robots" content="noindex">)))
+            path: loc('/404.html'),
+            # The script is this page's alone, so only this page asks for it.
+            extra_head: %(\n  <meta name="robots" content="noindex">) +
+                        %(\n  <script src="/assets/js/not-found.js" defer></script>)))
 
 if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))
-  cheat_blocks, = MarkdownParser.parse_body(cheat_body, nil)
+  cheat_blocks, = MarkdownParser.parse_body(cheat_body, CHEAT_SHEET_MEDIA_DIR)
+  cheat_blocks = cheat_sheet_pictures(cheat_blocks)
   cheat_title = cheat_meta['title'] || t('markdown_page.default_title')
-  content_html = Blocks.render_content(cheat_blocks, CHEAT_SHEET_PATH)
+  content_html = cheat_sheet_examples(Blocks.render_content(cheat_blocks, CHEAT_SHEET_MEDIA_PATH))
   cheat_sheet_template = ERB.new(File.read(File.join(ROOT, 'templates', 'markdown_cheat_sheet.html.erb'), encoding: 'utf-8'))
   Output.emit(File.join(CONTENT_ROOT, 'markdown', 'index.html'),
        layout(cheat_sheet_template.result(binding),
               title: "#{cheat_title} – #{SITE_SHORT_NAME}",
               description: t('markdown_page.description'),
-              path: CHEAT_SHEET_PATH))
+              path: loc(CHEAT_SHEET_PATH)))
 else
   warn t('build.cheat_sheet_missing', path: CHEAT_SHEET_SOURCE)
 end
@@ -4044,6 +4027,35 @@ end
 if LANG_ROOT.empty?
   Sidebar.write_all(PUBLIC_DIR).each_key { |name| WRITTEN[File.join(PUBLIC_DIR, name)] = true }
 end
+
+# On this day (lib/on_this_day.rb). Unlike the files above it belongs to
+# a LANGUAGE: every run writes its own, into its own root, with the titles
+# and addresses a reader of that language is sent to -- a translation's
+# own, a fallback's, the site's.
+#
+# Two things are written. The catalogue, beside the build cache and never
+# published, is every listed post of this run with what the selection
+# needs and what a row shows; the cron (scripts/refresh_sidebar.rb) turns
+# the day over from it at midnight without having to know what a
+# translation is. And today's file, so a build leaves the card current
+# instead of waiting for the next tick.
+#
+# Off, the catalogue goes too: a cron that still found one would keep
+# writing a file the sweep takes down again on every build.
+ON_THIS_DAY_PATH = File.join(CONTENT_ROOT, OnThisDay::FILE)
+if ON_THIS_DAY
+  catalogue = posts.map do |post|
+    OnThisDay.entry(post, post_display_time(post), title: post_title_for(post), url: post_href(post))
+  end
+  OnThisDay.write_catalogue(ROOT, SITE_LANG, LANG_ROOT.delete_prefix('/'), catalogue)
+  PublicFile.write(ON_THIS_DAY_PATH, OnThisDay.reader_json(catalogue, Date.today))
+  WRITTEN[ON_THIS_DAY_PATH] = true
+else
+  OnThisDay.remove_catalogue(ROOT, SITE_LANG)
+end
+# The run that owns the site root also forgets the languages the site no
+# longer publishes -- nothing else would ever rebuild their catalogues.
+OnThisDay.prune_catalogues(ROOT, SITE_LOCALES) if LANG_ROOT.empty?
 
 # Stats for tooted posts are filled in by cron (scripts/refresh_sidebar.rb) --
 # the build just registers the file so prune doesn't delete it, and creates
@@ -4101,8 +4113,8 @@ end
 # do read had no Czech address in it at all.
 SITEMAP_LANGUAGES = SITE_LOCALES.map do |lang|
   { 'lang' => lang,
-    'root' => lang_root_for(lang),
-    'address' => ->(entry) { address_of(entry, lang) },
+    'root' => Languages.lang_root_for(lang),
+    'address' => ->(entry) { Languages.address_of(entry, lang) },
     # A post has a page in a language when it has WORDS there; the site's
     # own language is where every post always has them.
     'has' => ->(entry) { lang == SITE_OWN_LANG || Translations.languages(entry).include?(lang) } }
@@ -4164,16 +4176,21 @@ Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:robots]), robots_txt)
 # are arbitrary, so unlike the former_slugs loop this one runs after
 # EVERYTHING real -- posts, listings, search, feeds, root files -- and a
 # stub yields to whatever the build already produced, out loud.
-# The list itself now lives in PostAddress, so the build, the checker and
-# the repair pass cannot drift apart about it.
-REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
+# The list of first segments it refuses lives in PostAddress
+# (REDIRECT_RESERVED), so the build, the checker and the repair pass cannot
+# drift apart about it.
 # Pages too, for the reason above -- and because a source like Substack
 # serves its pages under /p/<slug>, so the old address is a real one the
 # importer records and this loop is the only thing that answers it.
 (posts + pages + unlisted_posts).each do |post|
   Array(post['redirect_from']).each do |origin|
     parts = origin.to_s.split('/').reject(&:empty?)
-    case PostAddress.redirect_refusal(origin)
+    # The folder of a language the site publishes is the site's own too:
+    # everything under /en/ is written by the run of English, which knows
+    # nothing of a stub the site's own run put there -- so the stub was
+    # written by one run and deleted by the next, on every build, and the
+    # address answered nothing.
+    case PostAddress.redirect_refusal(origin, languages: SITE_LOCALES - [SITE_OWN_LANG])
     when :unusable
       warn t('build.redirect_from_unusable', slug: post['slug'], entry: origin.inspect)
       next
@@ -4199,7 +4216,13 @@ REDIRECT_FROM_RESERVED = PostAddress::REDIRECT_RESERVED
     # same loud skip -- the build's own output always wins over a stub.
     prefix_file = (0...parts.size).map { |i| File.join(CONTENT_ROOT, *parts[0..i]) }.find { |p| written_already?(p) }
     if written_already?(dest) || prefix_file
-      warn t('build.redirect_from_taken', slug: post['slug'], origin: origin)
+      # Said by the run that writes the ROOT, where the address is one
+      # somebody may follow. In the tree of a language it is nobody's: an
+      # old address of the web a post came from stood at the root, and
+      # that a page of this language stands at the same words under /en/
+      # is no collision -- but it was said as one, by this run, on every
+      # build, with nothing for `check` to say and nothing to be done.
+      warn t('build.redirect_from_taken', slug: post['slug'], origin: origin) if LANG_ROOT.empty?
       next
     end
     # The third collision: the destination is a DIRECTORY an earlier stub
@@ -4250,7 +4273,7 @@ puts
 # The posts this run gave a page of their own: on a language's branch that
 # is the translated ones, not every post its listings show -- "posts: 6642"
 # over /en/ with one post translated read as 6642 English pages.
-puts t('build.summary', posts: posts.count { |post| translated_here?(post) }, pages: page_count,
+puts t('build.summary', posts: posts.count { |post| Languages.translated_here?(post) }, pages: page_count,
                         dir: CONTENT_ROOT, tags: tags_map.size)
 # Said out loud, because a cache nobody can see is a cache nobody can
 # check. When a build takes longer than it should, this line is the first

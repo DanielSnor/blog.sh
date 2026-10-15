@@ -100,7 +100,7 @@
   // listen for the server's reply: the form stood empty, the buttons
   // wore their labels, and the reply that arrived went nowhere.
   function sane(saved) {
-    var out = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
+    var out = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "", editing: null };
     if (!saved || typeof saved !== "object") return out;
     ["title", "body", "tags"].forEach(function (k) { if (typeof saved[k] === "string") out[k] = saved[k]; });
     out.publish = saved.publish === true;
@@ -109,6 +109,10 @@
     // and becomes a filename on the blog, so a stored draft is not
     // allowed to talk this page into asking for some other address.
     out.receipt = /^[0-9a-f]{16}$/.test(saved.receipt) ? saved.receipt : "";
+    // The draft this text edits, when it came from the blog. Every part of
+    // it is written into the markdown or into an address, so a stored
+    // draft is held to the shapes the blog hands out and nothing else.
+    out.editing = saneEditing(saved.editing);
     if (Array.isArray(saved.shots)) {
       out.shots = saved.shots.filter(function (shot) {
         return shot && typeof shot === "object" && typeof shot.name === "string" && shot.name;
@@ -267,7 +271,7 @@
     function keep(file, ext, dataUrl, w, h, kind) {
       state.shots.push({
         name: freeName(safeName(file.name, state.shots.length + 1, ext),
-                       state.shots.map(function (s) { return s.name; })),
+                       state.shots.map(function (s) { return s.name; }).concat(existingMedia())),
         data: dataUrl, w: w, h: h, alt: "", raw: !w, size: file.size,
         type: String(file.type || ""), kind: kind || "image"
       });
@@ -343,7 +347,7 @@
 
   // Every name the text refers to that is not among the pictures here.
   function missingReferences() {
-    var have = state.shots.map(function (shot) { return shot.name; });
+    var have = state.shots.map(function (shot) { return shot.name; }).concat(existingMedia());
     var out = [], re = /!{1,2}\[[^\n]*?\]\(([^)\s]+)\)/g, m;
     while ((m = re.exec(state.body)) !== null) {
       var name = m[1].trim();
@@ -361,6 +365,39 @@
   function drawShots() {
     var box = $("shots");
     box.textContent = "";
+    // The draft's own pictures first: on the blog already, inserted by name,
+    // never sent again. Taken out of the text, one is deleted by the save.
+    existingShots().forEach(function (shot) {
+      var row = document.createElement("div");
+      row.className = "shot existing";
+      row.innerHTML =
+        '<img alt="">' +
+        '<div class="side">' +
+          '<span class="name"></span>' +
+          '<div class="row"><button type="button" class="btn small" data-insert-existing=""></button></div>' +
+        '</div>';
+      if (shot.kind === "video") {
+        var clip = document.createElement("div");
+        clip.className = "clip";
+        clip.textContent = t("app.video_badge");
+        row.querySelector("img").replaceWith(clip);
+      } else row.querySelector("img").src = shot.data;
+      var used = usedInText(shot.name);
+      var name = row.querySelector(".name");
+      name.textContent = shot.name + " ";
+      var where = document.createElement("span");
+      where.className = "chip ok";
+      where.textContent = t("app.existing_image");
+      name.appendChild(where);
+      var chip = document.createElement("span");
+      chip.className = "chip " + (used ? "ok" : "warn");
+      chip.textContent = used ? t("app.used_in_text") : t("app.unused_image");
+      name.appendChild(chip);
+      var insert = row.querySelector("[data-insert-existing]");
+      insert.dataset.insertExisting = shot.name;
+      insert.textContent = t("app.insert");
+      box.appendChild(row);
+    });
     state.shots.forEach(function (shot, i) {
       var row = document.createElement("div");
       row.className = "shot";
@@ -413,6 +450,110 @@
     });
   }
 
+  // ---------------------------------------------------------- editing
+  // A draft opened from the blog (`./blog.sh drafts --json`, through the
+  // shortcut and back in the address like any answer). What the page keeps
+  // of it: the slug and digest the save is checked against, where its
+  // preview lives -- the build copies a draft's media next to that hidden
+  // page, so its pictures are shown from there and never sent again --
+  // the names of those media, and the header lines this form has no field
+  // for (series, unlisted, a link card...), carried back untouched: a line
+  // left out would be a key removed from the post.
+  function safeMediaName(name) {
+    return typeof name === "string" && name.length > 0 && name.length <= 255 &&
+      name.indexOf("/") === -1 && name.indexOf("\\") === -1 && name.charAt(0) !== "." &&
+      !/[\u0000-\u001f]/.test(name);
+  }
+  function saneEditing(e) {
+    if (!e || typeof e !== "object") return null;
+    if (!/^[a-z0-9-]{1,200}$/.test(e.slug) || !/^[0-9a-f]{64}$/.test(e.base || "")) return null;
+    if (typeof e.preview !== "string" || !/^\/[A-Za-z0-9_\/-]*\/$/.test(e.preview) || e.preview.indexOf("//") !== -1) return null;
+    return {
+      slug: e.slug, base: e.base, preview: e.preview,
+      title: typeof e.title === "string" ? e.title : "",
+      scheduled: e.scheduled === true,
+      media: (Array.isArray(e.media) ? e.media : []).filter(safeMediaName),
+      header: (Array.isArray(e.header) ? e.header : []).filter(function (line) {
+        return typeof line === "string" && /^[a-z_]+:/.test(line) && !/^(title|tags|edits|base|publish|receipt):/.test(line) &&
+          line.indexOf("\n") === -1;
+      })
+    };
+  }
+  function existingMedia() { return state.editing ? state.editing.media : []; }
+  // The draft's pictures as the preview and the shot list draw them: from
+  // the hidden page the build already put them next to.
+  function existingShots() {
+    return existingMedia().map(function (name) {
+      return { name: name, data: state.editing.preview + encodeURIComponent(name), existing: true,
+               kind: /\.(mp4|mov|m4v)$/i.test(name) ? "video" : "image" };
+    });
+  }
+  // The draft's pictures the text has stopped naming: the save deletes
+  // them from the server, and nothing brings them back.
+  function droppedExisting() {
+    return existingMedia().filter(function (name) { return !usedInText(name); });
+  }
+  // The text the blog hands out is `edit`'s: a header, then the body.
+  function parseDraft(text) {
+    var out = { title: "", tags: "", header: [], body: String(text || "") };
+    var m = /^---\n([\s\S]*?)\n---\n?/.exec(out.body);
+    if (!m) return out;
+    out.body = out.body.slice(m[0].length).replace(/^\n+/, "");
+    m[1].split("\n").forEach(function (line) {
+      var kv = /^([a-z_]+):\s?(.*)$/.exec(line);
+      if (!kv) return;
+      if (kv[1] === "title") out.title = kv[2];
+      else if (kv[1] === "tags") out.tags = kv[2];
+      else if (kv[2].trim() !== "") out.header.push(line);
+    });
+    return out;
+  }
+  function loadDraft(entry) {
+    var p = parseDraft(entry.text);
+    clearTimeout(saveTimer);
+    forget(bytesClear());
+    state = {
+      title: p.title, body: p.body, tags: p.tags, shots: [], publish: false, sentAt: 0, receipt: "",
+      editing: saneEditing({ slug: entry.slug, base: entry.base, preview: entry.preview, title: entry.title,
+                             scheduled: entry.scheduled === true, media: entry.media, header: p.header })
+    };
+    $("result").hidden = true;
+    render();
+    save();
+    say(t("app.draft_loaded"), "good");
+  }
+  // Asking the blog for its drafts is a delivery like publishing is: one
+  // small file, drafts.txt, with `all` or the slug of one whose text did
+  // not fit the first answer (see scripts/receive.sh).
+  function requestDrafts(word) {
+    var file;
+    try { file = new File([word], "drafts.txt", { type: "text/plain" }); } catch (e) {
+      say(t("app.drafts_failed"), "bad");
+      return;
+    }
+    if (navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] })
+        .then(function () { say(t("app.drafts_asking"), "good"); })
+        .catch(function (err) {
+          if (err && err.name === "AbortError") { say(t("app.drafts_asking"), "good"); return; }
+          say(t("app.drafts_failed"), "bad");
+        });
+    } else {
+      try {
+        download(new Blob([word], { type: "text/plain" }), "drafts.txt");
+        say(t("app.drafts_saved"), "good");
+      } catch (e2) { say(t("app.drafts_failed"), "bad"); }
+    }
+  }
+  function drawEditing() {
+    var el = $("editing");
+    if (!el) return;
+    el.hidden = !state.editing;
+    if (!state.editing) return;
+    $("editing-what").textContent = t("app.editing").replace("{title}", state.editing.title || state.editing.slug);
+    $("editing-note").textContent = t("app.editing_note");
+  }
+
   // ------------------------------------------------------------ markdown
   // The engine's front matter parser is not YAML and takes values
   // literally: quotes around a title become part of it, and tags in
@@ -442,6 +583,14 @@
         .trim();
     }).filter(Boolean);
     if (tags.length) lines.push("tags: " + tags.join(", "));
+    // Editing: what the form has no field for goes back as it came, and the
+    // two lines that say which draft this replaces and which version of it
+    // was opened -- the blog refuses the save if that version is gone.
+    if (state.editing) {
+      state.editing.header.forEach(function (line) { lines.push(line); });
+      lines.push("edits: " + state.editing.slug);
+      lines.push("base: " + state.editing.base);
+    }
     // Draft is the default and needs no saying. Only the decision to go
     // straight out is written down -- and the blog reads it the way it
     // reads `publish <slug> --yes` at a desk: published, and announced.
@@ -783,6 +932,17 @@
       state.body = body.value;
       drawShots(); save(); return;
     }
+    var mine = e.target.closest("[data-insert-existing]");
+    if (mine) {
+      var named = mine.dataset.insertExisting;
+      var text = $("body");
+      var pos = text.selectionStart != null ? text.selectionStart : text.value.length;
+      var head = text.value.slice(0, pos), tail = text.value.slice(pos);
+      var bangs = /\.(mp4|mov|m4v)$/i.test(named) ? "!!" : "!";
+      text.value = head + spacedMark(head, tail, bangs + "[](" + named + ")") + tail;
+      state.body = text.value;
+      drawShots(); save(); return;
+    }
     var insert = e.target.closest("[data-insert]");
     if (insert) {
       var shot = state.shots[Number(insert.dataset.insert)];
@@ -824,6 +984,9 @@
     drawMode(); save();
   });
   function drawMode() {
+    var scheduled = !!(state.editing && state.editing.scheduled);
+    if (scheduled) state.publish = false;
+    $("mode").hidden = scheduled;
     var segs = $("mode").querySelectorAll("[data-mode]");
     for (var i = 0; i < segs.length; i++) {
       segs[i].classList.toggle("on", (segs[i].dataset.mode === "publish") === !!state.publish);
@@ -832,6 +995,7 @@
   }
 
   $("pick").addEventListener("click", function () { $("file").click(); });
+  if ($("open-drafts")) $("open-drafts").addEventListener("click", function () { requestDrafts("all"); });
   $("file").addEventListener("change", function (e) {
     addFiles(e.target.files);
     e.target.value = "";
@@ -872,7 +1036,7 @@
     clearTimeout(btn._armTimer);
     btn.dataset.arm = ""; btn.textContent = t("app.discard");
     clearTimeout(saveTimer);
-    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
+    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "", editing: null };
     try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
     forget(bytesClear());
     render();
@@ -908,6 +1072,14 @@
     if (mute.length && this.dataset.anyway !== "alt") {
       this.dataset.anyway = "alt";
       say(t("app.alt_missing_send").replace("{names}", mute.map(function (s) { return s.name; }).join(", ")), "bad");
+      return;
+    }
+    // A picture of the draft the text no longer names is deleted by the
+    // save, for good: said once, and a second tap means it.
+    var dropped = droppedExisting();
+    if (dropped.length && this.dataset.anyway !== "drop" && this.dataset.anyway !== "size") {
+      this.dataset.anyway = "drop";
+      say(t("app.drop_existing_send").replace("{names}", dropped.join(", ")), "bad");
       return;
     }
     // Over the server's ceiling as this page knows it. A second tap
@@ -1430,7 +1602,7 @@
       fit();
       try { frame.contentDocument.fonts.ready.then(fit); } catch (e) { setTimeout(fit, 600); }
     };
-    frame.srcdoc = previewDocument(renderMarkdown(state.body, state.shots));
+    frame.srcdoc = previewDocument(renderMarkdown(state.body, state.shots.concat(existingShots())));
   }
   // Redrawn a moment after the typing stops, not on each keystroke: the
   // pictures ride inside the document as data URLs, and re-parsing them
@@ -1526,9 +1698,10 @@
   // The reply sorted into what the page will say about it: the pictures
   // the server kept, what it refused, and the post if the text was taken.
   function describeAnswer(objects) {
-    var d = { stored: [], refused: [], post: null };
+    var d = { stored: [], refused: [], post: null, drafts: null };
     (objects || []).forEach(function (o) {
       if (!o || typeof o !== "object") return;
+      if (o.ok === true && Array.isArray(o.drafts)) { d.drafts = o.drafts; return; }
       if (typeof o.stored === "string") d.stored.push(o.stored);
       else if (o.ok === false) d.refused.push({ error: String(o.error || ""), message: String(o.message || "") });
       else if (typeof o.slug === "string") d.post = o;
@@ -1545,6 +1718,15 @@
       if (cls) el.className = cls;
       box.appendChild(el);
       return el;
+    }
+    if (d.drafts) {
+      showDrafts(d.drafts, add);
+      var shut = add("button", t("app.result_close"), "btn ghost close");
+      shut.type = "button";
+      shut.addEventListener("click", function () { box.hidden = true; });
+      box.hidden = false;
+      window.scrollTo(0, 0);
+      return;
     }
     var post = d.post;
     if (post) {
@@ -1638,7 +1820,7 @@
     // on arrival.
     if (post && state.sentAt) {
       clearTimeout(saveTimer);
-      state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
+      state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "", editing: null };
       try { localStorage.removeItem(KEY); } catch (e) { /* nothing to clear */ }
       forget(bytesClear());
       render();
@@ -1648,6 +1830,55 @@
 
   // Only an address on this site. Everything after "://" up to the first
   // slash has to be this page's own host.
+  // The drafts the blog handed out, as choices. One the phone cannot edit
+  // is shown, with why, and cannot be chosen; one whose text did not fit
+  // the answer asks for itself by name; choosing one over unsent text
+  // asks once before replacing it.
+  function showDrafts(list, add) {
+    add("h2", t("app.drafts_title"));
+    if (!list.length) { add("p", t("app.drafts_none"), "meta"); return; }
+    var ul = add("ul", null, "drafts");
+    list.forEach(function (entry) {
+      if (!entry || typeof entry !== "object" || !/^[a-z0-9-]{1,200}$/.test(entry.slug)) return;
+      var li = document.createElement("li");
+      var b = document.createElement("button");
+      b.type = "button";
+      b.className = "draft";
+      var title = document.createElement("span");
+      title.className = "draft-title";
+      title.textContent = String(entry.title || entry.slug);
+      b.appendChild(title);
+      var notes = [];
+      var when = new Date(entry.date);
+      // A scheduled draft says when it goes out instead: its date IS the plan.
+      if (!isNaN(when) && !entry.scheduled) notes.push(when.toLocaleDateString(LANG));
+      if (entry.scheduled) {
+        notes.push(t("app.drafts_scheduled").replace("{when}", isNaN(when) ? "" :
+          when.toLocaleString(LANG, { day: "numeric", month: "numeric", hour: "2-digit", minute: "2-digit" })));
+      }
+      if (entry.problem) notes.push(t("app.drafts_problem_" + entry.problem));
+      else if (entry.text == null) notes.push(t("app.drafts_omitted"));
+      var meta = document.createElement("span");
+      meta.className = "draft-meta";
+      meta.textContent = notes.join(" · ");
+      b.appendChild(meta);
+      if (!entry.editable) b.disabled = true;
+      b.addEventListener("click", function () {
+        if (entry.text == null) { requestDrafts(entry.slug); return; }
+        var busy = (state.title || state.body || state.shots.length) &&
+          !(state.editing && state.editing.slug === entry.slug && state.editing.base === entry.base);
+        if (busy && b.dataset.arm !== "yes") {
+          b.dataset.arm = "yes";
+          meta.textContent = t("app.drafts_replace");
+          return;
+        }
+        loadDraft(entry);
+      });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
   function siteUrl(url) {
     if (typeof url !== "string" || !/^https?:\/\//i.test(url)) return false;
     try { return new URL(url).origin === location.origin; } catch (e) { return false; }
@@ -1870,6 +2101,7 @@
     $("tags").value = state.tags;
     drawShots();
     drawMode();
+    drawEditing();
     drawLegend();
     drawBatch();
     drawTags();
@@ -1891,7 +2123,7 @@
     if (e.key !== KEY && e.key !== null) return;
     if (e.newValue !== null) return;
     clearTimeout(saveTimer);
-    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "" };
+    state = { title: "", body: "", tags: "", shots: [], publish: false, sentAt: 0, receipt: "", editing: null };
     render();
     say(t("app.sent_elsewhere"), "good");
   });

@@ -14,21 +14,25 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Every refusal below is written to stderr: the line the wizard hands to
+# cron sends stdout to /dev/null, and cron mails what is left. Said on
+# stdout, "ruby not found" went nowhere -- the queue simply never ran.
+#
 # The same Ruby floor blog.sh checks at the door -- under cron with a
 # minimal PATH, a system Ruby 2.6 would otherwise die mid-run with a
 # NoMethodError instead of a sentence.
 if ! command -v ruby >/dev/null 2>&1; then
-  echo "ruby not found in PATH -- blog.sh needs Ruby 2.7 or newer (cron PATH may lack rbenv/brew)."
+  echo "ruby not found in PATH -- blog.sh needs Ruby 2.7 or newer (cron PATH may lack rbenv/brew)." >&2
   exit 1
 fi
 if ! ruby -e 'exit((RUBY_VERSION.split(".").map(&:to_i) <=> [2, 7]) >= 0)'; then
-  echo "ruby $(ruby -e 'print RUBY_VERSION') is too old -- blog.sh needs Ruby 2.7 or newer (cron PATH may lack rbenv/brew)."
+  echo "ruby $(ruby -e 'print RUBY_VERSION') is too old -- blog.sh needs Ruby 2.7 or newer (cron PATH may lack rbenv/brew)." >&2
   exit 1
 fi
 
 if [ ! -f env.sh ]; then
-  echo "Missing env.sh -- copy the documented template first:"
-  echo "  cp env.sh.example env.sh && chmod 600 env.sh"
+  echo "Missing env.sh -- copy the documented template first:" >&2
+  echo "  cp env.sh.example env.sh && chmod 600 env.sh" >&2
   exit 1
 fi
 
@@ -71,7 +75,29 @@ ruby scripts/refresh_sidebar.rb "$@" || code=$?
 # non-zero when any name is missing and `set -euo pipefail` then killed
 # the script here, leaving every site with fewer than all the widgets
 # regenerating its JSONs and silently never uploading them.
-only="pixelfed.json,toots.json,commits.json,bluesky.json,rss.json,stats.json,comments.json"
+only="pixelfed.json,toots.json,commits.json,bluesky.json,rss.json,stats.json,comments.json,on-this-day.json"
+# on-this-day.json exists once per language tree (lib/on_this_day.rb), so
+# it is named under every language the engine has words for. A language
+# the site does not publish is a name that is neither built nor on the
+# target -- passed over in silence, like an unconfigured widget above.
+for locale in locales/*.yml; do
+  only="$only,$(basename "$locale" .yml)/on-this-day.json"
+done
+# ...and under every language the site keeps a catalogue for, which is
+# every language it publishes: one that borrows its interface from another
+# (ui_language) has no locale file of its own, so its file was written
+# over by this very run each midnight and never sent -- and the card,
+# which hides without today's window, showed there only on the day of a
+# full deploy.
+for catalogue in .on-this-day.*.json; do
+  [ -e "$catalogue" ] || continue
+  lang="${catalogue#.on-this-day.}"
+  lang="${lang%.json}"
+  case ",$only," in
+    *",$lang/on-this-day.json,"*) ;;
+    *) only="$only,$lang/on-this-day.json" ;;
+  esac
+done
 
 # Nothing has ever been built here, so there is nothing to send and nothing
 # on the target to take down either -- a site that has not been deployed has

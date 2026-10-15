@@ -32,12 +32,17 @@ nav:
 build:
   unreadable_posts: "❌ Unreadable post file(s) in content.nosync/posts/ -- build stopped:"
   duplicate_address: "❌ Two posts at one address in content.nosync/posts/ -- build stopped:"
-  unknown_locale: "❌ site.locales names a language the engine has no locale file for: %{langs} -- add locales/<code>.yml, take the code out of config/site.yml, or say which language its interface words come from (site.ui_language)."
+  unknown_locale: "❌ site.locales names a language the engine has no locale file for: %{langs} -- add locales/<code>.yml, take the code out of config/site.yml, or say which language its interface words come from: `ui_language: <code>` at the top of config/site.<code>.yml."
+  own_locale_unknown: "❌ site.lang is %{lang}, and the engine has no locale file for it. The site's own language cannot borrow an interface: add locales/%{lang}.yml (copy locales/en.yml and translate it), or choose a site.lang the engine speaks -- %{known}."
+  ui_language_unknown: "❌ %{file}: ui_language says %{value}, and the engine has no words in that language to lend -- it has %{known}. Name one of those."
+  language_file_own: "❌ %{file}: a file for the site's own language. What the site says in its own language is config/site.yml -- move what the file holds there, or move the file out of config/; nothing reads it as it stands."
+  language_label_not_text: "❌ %{file}: the word for %{keys} is not text -- YAML read it as something else (no, yes, on and off are true and false to it, and a bare number is a number). Put the word in quotes."
   language_key_moved: "❌ site.%{key} is a table keyed by language, which is the shape this had before 1.9. Each language says it in its own file now: %{file} and its kin, one key per file, no language names inside."
   language_file_stray: "❌ %{files}: a file for a language this site does not publish. Name the language in site.locales, or move the file out of config/ (its translations will be wanted if the language comes back) -- nothing reads it as it stands."
   language_key_unknown: "❌ %{file} says %{keys}, which the engine does not read. It knows: %{known}."
   language_key_orphan: "❌ %{file} translates %{keys}, which config/site.yml does not have -- there is nothing for it to replace. Set it up in site.yml first, or take it out of %{file}."
   language_label_empty: "❌ %{file} gives %{keys} an empty word, which would leave the pill with nothing on it. Write the word, or take the tag out of tags: -- it then shows as written."
+  language_series_empty: "❌ %{file} gives %{keys} an empty name, which would leave the series with no name to show. Write the name, or take the series out of series: -- it is then called what the posts call it."
   language_list_mismatch: "❌ %{file}: %{key} has to go to the same places as in config/site.yml, in the same order -- only the words change. %{detail}"
   # Every count is a labelled one -- "posts: 1" rather than "1 posts" --
   # because the engine's I18n has no plural forms and is not getting any.
@@ -63,7 +68,7 @@ build:
   archive_span_absurd: "⚠️  The archive runs from %{from} to %{to} -- almost certainly a typo rather than a date. The map therefore shows only the years that hold something; fix the date and the empty years come back."
   former_slug_unusable: "⚠️  %{slug}: unusable former_slugs entry %{entry} -- expected \"year/slug\"."
   unusable_slug: "⚠️  %{file}: the slug %{slug} is not one segment of a path -- this post is left out of the build."
-  former_slug_taken: "⚠️  %{slug}: redirect for %{former} skipped -- that address is already taken (a live page, or an earlier post's redirect)."
+  former_slug_taken: "⚠️  %{slug}: redirect for %{former} skipped -- that address is already taken (a live page, or an earlier redirect)."
   redirect_from_unusable: "⚠️  %{slug}: unusable redirect_from entry %{entry} -- expected a site-root path like \"/old-post/\"."
   redirect_from_reserved: "⚠️  %{slug}: redirect_from %{entry} skipped -- /%{segment}/ belongs to the site itself."
   redirect_from_taken: "⚠️  %{slug}: redirect_from %{origin} skipped -- that address is already taken (a live page, a site file, or an earlier redirect)."
@@ -94,7 +99,7 @@ post:
   reading_minutes_under: "< 1 min"
   toc_heading: "On this page"
   toc_label: "Table of contents"
-  series_part: "Part %{number} of %{total} of %{name}"
+  series_part: "%{name} — part %{number} of %{total}"
   series_draft_joins: "Series %{name} -- published parts: %{count}; published, this would be part %{number}."
   series_draft_new: "No published post carries the series \"%{name}\" yet -- a typo, or the first part?"
   series_previous: "← %{title}"
@@ -116,6 +121,17 @@ pagination:
   older: "Older →"
   latest: "latest"
   page: "page %{number}"
+  # The days a page of a listing covers, oldest to newest. Whatever both
+  # ends share is said once: "Sep 12–18, 2026" (one month), "Aug 28 – Sep
+  # 3, 2026" (one year); across a new year, two whole dates. The *_from and
+  # *_to patterns are strftime; a whole date is date_format above.
+  dates_month: "%{from}–%{to}"
+  dates_month_from: "%b %-d"
+  dates_month_to: "%-d, %Y"
+  dates_year: "%{from} – %{to}"
+  dates_year_from: "%b %-d"
+  # On the page the numbering starts from, where the "Older" link would be.
+  start: "the beginning"
 
 tag:
   feed_title: "%{name} – %{site_title}"
@@ -124,12 +140,15 @@ tag:
   # sight by default (see .listing-heading__kind in site.css).
   kind: "Tag"
   title: "Tag: %{name} – %{short_name}"
-  description: "Posts tagged %{name} on %{author}'s personal site."
+  description: "Posts tagged %{name} on %{author_name}'s personal site."
 
 series:
   kind: "Series"
   title: "%{name} – %{short_name}"
-  description: "The series %{name} on the personal site of %{author}, in reading order."
+  description: "The series %{name} on the personal site of %{author_name}, in reading order."
+  # The index of series at /series/: the page's heading and description.
+  index_title: "Series"
+  index_description: "Every series on %{site_title}."
 
 type:
   text: "Text"
@@ -141,7 +160,7 @@ type:
   link: "Links"
   document: "Documents"
   title: "%{label} – %{short_name}"
-  description: "Posts of type %{label} on %{author}'s personal site."
+  description: "Posts of type %{label} on %{author_name}'s personal site."
 
 index:
   empty: "No posts of this type yet."
@@ -155,6 +174,11 @@ archive:
   year_title: "Archive %{year}"
   year_description: "Posts from %{year} on %{site_title}."
   back: "← Back to the years"
+  # The two words either side of the legend under the map, and the label
+  # of the row of months at the top of a year's page.
+  legend_less: "less"
+  legend_more: "more"
+  jump_label: "jump to a month"
 tags:
   # The tag index at /tag/. Sorted by the folded name rather than by bytes,
   # or every accented tag would land after z.
@@ -162,6 +186,8 @@ tags:
   description: "Every tag on %{site_title}."
   sort_alpha: "A to Z"
   sort_count: "Most used"
+  # The label of the row of letters above the index.
+  jump_label: "jump to a letter"
 search:
   # Doubles as the page's own heading when no query has been typed yet.
   kind: "Search"
@@ -198,6 +224,9 @@ ui:
 # read locales/*.yml directly since it runs in the browser, not at build time.
 js:
   date_locale: "en-US"
+  on_this_day_ago_one: "a year ago"
+  on_this_day_ago_other: "%{n} years ago"
+  on_this_day_all: "Everything from this day (%{count})"
   stats_favourited: "Favourited"
   stats_boosted: "Boosted"
   stats_comments: "Comments"
@@ -301,9 +330,11 @@ cli:
   translate_hint: "<!--\nTRANSLATION into %{lang} of: %{title}\nOnly the words are here. The date, the tags, the series and the state belong to the post itself -- change those with `props` or `edit`, and they hold in every language.\nLeave the title empty and delete the body to take this language off the post; it then looks exactly as it did before the translation existed.\nLines starting with // are removed on save.\n-->\n"
   translate_saved: "Saved the %{lang} text of '%{slug}'."
   translate_removed: "Took the %{lang} text off '%{slug}'."
+  translate_removed_addresses: "Its old addresses (%{count}) now lead to the post itself: they went to the post's own list."
   translate_own_language: "'%{lang}' is the language the post is already written in -- edit that with `./blog.sh edit`."
   translate_unknown_language: "This site does not publish '%{lang}'. It publishes: %{known}. Add the language to `site.locales` in config/site.yml first."
-  translate_needs_language: "Which language? `./blog.sh translate <slug> --lang de`."
+  translate_needs_language: "Which language? `./blog.sh translate <slug> --lang %{lang}`. This site publishes: %{langs}."
+  translate_json_needs_slug: "--json needs to name the post: `translate <slug> --lang <code> --json`."
   translate_unknown_args: "❌ `translate` does not know what to do with: %{args}. It takes a post and one language -- `./blog.sh translate <slug> --lang <code>`."
   translate_needs_locales: "This site publishes one language. Name the others in `site.locales` in config/site.yml first."
   publish_partial: "Publishing %{slug} would put it out in one language: the site also publishes %{langs}, and this post has no words there. Write it with `./blog.sh translate`, or say `--allow-partial` to publish it as it is."
@@ -358,6 +389,10 @@ cli:
   add_extra_arguments: "One file at a time. These were left over and nothing was done with them: %{extra}"
   add_file_not_text: "Not readable as text: %{file}. `add` takes a markdown file -- this one is not valid UTF-8, so it is probably a photo, an office document, or a transfer that has not finished."
   add_file_empty: "Nothing to write: %{file} has no content below the frontmatter."
+  markdown_not_a_file: "%{path} is not a file: a directory or a device cannot be a picture"
+  markdown_video_needs_caption: "A video needs a caption: !![caption](%{target})"
+  markdown_media_own_line: "A picture or a video has to stand on a line of its own, with a blank line before it and after it. The problem is here:\n%{para}"
+  editor_failed: "$EDITOR (%{editor}) failed -- set the EDITOR environment variable to an editor that exists here (e.g. export EDITOR=vim) and rerun."
   add_file_missing_images: "These files are not there yet: %{files}. Upload them to %{dir} first -- nothing was written. (Interactive `add` waits for them; with a file argument there is nobody to wait for.)"
   add_json_needs_file: "--json needs a file to read: `add <file> --json`. Without one, `add` opens an editor and there is nothing to report until it closes."
   add_unknown_option: "Unknown option: %{option}. add takes a file, --json and --untrusted, nothing else."
@@ -366,7 +401,9 @@ cli:
   publish_yes_needs_slug: "--yes needs to name the post: `publish <slug> --yes`. Without a slug, publish offers the drafts to choose from -- and choosing is something to do with the preview in front of you, not one keystroke away from an announcement that cannot be recalled."
   no_announce_not_scheduled: "Note: --no-announce does not reach the scheduled publish. The cron works from the post itself, so it will announce this one when its date arrives. To keep it quiet, publish it by hand with --no-announce, or mark it unlisted."
   publish_yes_ambiguous: "The slug %{slug} exists in more than one year (%{years}), and --yes has nobody to ask which. Publish it from `props %{slug}`, which shows them and lets you choose."
+  slug_ambiguous: "The slug %{slug} exists in more than one year (%{years}), and there is nobody here to ask which one is meant -- nothing was done."
   toot_skipped_old: "No announcement: the date (%{date}) is outside the recent window, and that question has nobody to answer it here. The post is published; `toot` still sends it by hand."
+  toot_outside_window_for_program: "Not announced: the post's date (%{date}) is outside the recent window. Ask again with --force to announce it all the same."
   incoming_not_cleaned: "Left in incoming/: %{files} — the copy is in the post, but the staged original could not be deleted (no write permission on incoming/). Remove it by hand, so an empty incoming/ still means nothing is pending."
   generating_preview: "Generating preview"
   draft_saved_preview_pending: "Draft is saved. The preview will show up after a successful deploy -- then run ./blog.sh edit %{slug}"
@@ -374,6 +411,60 @@ cli:
   base_url_missing_preview: "SITE_BASE_URL is not set, can't build the preview URL."
   preview_label: "Preview: %{url}"
   mark_scheduled: "[SCHEDULED]"
+  edit_from_not_found: "There is no post called %{slug} -- nothing was written."
+  draft_not_found: "There is no draft called %{slug}."
+  edit_from_base_required: "%{slug} is published, and a text that edits it has to say which version it edited (base:), so a change made elsewhere in the meantime is not overwritten in silence -- nothing was written. Open the post again and start from what it says now."
+  translate_base_required: "A text in another language for %{slug} has to say which version of the post it was written against (base:), so a change made elsewhere in the meantime is not overwritten in silence -- nothing was written. Open the post again and start from what it says now."
+  edit_from_changed: "%{slug} changed after this text was taken from it -- edited elsewhere or published in the meantime. Nothing was written; open it again and start from what it says now."
+  edit_unknown_option: "Unknown option: %{option}. edit takes a slug, and --json to hand the text out instead of opening an editor."
+  edit_json_needs_slug: "--json needs to name the post: `edit <slug> --json`."
+  drafts_none: "No drafts."
+  drafts_problem_content_lost: "not from the phone: markdown would lose part of it"
+  drafts_problem_missing_media: "not from the phone: a picture it names is missing"
+  drafts_problem_unreadable: "not from the phone: its text does not read back"
+  drafts_unknown_option: "Unknown option: %{option}. drafts takes --json and a slug, nothing else."
+  props_unknown_option: "Unknown option: %{option}. props takes a slug and --json, and with --json also --set, --drop-address (with --kind), --rename, --versions, --restore-version, --yes and --rebuild."
+  props_json_needs_slug: "--json needs to name the post: `props <slug> --json`. Without a slug, props offers the posts to choose from, and an object for an answer means nobody is there to choose."
+  queue_unknown_option: "Unknown option: %{option}. queue takes --json, and with it --up, --down, --move and --to."
+  option_needs_value: "%{option} needs a value after it."
+  props_flags_need_json: "--set, --drop-address (with --kind), --rename, --versions, --restore-version, --yes and --rebuild are the screen's keys answered for a program, and are for --json only; without it, props opens the screen."
+  props_one_action: "One action per call: --set (any number of times), --drop-address, --rename, --versions or --restore-version, not two of them."
+  props_bad_property: "Cannot set %{key} to \"%{value}\". The keys are %{keys}; series_part is a number or -, tags a comma-separated line or -, type one of the engine's eight or -, unlisted and pinned yes or no, hero and toc yes, no or default."
+  props_address_unknown: "This post has no old address %{address}."
+  props_address_ambiguous: "%{address} stands in more than one of this post's lists (%{kinds}). Say which one is meant: --kind with one of those names."
+  props_kind_once: "--kind is said once."
+  props_kind_needs_drop: "--kind says which list an address is dropped from, and goes with --drop-address."
+  props_kind_unknown: "%{address} stands in no list called %{kind}; it stands in %{kinds}."
+  edit_incoming_name_taken: "%{file} also arrived in incoming/ and was not used: the post already has a file by that name, and a name that is taken means the file that has it. To replace a picture, send the new one under another name."
+  props_version_unknown: "This post has no version called %{name} -- props --versions --json lists the ones it has."
+  props_rename_needs_yes: "--rename needs --yes beside it: the screen confirms a rename with a key, and a program confirms it with the flag."
+  props_restore_needs_yes: "--restore-version needs --yes beside it: it overwrites the text being worked on (the current text is kept as a version first)."
+  toot_unknown_option: "Unknown option: %{option}. %{command} takes a slug, and with --json also --force."
+  toot_json_needs_slug: "--json needs to name the post: `%{command} <slug> --json`."
+  toot_force_needs_json: "--force answers the \"announce it anyway?\" question for a program and is for --json only; without it, %{command} asks."
+  queue_one_move: "One move per call: --up, --down or --move, not two of them."
+  queue_flags_need_json: "--up, --down, --move and --to are the screen's keys answered for a program, and are for --json only; without them, queue opens the screen."
+  queue_to_missing: "--move needs --to <position> beside it: the slot the post is carried to, counted from 1."
+  queue_bad_position: "--to has to be a position in the queue, from 1 to %{count}."
+  schedule_unknown_option: "Unknown option: %{option}. schedule takes a slug, --allow-partial, and with --json also --at <time>, --cancel and --compact."
+  list_unknown_option: "Unknown option: %{option}. list and browse take --type, --tag, --search, --drafts and --json, nothing else."
+  list_needs_value: "%{option} wants a value: %{option}=something, or %{option} something."
+  schedule_flags_need_json: "--at, --cancel and --compact answer the questions the dialog asks, and are for --json only: `schedule <slug> --at \"2026-08-15 09:00\" --json`. Without --json, schedule asks."
+  schedule_json_needs_slug: "--json needs to name the post: `schedule <slug> --at <time> --json`."
+  schedule_json_needs_at: "--json needs the time: `schedule <slug> --at \"2026-08-15 09:00\" --json` -- or --cancel to take the post out of the queue."
+  schedule_not_scheduled: "Post '%{slug}' is not scheduled -- there is no plan to cancel."
+  publish_compact_needs_json: "--compact answers the queue's question for a program, and is for --json only: `publish <slug> --yes --compact --json`."
+  unpublish_unknown_option: "Unknown option: %{option}. unpublish takes a slug, and with --json also --yes."
+  unpublish_json_needs_yes: "--json needs the post named and the confirmation given: `unpublish <slug> --yes --json`. Typing the slug is the confirmation at the terminal; the flag is it for a program."
+  unpublish_yes_needs_json: "--yes is for --json only; without it, unpublish asks for the slug itself."
+  delete_unknown_option: "Unknown option: %{option}. delete takes a slug, and with --json also --yes and --rebuild."
+  delete_json_needs_yes: "--json needs the post named and the confirmation given: `delete <slug> --yes --json`. Typing the slug is the confirmation at the terminal; the flag is it for a program."
+  delete_yes_needs_json: "--yes and --rebuild are for --json only; without it, delete asks for the slug and offers the rebuild itself."
+  restore_unknown_option: "Unknown option: %{option}. restore takes a slug, and with --json also --rebuild."
+  restore_rebuild_needs_json: "--rebuild is for --json only; without it, restore offers the rebuild itself."
+  restore_media_json: "The trash holds only media for '%{slug}' (set aside by check --repair), not a post -- restore them at the terminal: ./blog.sh restore %{slug}."
+  empty_unknown_option: "Unknown option: %{option}. empty takes trash or versions, and with --json also --yes."
+  empty_yes_needs_json: "--yes is for --json only; without it, empty asks for the count itself."
   mark_draft: "[DRAFT]"
   mark_pinned: "[PINNED]"
   local_preview_hint_deployed: "The address above is the template's example -- the site does deploy, only site.base_url does not say where yet (./setup.sh fixes it). To look here: ./blog.sh preview and %{url}."
@@ -451,14 +542,17 @@ cli:
   props_queue_heading: "The queue (%{count} scheduled):"
   queue_empty: "The queue is empty -- a draft is scheduled via [s] in its preview, or ./blog.sh schedule."
   queue_overdue: "(waiting for the cron)"
+  queue_overdue_no_scheduler: "(overdue -- nothing publishes the queue here)"
   queue_menu_hint: "↑↓ move · Enter act on post · Esc back"
   queue_pick_prompt: "Post number (empty = quit): "
-  queue_actions: "'%{slug}': [u] a slot earlier  [d] a slot later  [p] publish now  [s] different time  [n] remove from queue  [Enter] back: "
+  queue_actions: "'%{slug}': [u] a slot earlier  [d] a slot later  [p] publish now  [s] reschedule  [n] cancel the schedule  [Enter] back: "
   queue_unknown: "Not understood, try u / d / p / s / n."
   queue_already_first: "The post is already first in the queue."
   queue_already_last: "The post is already last in the queue."
   queue_swap_overdue: "A post whose time has passed can't be reordered -- wait for the cron to publish it."
+  queue_swap_overdue_no_scheduler: "A post whose time has passed can't be reordered -- and nothing publishes the queue on this blog: no scheduler has ever run here. Publish it yourself with ./blog.sh publish <slug>; ./blog.sh doctor says how to set the scheduler up."
   queue_busy: "The publishing run is going right now, so nothing was written -- the line above says who holds the queue and since when. Try again in a moment."
+  busy_for_program: "Another run holds the blog right now -- a build, a publishing run or a save -- so nothing was written. Try again in a moment."
   queue_swapped: "Moved: '%{slug}' publishes %{date}."
   queue_action_carry: "[m] carry it elsewhere  "
   queue_carry_hint: "↑↓ carry the post · Enter put it down · Esc cancel"
@@ -483,6 +577,8 @@ cli:
   announcing: "Announcing"
   preview_serving: "Serving public.nosync at %{url} -- Ctrl-C stops it."
   preview_bad_port: "❌ \"%{value}\" is not a port number. Write something like `./blog.sh preview 8000`, or leave the port out."
+  preview_port_taken: "❌ Something is already listening on port %{port} -- a preview left running in another window, perhaps. Try another port: ./blog.sh preview %{other}"
+  preview_port_denied: "❌ This account may not open port %{port} (ports under 1024 belong to the system). Try ./blog.sh preview 8000."
   preview_missing_public: "public.nosync does not exist yet -- run a build first (ruby build/build_blog.rb)."
   schedule_date_invalid: "That's not a date I can read -- expected e.g. 2026-08-15 09:00."
   schedule_date_not_future: "The publish date has to be in the future."
@@ -532,6 +628,7 @@ cli:
 
   no_changes: "No changes, nothing to save."
   content_loss_warning: "Careful, saving this would lose: %{summary}."
+  content_lost_from_file: "This text cannot say everything the post holds, and saving it would lose: %{summary}. Nothing was written. Such a post is edited at the desk, in the terminal, where the engine can ask before it lets that go."
   content_loss_item: "%{count}× %{kind}"
   # What the guard above names, as an author knows it. A type missing here
   # is named by its schema word rather than refused.
@@ -615,8 +712,8 @@ cli:
   rebuild_prompt: "Rebuild and deploy the site now? [Y/n] "
   yaml_invalid: "%{path} is not valid YAML (%{message})."
   yaml_invalid_doctor: "Run ./blog.sh doctor for the full picture."
-  doctor_unknown_option: "doctor does not know %{option} -- it takes --online (also checks what needs trying over the network) and --strip-location (removes the location from photos)."
-  rebuild_unknown_option: "rebuild does not know %{option} -- it takes --full (build every page again) and --force (let the deploy through its guards and upload everything)."
+  doctor_unknown_option: "doctor does not know %{option} -- it takes --online (also checks what needs trying over the network), --json (answers as data) and --strip-location (removes the location from photos)."
+  rebuild_unknown_option: "rebuild does not know %{option} -- it takes --full (build every page again), --force (let the deploy through its guards and upload everything) and --json (answer as data)."
   unknown_command: "❌ ./blog.sh has no command \"%{command}\"."
   unknown_command_nearest: "   Did you mean ./blog.sh %{command}?"
   unknown_command_help: "   ./blog.sh help lists every command."
@@ -624,36 +721,61 @@ cli:
   header_mode: "Mode: %{mode}"
   usage: |
     usage:
-      ./blog.sh add [<file>]         creates a draft, shows a preview and asks what's next;
+      ./blog.sh add [<file>] [--json] [--untrusted]
+                                     creates a draft, shows a preview and asks what's next;
                                      with a markdown file it asks nothing at all and just writes the draft,
-                                     which is the route for a phone, a script or a shortcut (--json reports it as data)
-      ./blog.sh edit [<slug>]        edits a post; without a slug, offers the last %{recent_count} posts to edit
-      ./blog.sh translate <slug> --lang <code>
-                                     writes that post's text in another language the site publishes
-      ./blog.sh props [<slug>]       a post's state, its properties (series, tags, type, flags) and its actions
-      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
+                                     which is the route for a phone, a script or a shortcut (--json reports it as data,
+                                     --untrusted takes pictures by bare file name only)
+      ./blog.sh edit [<slug>] [--json]
+                                     edits a post; without a slug, offers the last %{recent_count} posts to edit;
+                                     --json hands the text out as data instead of opening an editor
+      ./blog.sh translate <slug> --lang <code> [--json]
+                                     writes that post's text in another language the site publishes;
+                                     --json hands the text out as data instead of opening an editor
+      ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a> [--kind <kind>]] [--rename <slug> --yes] [--versions] [--restore-version <name> --yes] [--rebuild]
+                                     a post's state, its properties (series, tags, type, flags) and its actions;
+                                     --json prints them as data, with the actions that apply to it
+      ./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
                                      shows a draft's preview and asks what's next (without a slug, offers drafts in progress);
-                                     --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky
-      ./blog.sh schedule [<slug>]    asks for a date and schedules the draft for automatic publishing then; run again to cancel
-      ./blog.sh queue                the scheduled-post queue -- reorder, publish now, return a post to the drafts
-      ./blog.sh unpublish [<slug>]   moves a published post back to draft, deletes its toot too (without a slug, offers published posts)
-      ./blog.sh delete [<slug>]      deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
-      ./blog.sh restore [<slug>]     restores a post from trash; without a slug, offers what's in trash
-      ./blog.sh empty trash          deletes everything in the trash for good, after telling you how much
-      ./blog.sh empty versions       keeps each post's newest version and removes the older ones
-      ./blog.sh toot [<slug>]        (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
-      ./blog.sh bluesky [<slug>]     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
-      ./blog.sh rebuild [--full] [--force]
+                                     --yes publishes straight away without asking, --no-announce keeps it off Mastodon and Bluesky,
+                                     --allow-partial lets it out without the words of every language the site publishes
+      ./blog.sh schedule [<slug>] [--allow-partial] [--at <time>] [--cancel] [--compact] [--json]
+                                     asks for a date and schedules the draft for automatic publishing then; run again to cancel;
+                                     --json with --at writes that date, --cancel takes the post out of the queue (--compact shifts the rest forward)
+      ./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
+                                     the scheduled-post queue -- reorder, publish now, return a post to the drafts;
+                                     --json prints it as data
+      ./blog.sh unpublish [<slug>] [--yes] [--json]
+                                     moves a published post back to draft, deletes its toot too (without a slug, offers published posts);
+                                     --yes belongs to --json: at the keyboard it asks
+      ./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
+                                     deletes a post to trash; without a slug, offers the last %{recent_count} posts to delete
+                                     (--yes belongs to --json here too)
+      ./blog.sh restore [<slug>] [--rebuild] [--json]
+                                     restores a post from trash; without a slug, offers what's in trash (--json lists it)
+      ./blog.sh empty trash [--yes] [--json]
+                                     deletes everything in the trash for good, after telling you how much
+      ./blog.sh empty versions [--yes] [--json]
+                                     keeps each post's newest version and removes the older ones
+      ./blog.sh toot [<slug>] [--force] [--json]
+                                     (re-)sends the comment toot (Mastodon sites); without a slug, offers the last %{recent_count} posts
+      ./blog.sh bluesky [<slug>] [--force] [--json]
+                                     (re-)sends the Bluesky announcement (Bluesky sites); same rules as toot
+      ./blog.sh rebuild [--full] [--force] [--json]
                                      rebuilds and deploys the whole site, not tied to a specific post;
                                      --full builds every page again instead of only the ones that changed;
-                                     --force lets the deploy past its guards and uploads everything
+                                     --force lets the deploy past its guards and uploads everything;
+                                     --json answers with one object instead of the narration
       ./blog.sh preview [<port>]     serves public.nosync locally (default port 8000)
-      ./blog.sh list [--type=image] [--tag=foo] [--drafts]
+      ./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
                                      prints the posts one per line, newest first -- plain text for pipes and scripts
       ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                      walks the archive on screen: filters, search, preview, Enter opens the post
-      ./blog.sh doctor [--online] [--strip-location]
+      ./blog.sh doctor [--online] [--json] [--strip-location]
                                      reads the configuration and says what is wrong with it
+      ./blog.sh pair [--list] [--revoke [<device>]] [--json] [--host <address>] [--port <n>] [--no-wait]
+                                     shows a code an app on a phone connects with; --list names the devices let in,
+                                     --revoke takes one out by its number, name or fingerprint
       ./blog.sh check [--online] [--json] [--repair] [--languages]
                                      walks the archive and says what is broken in it;
                                      --json prints every finding as data, uncapped;
@@ -662,8 +784,12 @@ cli:
       ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                      writes the whole archive out as a tree of markdown files (default tmp/export)
       ./blog.sh stats [--json]       counts the archive -- posts, years, words, tags, media, where it came from
+      ./blog.sh on-this-day [--date MM-DD] [--json]
+                                     what this day holds from earlier years, and what the widget shows of it
+      ./blog.sh drafts [--json] [<slug>]
+                                     lists the drafts; --json with each one's text, as the phone opens it
       ./blog.sh help                 shows this help
-      ./blog.sh version              prints the engine version
+      ./blog.sh version [--json]     prints the engine version
       ./blog.sh                      launches the interactive wizard
 
   wizard_prompt_action: "What do you want to do?"
@@ -672,7 +798,7 @@ cli:
   wizard_unknown_choice: "Unknown choice, try again."
   wizard_menu_add: "New post"
   wizard_menu_post: "A post -- edit the text, its properties and the actions on it"
-  wizard_menu_queue: "The scheduled-post queue -- reorder, publish now, remove"
+  wizard_menu_queue: "The scheduled-post queue -- reorder, publish now, cancel the schedule"
   wizard_menu_restore: "Trash -- restore a deleted post"
   wizard_menu_browse: "The archive -- filters, search, preview"
   wizard_menu_rebuild: "The site -- rebuild and deploy after a settings change"
@@ -853,6 +979,7 @@ cron:
   sidebar_empty_pass: "⚠️  The full pass fetched nothing at all, so it is not recorded as done -- the next run will try again instead of waiting a week."
   sidebar_stats_full: "stats.json: %{updated} post(s) updated (%{total} total) [full refresh]"
   sidebar_stats_recent: "stats.json: %{updated} post(s) updated (%{total} total) [last ~90 days only]"
+  on_this_day: "%{file}: %{count} post(s) from earlier years on this day"
   sidebar_comments_removed: "comments.json: removed (comments.approval is off)"
   sidebar_comments: "comments.json: %{threads} thread(s) updated, %{comments} approved comment(s) total"
   published_scheduled: "Published scheduled post '%{slug}' (date %{date})."
@@ -1068,7 +1195,46 @@ import:
 # wrong with it (lib/doctor.rb). Every "fix" line has to be actionable on
 # its own: it is read by someone who does not know which file the setting
 # lives in, let alone which key.
+# ./blog.sh pair: the code that lets an app in (lib/pairing.rb).
+pair:
+  intro: "This code lets an app into the blog %{site}. It is good until %{time} and for one use."
+  how: "In the app choose \"Add a blog\" → \"Scan a code\" and point the camera here:"
+  as_text: "With nothing to scan with, paste it into the app as text:"
+  waiting: "Waiting for the app… (Ctrl-C cancels the code)"
+  paired: "✅ Connected: %{device}"
+  paired_note: "   The code opens nothing any more. ./blog.sh pair --list shows the devices and ./blog.sh pair --revoke takes one out."
+  expired: "The code ran out and nobody used it. Nothing has changed."
+  cancelled: "Cancelled. The code is no longer good."
+  q_address: "The address of this machine, as the phone will reach it (an IP address or a name) [%{address}]: "
+  bad_address: "❌ \"%{address}\" is not an address to connect to: a name or a number, with no spaces."
+  no_sshd: "❌ Nothing answers SSH on port %{port} here, so the app would have nowhere to connect."
+  keys_path_bad: "BLOG_SH_AUTHORIZED_KEYS says %{path}, and that path cannot be expanded -- a ~user this machine does not have. Correct it in env.sh."
+  no_sshd_mac: "   Turn it on in System Settings → General → Sharing → Remote Login and run ./blog.sh pair again."
+  no_sshd_other: "   Start sshd on this machine (or name its port with --port), or set the app up by hand as docs/operations.md describes."
+  container: "   The blog runs in a container: the keys for logging in are the host's, not the container's. Set the app up by hand as docs/operations.md describes."
+  no_keygen: "❌ ssh-keygen is missing; a code cannot be made without it."
+  small_window: "The window is too small for the code (it wants at least %{cols} × %{rows} characters). Make it larger and run ./blog.sh pair again, or use the code as text."
+  code_too_long: "The code is too long to draw -- paste it into the app as text, the line is below."
+  list_none: "No device has been let into this blog by a code."
+  list_head: "Devices let in by a code:"
+  list_row: "  %{number}. %{name}   SHA256:%{fingerprint}"
+  revoked: "✅ Removed: %{device}"
+  revoke_none: "❌ There is no device called \"%{which}\" here. ./blog.sh pair --list shows which there are."
+  revoke_needs_device: "❌ --revoke wants to know which device: its number, name or fingerprint from ./blog.sh pair --list."
+  json_scope: "With --json pair does two things: --list, and --revoke with nothing after it -- which takes out the device that is asking. A code is shown at the terminal, and another device is taken out there too."
+  device_unknown: "This blog cannot tell which device is asking: the line that let it in was written by hand, or by a pairing from before a line said whose it is. On the server, ./blog.sh pair --list brings an older pairing up to date and ./blog.sh pair --revoke takes a device out; a line written by hand is taken out by hand."
+  busy: "Somebody else is changing the file with the keys right now, so nothing was taken out. Try again in a moment."
+  q_revoke_which: "Which one goes? [1–%{count}]: "
+  q_revoke: "Take \"%{device}\" out? The app on it will no longer reach the blog. [y/N] "
+  write_failed: "❌ %{path} could not be written: %{error}"
+  read_failed: "%{path} could not be read: %{error}"
+  unknown_option: "pair does not know %{option} -- it takes --list, --revoke <device>, --json, --host <address>, --port <number> and --no-wait."
+  needs_value: "%{option} wants a value."
+
 doctor:
+  pairing_leftover: "%{path} still holds a line from a pairing code that ran out (%{count}). It opens nothing: the engine refuses that key once its code has run out, even where SSH would still let it through."
+  pairing_leftover_fix: "./blog.sh pair --list tidies it away."
+  json_and_strip: "❌ --json and --strip-location cannot run together: --json is a document about the installation as it stands, --strip-location rewrites photographs. Run them one at a time."
   tag_icons_ok: "Tag icons: %{count}, all of them drawable."
   tag_icon_stripped: "The `icon_svg` of the tag \"%{tag}\" carries something the engine takes out before it reaches a page -- a script, a style, an event handler or a javascript: address. The pages are safe; the icon is not what it was copied from, and whoever wrote it should say whether that source is worth trusting."
   social_icon_unknown: "The link \"%{name}\" in the footer asks for an icon called \"%{icon}\", which the engine does not have -- it draws an empty space where the icon belongs. The ones it does have: %{known}. Your own SVG goes in `icon_svg` instead."
@@ -1144,6 +1310,9 @@ doctor:
   approval_no_network_fix: "Moderation picks from the replies to an announcement. Configure mastodon: or bluesky:, or set comments.approval: off."
   approval_needs_cron: "Moderated comments reach the site only through scripts/refresh-sidebar.sh."
   approval_needs_cron_fix: "Put it in cron (*/30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh). Without it the site keeps the comments it last uploaded, and a newly approved one never appears."
+  on_this_day_never: "The On this day card is switched on, but scripts/refresh-sidebar.sh has never run here -- without it the day does not turn over: the card shows the day of the last build and is gone the day after."
+  on_this_day_stale: "The On this day card is switched on, but nothing has run scripts/refresh-sidebar.sh for %{ago} -- without it the day does not turn over, and the card disappears."
+  on_this_day_fix: "Put it in cron (*/30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh)."
   approval_probe_ok: "The token can see which replies you favourited."
   approval_probe_nothing: "Nothing is announced yet, so there was no thread to test the token against."
   approval_probe_blind: "The network answers without saying which replies you favourited -- every thread on the site would come out empty."
@@ -1203,7 +1372,7 @@ doctor:
   map_shape: "`%{key}` is not a section of settings."
   map_shape_fix: "This key holds settings written as `name: value` lines indented under it. A key with nothing under it means none of them, which is allowed."
   widget_unknown: "The sidebar has no card called %{name}."
-  widget_unknown_fix: "The cards are toots, pixelfed, commits, bluesky and rss. A name outside that list is drawn by nothing -- and if it is the only widget written down, the column disappears from every page."
+  widget_unknown_fix: "The cards are toots, pixelfed, commits, bluesky, rss and on_this_day. A name outside that list is drawn by nothing -- and if it is the only widget written down, the column disappears from every page."
   nav_item_shape: "Menu item %{index} has no label, or nowhere to go."
   nav_item_shape_fix: "Each item takes a `label` plus either a `tag` (a tag slug) or a `url`. An item missing either half is skipped rather than drawn empty."
   sidebar_ok: "Sidebar: %{count} card(s)."
@@ -1230,6 +1399,10 @@ doctor:
   slots_shape: "publishing.slots has to be a list."
   slots_bad: "Publishing slots that will be ignored: %{values}."
   slots_bad_fix: "The format is \"<day> HH:MM\" -- mon, tue, wed, thu, fri, sat, sun or daily, then a 24-hour time. Full day names do not work."
+  publishing_shape: "publishing is %{value}, not a map of keys -- neither its slots nor allow_partial are read."
+  publishing_shape_fix: "Write the section as the example shows it: publishing:, with slots: and allow_partial: indented under it."
+  allow_partial_shape: "publishing.allow_partial is %{value}, which is neither true nor false -- it is read as off."
+  allow_partial_shape_fix: "Write publishing.allow_partial: true (no quotes), or delete the line."
   scheduler_ok: "The queue has %{count} post(s) waiting and something ran it %{ago} ago."
   scheduler_never: "%{count} post(s) are waiting in the queue, but nothing has ever run it here -- they will not publish on their own."
   scheduler_stale: "Nothing has run the queue for %{ago}, and %{count} post(s) are waiting -- it runs every fifteen minutes when it runs at all."
@@ -1313,8 +1486,9 @@ check:
   repair_no_offer: "No repair to offer here: this one is yours to decide."
   repair_no_offer_draft: "The only post of that name is still a draft, and a draft has no address on the site yet -- publish it and this link repairs itself."
   repair_no_offer_duplicate: "Two posts carry that slug, in different years, so it names neither of them. This one needs a person."
+  repair_no_offer_language: "That address is in the tree of a language the post is not written in, so no page of it stands there -- and a redirect into that folder is one the build refuses. This one needs a person: link the post's own address, or translate the post."
   repair_add_redirect: "Write %{origin} into the redirect_from of %{slug} (%{to}) -- one added line, every link to the old address answered, including the ones from outside."
-  repair_rewrite_link: "Rewrite the link in %{slug}: %{from} -> %{to}"
+  repair_rewrite_link: "Rewrite the link in %{slug}: %{from} -> %{shown}"
   repair_decode_entities: "Replace the entity codes in %{slug} with the characters they stand for (places: %{count}, first: \"%{before}\" -> \"%{after}\"). It is one decision for the whole post. The previous version stays in its history."
   repair_decode_changed: "The post has changed since it was checked, so nothing was written -- run check --repair again over what it says now."
   repair_decode_another_layer: "One layer came off. The text still carries entities (%{entities}) -- the source escaped it more than once. The next run offers them as a decision of their own."
@@ -1329,8 +1503,31 @@ check:
   repair_rebuild: "Run ./blog.sh rebuild to put the changes on the site."
   language_address_taken_fix: "Give one of them another address: the `slug:` line in the header that `./blog.sh translate <slug> --lang %{lang}` opens."
   language_address_taken: "In %{lang}, %{slugs} both ask for %{address} -- the build stops on it, and the site is not deployed."
+  language_address_taken_pages: "In %{lang}, the pages %{slugs} both ask for %{address} -- the site still builds, but only one of them is served there, and the other has no page in that language."
+  translation_own_language: "%{slug}: holds a text filed under %{lang}, which is the site's own language. In that language the post is its own title and text, so this entry is not read and its words are shown nowhere."
+  translation_own_language_fix: "If those words are the ones the post should have, put them into the post itself (./blog.sh edit) and take translations.%{lang} out of the post's file. If the site's language was changed, the posts' own texts are still in the old one: site.lang says what language the posts are written in."
   unknown_locale: "%{langs}: `site.locales` names it, and the engine has no locale file for it -- no language of this site will build."
-  unknown_locale_fix: "Add locales/<code>.yml for it, take the code out of `site.locales`, or name the language its interface words come from under `site.ui_language` in config/site.yml."
+  unknown_locale_fix: "Add locales/<code>.yml for it, take the code out of `site.locales`, or name the language its interface words come from: `ui_language: <code>` at the top of that language's own file, config/site.<code>.yml."
+  own_locale_unknown: "%{lang} is the site's own language (site.lang), and the engine has no locale file for it -- no language of this site will build."
+  own_locale_unknown_fix: "The site's own language cannot borrow its interface (ui_language is for the other languages, in their own files). Add locales/%{lang}.yml -- copy locales/en.yml and translate it -- or choose a site.lang the engine speaks: %{known}."
+  ui_language_unknown: "%{file}: `ui_language` says %{value}, and the engine has no words in that language to lend -- no language of this site will build."
+  ui_language_unknown_fix: "The engine speaks %{known}. Name one of those -- the language whose interface words this one borrows -- or add locales/<code>.yml for the one you named."
+  language_file_own: "%{file} is a file for the site's own language -- nothing reads it, and no language of this site will build."
+  language_file_own_fix: "What the site says in its own language is config/site.yml. Move what the file holds there, or move the file out of config/."
+  language_label_not_text: "%{file}: the word for %{keys} is not text -- YAML read it as something else."
+  language_label_not_text_fix: "no, yes, on and off are true and false to YAML, and a bare number is a number. Put the word in quotes -- ne: 'no'."
+  language_title_blank: "%{file} gives the site an empty title; the pages of that language carry the site's own."
+  language_title_blank_fix: "Write the title, or take the line out."
+  language_item_wordless: "%{file}: %{key} has no word of its own for item %{items}; it is shown under the word the site's own list has for it."
+  language_item_wordless_fix: "Write the word -- label: in the menu, title: in the footer's links -- so the item reads in that language."
+  language_fallback_idle: "%{file}: fallback names %{langs}, which stands in for nothing -- a language this site does not publish, the language itself, or one written after the site's own language, where every chain ends."
+  language_fallback_idle_fix: "A fallback is another language this site publishes (%{known}), written before the site's own. Correct the entry or take it out; nothing is wrong on the site meanwhile, the line simply does nothing."
+  language_name_missing: "%{file}: the language borrows its interface and has no name for itself, so the language switch calls it %{code}."
+  language_name_missing_fix: "Say what the language is called in itself -- language_name: Slovenčina, at the top of that file beside ui_language."
+  language_series_unused: "%{file} gives a name to the series %{series}, which no published post is in -- nothing shows it."
+  language_series_unused_fix: "Usually a key that is not the series' name letter for letter. Correct it, or take the line out."
+  language_key_moved: "`site.%{key}` in config/site.yml: a language's own settings moved to its own file in 1.9, and the build refuses the old place -- no language of this site will build."
+  language_key_moved_fix: "Write `%{key}: <value>` at the top of config/site.<code>.yml for each language that needs it, and take `site.%{key}` out of config/site.yml."
   language_file_stray: "%{file} is a file for a language this site does not publish -- nothing reads it."
   language_file_stray_fix: "Name the language in `site.locales`, or move the file out of config/ -- its translations will be wanted if the language comes back. The site's own language has no file of its own: config/site.yml is it."
   language_key_unknown: "%{file} says %{keys}, which the engine does not read."
@@ -1341,12 +1538,14 @@ check:
   language_key_orphan_fix: "There is nothing for it to replace. Set it up in site.yml first, or take it out of the file -- as it stands it does nothing."
   language_label_empty: "%{file} gives %{keys} an empty word, which would leave the pill with nothing on it."
   language_label_empty_fix: "Write the word, or take the tag out of tags: -- it then shows as written."
+  language_series_empty: "%{file} gives %{keys} an empty name, which would leave the series with no name to show."
+  language_series_empty_fix: "Write the name, or take the series out of series: -- it is then called what the posts call it."
   language_list_mismatch: "%{file}: %{key} goes to other places than in config/site.yml. %{detail}"
   language_list_mismatch_fix: "A translated menu or footer names the same places in the same order; only the words change. The build refuses the file until they match."
   language_tag_unused: "%{file} gives a word to %{tags}, which no published post carries -- nothing shows it."
   language_tag_unused_fix: "Nothing is wrong on the site. Take the line out, or leave it for a tag you are about to use."
   languages_legend: "A tick is written, a half circle a title with no text yet, a dot where that language has nothing -- the other language still shows the post and links to the one copy of it."
-  languages_alone: "check --languages prints a table and --json and --repair do not; ask for them one at a time."
+  languages_alone: "check --languages answers with the table of languages and --repair changes the archive; ask for them one at a time."
   languages_none: "This site publishes one language, so there is nothing to tabulate. Name the others in `site.locales` in config/site.yml."
   unknown_option: "Unknown option: %{option}. check takes --online, --json, --languages and --repair, nothing else."
   heading: "Checking this archive"
@@ -1369,6 +1568,8 @@ check:
   image_degenerate_fix: "Anything 1px or smaller is treated as a tracking pixel and dropped WITH its caption, so the page silently loses both. Replace the image or remove the block."
   link_dead: "%{slug}: links to %{url}, which nothing on this site answers at."
   link_dead_fix: "Usually a permalink left over from an import, or a slug renamed before renames kept a redirect. Fix the link, or give the target post a redirect_from entry."
+  link_dead_fix_own: "Fix the link. The address is one the site makes itself, so a redirect_from entry cannot answer at it. If the post it means used to live there, the old address goes into that post's former_slugs as <year>/<slug> (for the text of another language, into the former_slugs of that language) and is answered from then on."
+  link_dead_fix_unusable: "Fix the link. No redirect can answer at an address of that shape -- a segment of a dot alone, a question mark or a hash, a character a path cannot hold, or a segment too long for a folder -- so neither redirect_from nor former_slugs can stand in for it."
   link_relative: "%{slug}: links to %{url}, which is read relative to the post itself, not to the site."
   link_relative_fix: "Three shapes, three different fixes: a link to another post on this site (rewrite it as /posts/<year>/<slug>/), a bare host name missing nothing but its protocol (the address is right -- add https://), and an absolute URL with a stray character in front of it (\" or :). All three resolve inside the post's own URL, and a query string a static host ignores answers 200 with the very page the reader is standing on -- so nothing breaks and nobody arrives. Whether the target still answers is a question for check --online."
   media_orphan: "No post owns the media directory %{dir}."
@@ -1405,11 +1606,12 @@ check:
   redirect_collision: "%{origin} is claimed by more than one post: %{slugs}."
   redirect_collision_fix: "Whichever renders last wins and the others' readers land on it. Leave the entry on one post only."
   redirect_from_reserved: "%{slug}: the redirect_from %{entry} will not be served -- its first segment belongs to the site itself."
-  redirect_from_reserved_fix: "The build refuses it and says so once, in the middle of a log nobody keeps, so the old address quietly 404s. Point it somewhere outside the site's own namespace (posts, page, tag, type, assets, search, markdown), or take the entry out."
+  redirect_from_reserved_fix: "The build refuses it and says so once, in the middle of a log nobody keeps, so the old address quietly 404s. Point it somewhere outside the site's own namespace (posts, page, tag, type, assets, search, markdown, and the folder of each language the site publishes), or take the entry out."
   redirect_from_unusable: "%{slug}: the redirect_from %{entry} will not be served -- the build can make no directory of that shape."
   redirect_from_unusable_fix: "A query, a fragment, a . or .. segment, or a segment too long for a filename. Expected a site-root path like \"/old-post/\". Correct it, or take the entry out."
   former_slug_unusable: "%{slug}: the former_slugs entry %{entry} will not be served -- the build can make no directory of that shape."
   former_slug_unusable_fix: "Expected year/slug: two segments, neither hidden, neither carrying a separator, neither longer than a filename allows. Correct it, or take the entry out."
+  former_slug_of_language: " It is an old address of the post's %{lang} text (the list translations.%{lang}.former_slugs); ./blog.sh props drops it, under the old addresses."
   check_failed: "The question \"%{check}\" could not be asked (%{reason}). The rest of the check ran, but it says nothing about this part of the archive."
   check_failed_fix: "Most likely the archive holds a shape this question does not expect -- the findings above often name it. If they do not, this is a bug in check itself and worth reporting, with this line."
   post_bad_draft_token: "%{file} has a draft_token that is not a single path segment (%{token})."
@@ -1424,6 +1626,14 @@ check:
   address_fold_duplicate_fix: "The build writes both into it and one of the posts is not on the site. On a Linux server they are two addresses, but an archive that syncs through iCloud does not keep them apart. Rename one of them:"
   former_slug_taken: "%{slug}: the old address %{entry} will not be served -- the live post %{holder} stands at it."
   former_slug_taken_fix: "Links and announcements pointing at that old address lead to %{holder}, not here. Either take the entry out of former_slugs or rename the other post; the build mentions it in one line in the middle of its output."
+  former_slug_taken_partly: "%{slug}: the old address %{entry} is served %{served} only -- %{taken} the live post %{holder} stands at it."
+  former_slug_taken_partly_fix: "A link to that old address leads here from one place and to %{holder} from the other. Either take the entry out of the list or rename the other post; the build says it skipped the address in one line, on every run."
+  former_slug_two_languages: "%{slug}: the old address %{entry} is in the lists of %{langs}. Each of them serves it in its own tree, but at the root of the site it can lead to one text only -- it leads to the %{first} one."
+  former_slug_two_languages_fix: "Keep the entry in the list of the language whose address it was (./blog.sh props, under the old addresses). The build says it skipped the address in one line, on every run."
+  former_slug_unpublished: "%{slug}: the old address %{entry} is not served -- it belongs to the post's %{lang} text, and the site does not publish %{lang}."
+  former_slug_unpublished_fix: "Nothing answers there, so a link to it is dead. Name %{lang} in site.locales; or drop the entry (./blog.sh props, under the old addresses) and write it into the post's own former_slugs, where it leads to the post itself."
+  tree_root: "at the root of the site"
+  tree_language: "under /%{lang}/"
   redirect_from_taken: "%{slug}: redirect_from %{entry} will not be served -- the live post %{holder} stands at it."
   redirect_from_taken_fix: "Whoever arrives at that old address gets %{holder}. Either take the entry out of redirect_from or rename the other post."
   duplicate_post: "%{year}/%{copy} looks like a copy of %{year}/%{original} -- same title, same date, same content. That is what importing an export back into an archive that already held it leaves behind."
@@ -1469,6 +1679,19 @@ stats:
   media_line: "%{files} file(s), %{size}, across %{posts} post(s)"
   media_referenced_line: "%{referenced} file(s) the posts ask for, across %{posts} post(s) -- media.nosync is not here"
 
+on_this_day:
+  unknown_option: "Unknown option: %{option}. on-this-day takes --date and --json, nothing else."
+  bad_date: "%{value} is not a date -- write it as MM-DD or YYYY-MM-DD."
+  no_leap_day: "This year has no 29 February -- its posts are remembered on the 28th, which is the day shown here."
+  no_posts: "There is nothing in the archive yet."
+  heading: "On this day: %{date}"
+  summary: "%{posts} post(s) from %{years} earlier year(s)"
+  nothing: "Nothing from earlier years on this day -- the widget hides itself today."
+  windows: "What the widget shows (%{count} window(s)):"
+  all_heading: "Everything from this day"
+  legend: "● on the widget today"
+  widget_off: "The on_this_day widget is not switched on -- write it under widgets: in config/site.yml, or switch it on in ./style.sh."
+
 export:
   heading: "Writing this archive out to %{path}"
   progress: "Writing posts: %{done}/%{total}"
@@ -1489,7 +1712,7 @@ export:
 
 setup:
   intro: "This asks for the settings a site needs to work, checks the answers as it goes, and writes them into config/site.yml and env.sh."
-  intro_skip: "Most questions can be skipped -- Enter takes the value pre-filled under it; the site's name, short name, description and author need typing only while they are still the template's example. Nothing is written until you have seen all the changes together and said yes."
+  intro_skip: "Most questions can be skipped -- Enter takes the value pre-filled under it; the site's name, short name, description, author and address need typing only while they are still the template's example. Nothing is written until you have seen all the changes together and said yes."
   intro_expert: "(Rather edit the files yourself? config/site.yml has a commented template in config/site.yml.example, and env.sh one in env.sh.example.)"
   config_unreadable: "❌ %{path} could not be read: %{error}"
   network_unchanged: "Nothing given, so nothing changed -- the site keeps the comments network it had."
@@ -1601,6 +1824,16 @@ setup:
   doctor_clean: "✅ Nothing else needs attention."
   doctor_rest: "Still worth doing"
   doctor_hint: "./blog.sh doctor says this again any time, and ./style.sh handles the appearance ones."
+  # The launcher for a Mac: an icon in Applications that opens Terminal in
+  # the site's folder and runs ./blog.sh.
+  q_launcher: "Put an icon in Applications that opens this blog with a double-click?"
+  launcher_made: "✅ The launcher is ready: %{path}"
+  launcher_first_run: "   On the first double-click macOS asks whether it may control Terminal — allow it, or the icon does nothing. Terminal keeps its window open afterwards; closing it after a clean exit is a setting in Terminal (Settings → Profiles → Shell). ./setup.sh --launcher makes it again."
+  launcher_permission: "The launcher opens Terminal in your blog's folder and runs ./blog.sh there. It does nothing else."
+  launcher_failed: "⚠️  The launcher could not be made: %{error}"
+  launcher_taken: "⚠️  %{path} is an application blog.sh did not make. Leaving it alone."
+  launcher_other_site: "⚠️  %{path} is the launcher of another site of the same name (%{folder}). Leaving it alone -- give one of the two a different site.short_name, or drag the old launcher to the Trash, and try again."
+  launcher_mac_only: "blog.sh can only make a launcher on a Mac."
 
 # lib/wizard.rb -- what ./setup.sh and ./style.sh both say: asking a
 # question that can be skipped, choosing from a list, and the moment at
@@ -1744,6 +1977,7 @@ style:
   widget_commits: "Recent commits from a GitHub, Gitea or Forgejo account"
   widget_bluesky: "Recent posts from a Bluesky account"
   widget_rss: "Anything with an RSS or Atom feed"
+  widget_on_this_day: "Your own posts from this day in earlier years"
   q_widget_heading: "Heading over the widget"
   q_widget_account_id: "Account id"
   h_widget_account_id: "The id, not the @handle -- a number on Mastodon, a ULID on GoToSocial. ./setup.sh finds it when the token is filled in. By hand: open https://your-instance/api/v1/accounts/lookup?acct=yourname and copy \"id\"."
@@ -1761,6 +1995,7 @@ style:
   e_account_id: "That has to be the account's id, not the @handle -- a number on Mastodon, a ULID on GoToSocial. With a handle the widget silently shows nothing."
   e_feed_url: "That has to be a URL starting with http:// or https://."
   widget_set: "✅ The %{name} widget is set up. ./scripts/refresh-sidebar.sh fills it in; run it from cron to keep it fresh."
+  widget_incomplete: "The %{name} widget was not set up: it has no answer to “%{what}”, and without one the card would show nothing. Nothing was written."
   widget_removed: "✅ The %{name} widget is gone. It stays commented out in the config, so you can switch it back on any time."
 
   fonts_intro: "Fonts set here apply to just two lines on the banner -- the name and the description; the rest of the site's type comes with the engine. A font file of your own goes in assets/fonts/, and the questions below add it to config/site.yml under fonts.faces for you."
@@ -1888,3 +2123,4 @@ chrome:
   widget_commits: "Recent commits"
   widget_bluesky: "Recent Bluesky posts"
   widget_rss: "Elsewhere"
+  widget_on_this_day: "On this day"

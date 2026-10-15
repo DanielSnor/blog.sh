@@ -67,15 +67,17 @@ already carries, so each can be read as well as changed:
 - **`series: Name`** files the post into a series. A series with two or
   more published parts gets a listing of its own at `/series/<slug>/` --
   a series of one is just a post, and the listing appears when the
-  second part does. The listing reads from part one: a long series is
+  second part does -- and with it a line in the index of series at
+  `/series/`. The listing reads from part one: a long series is
   paged in reading order, `/series/<slug>/` holds the first parts and
-  `/series/<slug>/page/2/`, `/page/3/`… the ones after, so the "Part 1 of
+  `/series/<slug>/page/2/`, `/page/3/`… the ones after, so the "part 1 of
   30" link on every post opens where the series starts. (Up to 1.7 a
   series of twenty parts or more opened at its last page instead, and its
   `/page/N/` addresses held other parts than they do now.) A series whose
   name is too long to fit an address gets no listing; its parts still say
-  which part they are, without a link. The build puts "Part 2 of 5"
-  on each post in it, with the way to the part before and the part after
+  which part they are, without a link. The build puts the series' name
+  and "part 2 of 5" on each post in it -- and on each card of the series'
+  own listing -- with the way to the part before and the part after
   -- within the series only, since a post's chronological neighbours
   across a whole archive are rarely what a reader wants next. Parts are
   ordered by date, which is what a series written in order needs;
@@ -107,9 +109,57 @@ already carries, so each can be read as well as changed:
   leaves behind when it straightens a relative link out of an import.
 - **`publish: yes`** publishes the post the moment `add <file>` writes
   it -- the date settled, the announcement sent, the site rebuilt -- the
-  road `publish <slug> --yes` takes at a desk. It is the one key only the
-  file route reads; the wizard never publishes directly. Absent, or
-  anything but yes/true/1, is a draft.
+  road `publish <slug> --yes` takes at a desk. Only the file route reads
+  it; the wizard never publishes directly. Absent, or anything but
+  yes/true/1, is a draft.
+- **`edits: <slug>`** makes the file not a new post but a new text for
+  that post -- the save `edit` does, with every question it would ask
+  turned into a refusal, because nobody is there to answer it. `base:`
+  beside it is the digest `./blog.sh drafts --json` or `edit <slug>
+  --json` handed out with the text; when the post has changed since, the
+  file is refused (`changed`) instead of undoing whatever happened in
+  between. A draft may come without `base:`; a published post may not
+  (`base_required`), and saving one rebuilds and deploys. What the new
+  text leaves out is taken out: a paragraph, a picture or a rule its
+  author removed is the edit, and a picture the text stops naming is
+  deleted from the post's media. A picture the text names by a name the
+  post already has is the post's own file -- so a new one sent under
+  that name is not used (the answer says so in `warnings`); a picture is
+  replaced by sending the new one under a name of its own. Taking everything out is not an edit: a
+  file with no text under its header is refused (`empty`), as a new one
+  is, because that is also what a program sends when it never had the
+  text -- of a post that had a body; one that is a title and its tags, or
+  a link card, which travels in the header, has none to begin with, and is
+  saved. What the text leaves as it was is saved
+  as it was stored -- the very block, with whatever an import put on it
+  that markdown cannot say (a paragraph's kind, a video's provider) -- so
+  an edit changes what was edited and nothing else. A block the text did
+  change is made again from the text, and keeps what the text could not
+  have said about it -- the kind an import gave a paragraph, the address a
+  video was first at -- where the save can tell which stored block it
+  rewrote: between two blocks kept as stored, the rewritten blocks are
+  paired in order with the stored ones of their kind when there are as
+  many of each. A paragraph inserted beside a corrected one makes two for
+  one, and both are saved as written. What is refused as a loss
+  (`content_lost`) is what the author never saw going, and it is one of
+  two things. A block the text has no line for at all -- a second link
+  card, a player from somewhere the engine does not know -- is lost by any
+  save of that text: such a post is marked `editable: false` when its
+  text is handed out, and editing it is for the desk, where `edit` asks.
+  And a block the edit rewrote may have held more than its words -- a
+  mention an import made of `@somebody`, small print: that edit is
+  refused too, naming the thing, while the same post edited anywhere
+  else is saved, with that block as it stood. This
+  is how an app saves a post it opened (see
+  [Writing from a phone](#editing-a-draft-from-the-phone)), and a way for
+  a script to edit without the `$EDITOR` trick.
+- **`lang: <code>`** beside `edits:` and `base:` makes the file a
+  translation rather than the post's own text: the words become the
+  post's text in that language, the one `translate <slug> --lang <code>
+  --json` handed out with its `base:`. The same rules as `edits:` hold --
+  `changed`, `content_lost`, what is left as it was stays as stored --
+  except that `base:` is required for a draft too (`base_required`), and
+  a title and a body both empty take the language off the post.
 - **`toc: true` / `toc: false`** overrides the table of contents. A post
   with four headings or more gets one on its own -- that is the length at
   which a reader starts scrolling to look for something rather than
@@ -128,7 +178,13 @@ post page carries how long the post takes to read, counted at 200 words
 a minute -- the same figure `./blog.sh stats` reports; a post too short
 to time says "under a minute". And the build writes a `noindex`
 `/404.html` in the site's own chrome, menu and search field included, so
-a dead end is somewhere to go on from.
+a dead end is somewhere to go on from. Under its sentence stand a search
+field of its own -- filled, where the browser runs scripts, with the
+words of the address that was not found -- and pills back to the front
+page, to the archive and to the index of tags; an address that names a
+year the archive has gets a pill straight to that year. The page is one
+file for every missing address, served by your host: it is written in the
+site's first language whatever language the address was in.
 
 **Backdating** isn't part of that flow -- publishing means "now" -- but
 the frontmatter parser still honors a `date:` line you type in by hand
@@ -250,7 +306,21 @@ The lead image and the chapter list have three states, not two: on, off,
 and whatever the site does -- which is what a post that says nothing
 about them takes, and a different thing from saying no.
 
-**Undoing an edit** is what `[v]` is for. Every `edit` keeps the previous
+**`props <slug> --json`** prints the same screen as one object and
+exits: state, date, address, type, tags, series, the flags, which
+languages the post is written in, whether and where it was announced
+(`announces` says which of the six cases it is), the old addresses --
+and `actions`, the keys the screen would offer this post, by name
+(`publish`, `schedule`, `unschedule`, `unpublish`, `announce`, `pin`,
+`properties`, `rename`, `addresses`, `versions`, `delete`). A program
+reads that instead of re-deriving the screen's rules, then calls the
+command it wants. A slug nobody has, or one that lives in two years, is
+refused as an object (`"ok": false`, `not_found` or `ambiguous_slug`)
+with a zero exit, the way `add --json` refuses; the slug is required,
+because an object for an answer means nobody is there to pick one.
+
+**Undoing an edit** is what `[v]` is for. Every `edit` and every
+`translate` keeps the previous
 text first, up to ten of them per post, and `[v]` lists them newest first
 with the line under the cursor showing what that version said -- its
 title, or its opening words when it has none -- so the choice is made by
@@ -260,7 +330,10 @@ only on a post that has been edited at least once.
 Choosing one is itself undoable: the current text is kept as a version
 before it is replaced, so a wrong choice is one `[v]` away from being
 walked back -- which is why a single key confirms it. Only the text comes
-back -- images are not versioned, and the line above the list says so. A
+back -- images are not versioned, and the line above the list says so.
+The text of every language the version holds comes back with it; a
+language the post was given since is left as it is, and so is the address
+each language serves the post at. A
 version that will not parse stays in the list without a preview. Versions
 travel with the post into the trash and back out again.
 
@@ -338,7 +411,9 @@ the languages too. With one other language it names it (`[l] language:
 Deutsch`); with several it opens a picker that says what is already
 written, what is only started, and what has nothing yet -- the same three
 states `check --languages` prints. The properties screen carries a
-`languages` row for the same reason.
+`languages` row for the same reason. (As data the two say them in
+different words: `props --json` has `written`, `started` and `none`,
+`check --languages --json` has `written`, `title_only` and `missing`.)
 
 The editor that opens holds a title and a body, and nothing else. That is
 the whole of what a translation may carry: the date, the tags, the series,
@@ -359,15 +434,75 @@ text being translated is in front of you rather than in another window.
 The editor drops every `//` line on save, which is also why a translation
 left half-done cannot save the original as though it were this language's.
 
+What a translation's text does not say is kept, as it is for the post's
+own: a block the new text left alone is saved as it was stored, with a
+paragraph's kind or a video's player still on it, and a block the text
+rewrote keeps them too. What the text cannot
+carry at all -- a link card, a player with no address to write -- is
+asked about before it goes; from a file it is refused (`content_lost`),
+and `translate --json` marks such a translation `editable: false`
+beforehand.
+
 **Publishing a post the site cannot show in every language it publishes**
 is a decision, not an accident: the command line refuses it and names
 `--allow-partial`, and the wizard asks -- write the missing language now,
-or publish it as it stands.
+or publish it as it stands. A site that has made that decision for every
+post says `publishing.allow_partial: true` in `config/site.yml`, and is
+neither refused nor asked ([localization.md](localization.md)).
 
 **Taking a language off a post** is emptying the title and deleting the
 body. The post then looks exactly as it did before the translation existed
 -- which matters, because a half-empty translation would otherwise give
-that language a page with the wrong words on it.
+that language a page with the wrong words on it. Two things of it are
+kept: the text as it was, as a version `[v]` restores, and the old
+addresses that text was owed, which go to the post's own list.
+
+**An address that belonged to a translation** is kept with it. When two
+posts that were the same piece in two languages are made one -- the
+English post becomes the Czech post's `translations.en` -- the English
+post's address is still out on the web. Put into the post's own
+`former_slugs` it would lead to the post, which at the site's root is the
+Czech page. Written into the translation instead, it leads to the
+translated one:
+
+```json
+"translations": { "en": { "title": "…", "slug": "the-old-slug", "content": [ … ],
+                          "former_slugs": ["2019/the-old-slug"] } }
+```
+
+`/posts/2019/the-old-slug/` then redirects to `/en/posts/2019/the-old-slug/`.
+
+The merge has two more steps, and `check` between them speaks of
+neither. The English post is still in the archive, at the very address
+the list now names -- so `check` says the address is taken by a live post
+and offers to drop the entry or rename that post. Neither: the English
+post is what goes, `./blog.sh delete the-old-slug`, and the entry is
+served from then on. Before it goes, copy any picture only it had into
+the media folder of the post that stays (`media.nosync/<year>/<slug>/`),
+under a name the translation's blocks then use: `delete` takes a post's
+media to the trash with it, and a translation shows files from the
+folder of the post it belongs to. Deleting a published post also takes
+its announcement down where the network allows it, as any `delete` does.
+The same list covers a translation whose `slug:` is changed -- in the
+header `translate` opens, or in a text an app sends -- on a post that is
+out: the address its page stood at is written into the list by that
+save, as a post's own old address is when it is renamed, and redirects
+to the new one in that language's tree. (A translated *page* has no year
+in its address and the list has no way to say one; there the old address
+is yours to keep, with `redirect_from`.) For the merge the list is
+written by hand, and nothing drops it: `translate` and an edit from an
+app carry it across, and taking the language off the post hands the list
+to the post itself, where each address then leads to the post.
+
+Such an address is answered in two places and no others -- the site's
+root and that language's tree -- and only while the language is
+published: take the language out of `site.locales` and its old addresses
+answer nothing, which `check` says of each entry. `check` asks each tree
+about its own pages, as the build does. An old address another post's
+page stands at in one of them is reported with where it is taken and
+where it is still served; and one written into the lists of two
+languages leads, at the root, to the text of the language the file names
+first -- `check` names that too.
 
 **A post you have not translated is not hidden.** It stays in the other
 language's listing and the link on it goes to the address the post really
@@ -453,7 +588,10 @@ photo, asks what to do with the draft. `./blog.sh add <file>` is the same
 work with the conversation removed -- it takes a markdown file with the
 usual header, writes the draft, and returns. It never asks anything, so
 it is the route for a shortcut, a script or anything else running where
-nobody is at the keyboard.
+nobody is at the keyboard. The file is read as the editor's buffer is:
+a line starting with `//` is a note to yourself and does not reach the
+post (`//--more--//` is the one that does, and a `//` inside a code
+fence is the code), and neither does a `<!-- ... -->` block.
 
 ```bash
 ./blog.sh add clanek.md
@@ -489,7 +627,8 @@ front of the world* -- publishing stays a second command:
 
 `--yes` answers the draft dialog with "publish" in advance. `--json`,
 which needs `--yes` beside it, prints the same object `add --json` does --
-`slug`, `path`, `state`, `url`, `deploy`, `warnings` -- or a refusal with
+`ok`, `slug`, `path`, `state`, `scheduled`, `date`, `url`, `deploy`,
+`warnings`, the keys every action on a post answers with -- or a refusal with
 its reason as a code (`not_found`, `already_published`, `publish_refused`),
 and leaves with **zero** either way, for the reason `add` does: a phone
 throws away the output of a command that failed.
@@ -514,7 +653,7 @@ nothing else, so a caller can read it without parsing prose:
 ```json
 {
   "slug": "psano-v-posteli",
-  "path": "content.nosync/posts/2026/psano-v-posteli.json",
+  "path": "/home/me/blog/content.nosync/posts/2026/psano-v-posteli.json",
   "state": "draft",
   "url": "https://example.com/draft/89260b63fb498e75/psano-v-posteli/",
   "deploy": "done",
@@ -538,6 +677,19 @@ and a second filename fall outside this, and those end in prose on
 standard error.
 
 ### A post sent from the phone itself
+
+**This page and its shortcut are on their way out.** Native apps for iOS
+and Android are in preparation; they reach the engine over the same SSH
+([Over SSH, from an app](#over-ssh-from-an-app)) and need neither. 1.11
+removes `/write/` -- the page and everything published under that
+address -- the `SendPost` shortcut and the `publish.txt` and `drafts.txt`
+requests described below. In 1.10 everything in this section works as
+written -- but for the link that opens a draft
+([Editing a draft from the phone](#editing-a-draft-from-the-phone)) --
+and nothing is being added to it. Two things stay, because the
+apps use them as the page does: the receiver itself,
+`scripts/receive.sh`, and the `receipt:` line of a delivery, which is
+what makes a delivery that arrives twice one post.
 
 `write: true` publishes a page at `/write/` to write the post on: a title,
 the text, tags, and photographs each with its description. It keeps what
@@ -782,6 +934,20 @@ command: a leading dash is a flag, and anything outside a slug's own
 alphabet is refused here rather than explained by whatever it hits. The
 page then asks the same receipt again until it says published.
 
+### Editing a draft from the phone
+
+This is what an app does: it asks the blog for its drafts
+(`drafts --json`) and sends the text back with `edits: <slug>` and
+`base: <digest>` in its header -- see
+[Over SSH, from an app](#over-ssh-from-an-app), and the
+[header keys](#writing-and-publishing) for what such a save keeps and
+what it refuses.
+
+The page was given a link for it too, *Open a draft from the blog*,
+which sends one file, `drafts.txt`, through the shortcut and waits for
+the list of drafts in the address. Tried on a tablet it loaded nothing,
+and it is not being repaired: the page is frozen and leaves in 1.11.
+
 **A delivery that arrives twice is one post.** The receipt is minted once
 per send, immediately before the files it names are built, so two
 deliveries carrying the same one are the same send arriving twice --
@@ -874,9 +1040,10 @@ whole point of the answer. The cost is that Shortcuts then reports a tick
 for a refusal exactly as it does for a post. End the shortcut by opening the
 page with the answer, as the second run above does, or with a *Show Content*
 of the SSH output. The reply is one JSON object per file, so read it
-whole: a picture answers `"ok":true`, a refusal answers `"ok":false` and
-names the reason, and the post that was written answers with a `slug`
-and no `ok` at all. Without that, a shortcut whose Input field is empty connects,
+whole: a picture answers `"ok":true` and the name it was `stored` under,
+a refusal answers `"ok":false` and names the reason, and the post that
+was written answers with its `slug` (and, since 1.10, `"ok":true` like
+every other answer). Without that, a shortcut whose Input field is empty connects,
 waits out the thirty-second deadline, is refused for `empty_input`, and
 shows a tick -- which is a slow, silent way to learn nothing.
 
@@ -905,6 +1072,15 @@ not answer in JSON -- no `env.sh`, no ruby, a configuration that will not
 parse -- the receiver answers for it with `engine_failed` and the words
 the engine printed, and every delivery ends with status 0 once an answer
 has been given -- a ceiling that is not a number (`bad_limit`) included.
+
+Deliveries are taken in one at a time. From the first file of a delivery
+landing in `incoming/` to the engine having taken them out again, a
+second delivery waits: `incoming/` is one folder, a picture is known
+there by the name it was sent under, and two phones -- or one app
+sending two posts -- both call their first picture `01.jpg`. The one
+that waits does so for up to `BLOGSH_TURN_SECONDS` (300, set where the
+other two are) and is then told `busy`, with nothing of it stored; send
+it again. A delivery that died mid-way does not hold the next one up.
 
 A delivery that goes wrong halfway can simply be repeated. Pictures wait
 in `incoming/` until a text names them, so a refused post leaves them
@@ -959,6 +1135,433 @@ successive rewrites of it, and nearly all of them lived in the unpacking
 bomb that wrote gigabytes from megabytes, a half-failed extraction that
 published a truncated photograph and reported success. None of that can
 be expressed when there is nothing to unpack.
+
+## Driving the engine from a program
+
+Every screen a person reads before acting, and every action those
+screens offer, has a `--json` form: one object on standard output,
+nothing else on it, every key always present -- a consumer that has to
+test for a missing key is a consumer writing its own parser. A refusal
+is an object too, `{"ok": false, "error": "<code>", "message": "<a
+sentence>"}`, with a **zero** exit: the status answers whether an
+answer arrived at all, the object says what it was. (The engine falling
+over is the one thing that still leaves with 1 and prose on stderr.)
+This is the contract `add --json` and `publish --yes --json` have kept
+since the phone first needed them; the rest of the engine keeps it now.
+
+Three rules follow from "nobody is at the keyboard":
+
+- **A question the dialog asks is a flag.** The slug typed back to
+  confirm a delete is `--yes`; the date the schedule dialog asks for is
+  `--at`; "shift the rest of the queue forward?" is `--compact`;
+  "rebuild and deploy now?" is `--rebuild`; "publish it though one of the
+  site's languages has no text for it yet?" is `--allow-partial`. Without
+  the flag the answer is no -- a program that did not say it did not mean
+  it. (On a site of more than one language that last one decides whether
+  anything can be scheduled or published at all before it is translated:
+  without it both answer `partial_translation` -- unless the site itself
+  says `publishing.allow_partial: true`, which `props --json` shows as
+  `languages.allow_partial`, and then neither does.)
+- **Those flags are for `--json` only.** `delete <slug> --yes` without
+  `--json` is refused: at the terminal the dialog is there to ask, and
+  a flag that silently skips a confirmation is how a shell history
+  deletes a post.
+- **A post is named by its slug, and never guessed.** The same slug in
+  two years is refused as `ambiguous_slug` where the terminal would show
+  both and ask; `list --json` carries the year so a program can tell
+  them apart, and will be able to name one. A slug no post has is
+  `not_found`.
+
+| command | what it answers | refusals |
+|---|---|---|
+| `version --json` | `ok`, `engine`, `max_mb` (the receiver's ceiling for a delivery, so a sender can weigh one first), `site`: name, claim, url, lang, locales, accent (`light`, `dark`: the palette's accent as colors.css resolves it), palette (`light`, `dark`, each `bg`, `text`, `meta_text`, `border`, resolved the same way) -- the identity block as data; answers on a broken config with what it can | -- |
+| `list [--type=<type>] [--tag=<tag>] [--search=<words>] [--drafts] --json` | `posts` (slug, year, date, title, type, tags, state, scheduled, series, pinned, match), `count`, `drafts`, `search`; `--search="words"` is the search `browse` runs behind [/] -- the same query language, over the whole text -- and `match` is the line that says why a row is there (null when the hit is in the title or a tag); `search` says the query back, null when there was none. A filter's value is written after `=` or as the next word (`--tag=cats`, `--tag cats`); a filter with nothing after it (`--tag`, or `--tag=`), or a word the command has no use for, is an abort -- but an empty `--search=` is a query, which matches nothing | -- |
+| `props <slug> --json` | the properties screen as data, with `actions`: the keys it would offer this post; `network` says which one [t] announces on, `slot` the time the schedule dialog would offer a plain draft; `type_set`, `hero` and `toc` are the [e] rows in the words `--set` takes back, and so is `series_part` -- a string or null, though the post's file holds a number; `languages` names the site's own (`own`) and says of each other one (`others`) `none`, `started` or `written` -- the three states `check --languages --json` calls `missing`, `title_only` and `written`; `languages.allow_partial` is true on a site that lets a post out without the words of every language (`publishing.allow_partial`), where `publish` and `schedule` need no `--allow-partial` | `not_found`, `ambiguous_slug` |
+| `props <slug> --set key=value ... --json` | the screen after the write (`deploy`, `warnings` added); keys: series, series_part, tags, type, unlisted, hero, toc, pinned -- the words the screen shows (yes/no, default for hero and toc, `-` to clear) | `bad_property`, `busy`, `not_found`, `ambiguous_slug` |
+| `props <slug> --drop-address <address> [--kind <kind>] --json` | the screen after the drop. The address is one `addresses` lists -- each with its `kind`: `former_slugs`, `redirect_from`, or `translations.<lang>.former_slugs` for an old address of the post's text in another language. An address two of the lists hold is taken out of the one `--kind` names | `address_unknown`, `address_ambiguous` (in two lists, and no `--kind`), `kind_unknown` (no such list holds it), `kind_needs_drop`, `kind_once`, `busy`, `not_found`, `ambiguous_slug` |
+| `props <slug> --rename <slug> --yes [--rebuild] --json` | the screen of the renamed post; a draft's preview is rebuilt, a published post waits for `--rebuild` | `busy`, `rename_unusable`, `rename_too_long`, `rename_same`, `rename_taken`, `rename_unreadable`, `not_found`, `ambiguous_slug` |
+| `props <slug> --versions --json` | `versions`: name, date, label, newest first | `not_found`, `ambiguous_slug` |
+| `props <slug> --restore-version <name> --yes --json` | the screen after the restore, the preview rebuilt | `busy`, `version_unknown`, `version_unreadable`, `not_found`, `ambiguous_slug` |
+| `queue --json` | `queue`: position, date, slug, year, title, overdue; `scheduler`: `last_run`, when something last ran the queue, null where nothing ever has | -- |
+| `queue --up <slug> --json`, `--down <slug>`, `--move <slug> --to <n>` | the queue afterwards, `warnings`; nothing is rebuilt -- the screen rebuilds once on the way out, a program calls `rebuild --json` when it is done | `not_scheduled`, `ambiguous_slug`, `not_moved` (first, last, or its time has passed), `bad_position`, `overdue`, `busy` |
+| `toot <slug> [--force] --json`, `bluesky <slug> [--force] --json` | `url`, `recovered` (Bluesky found the announcement on the account instead of sending one) | `busy`, `wrong_network`, `no_network`, `still_draft`, `already_announced`, `unlisted`, `outside_window` (unless `--force`), `failed`, `not_sent`, `not_found`, `ambiguous_slug` |
+| `drafts --json [<slug>]` | the drafts with their text, as the phone opens them; every entry says `omitted` -- true where its text was left out of a long answer and has to be asked for by name | `not_found` |
+| `translate <slug> --lang <code> --json` | the post's text in that language as the editor opens it (empty when there is none yet), the original beside it, the post's media by name, `preview` (the address of the post's own page -- not of its page in that language), `base:`, and `editable` with `problem` as `edit --json` says them; the words come back through `add` of a file saying `edits:`, `base:` and `lang:` -- a title and a body both empty take the language off the post, and what the text could not carry is refused (`content_lost`) | `no_locales`, `own_language`, `unknown_language`, `not_found`, `ambiguous_slug` |
+| `edit <slug> --json` | one post, any state, with its text as the editor opens it, its media, its address and the digest `base:` hands back; the text comes back through `add` of a file saying `edits:` -- for a published post `base:` is required, and the save rebuilds and deploys | `not_found`, `ambiguous_slug` |
+| `schedule <slug> --at <time> [--allow-partial] --json` | the post, `position` in the queue, `compacted` (0). The time is `YYYY-MM-DD HH:MM` -- a `T` for the space, seconds and a zone (`...Z`, `+02:00`) if wanted -- or `HH:MM` alone for today; it is written down, and the post filed, in the site's own zone. Said any other way, or naming a day the calendar does not have, it is `bad_date` | `schedule_needs_at`, `bad_date` (a day without a time too), `not_future`, `already_published`, `partial_translation` (unless `--allow-partial`), `busy`, `not_found`, `ambiguous_slug` |
+| `schedule <slug> --cancel [--compact] --json` | the post back among the drafts, `compacted`: how many moved forward | `not_scheduled`, `already_published`, `busy`, `not_found`, `ambiguous_slug` |
+| `publish <slug> --yes [--no-announce] [--allow-partial] [--compact] --json` | the published post (`add --json`'s shape), `compacted`; `--no-announce` puts it on the site and tells no network | `busy`, `already_published`, `partial_translation` (unless `--allow-partial`), `publish_refused`, `not_found`, `ambiguous_slug` |
+| `unpublish <slug> --yes --json` | the post as a draft, `announcement_kept`: addresses that could not be deleted | `busy`, `already_draft`, `not_found`, `ambiguous_slug` |
+| `delete <slug> --yes [--rebuild] --json` | `trash`: where it went, `announcement_kept`, `deploy` | `busy`, `not_found`, `ambiguous_slug` |
+| `restore --json` | `trash`: what is in it (slug, year, date, title, type, tags, state, media_only) | -- |
+| `restore <slug> [--rebuild] --json` | the post back in place | `busy`, `not_found`, `ambiguous_slug`, `media_only` |
+| `rebuild [--full] [--force] --json` | `deploy: done`, `warnings` | `busy`, `rebuild_failed` |
+| `empty trash\|versions [--yes] --json` | `count`, `bytes`, `size`, `emptied` -- without `--yes` only the count, which is the question the terminal asks | `empty_what` |
+| `check --json`, `stats --json` | the findings, the figures -- see their own sections | -- |
+| `on-this-day [--date <day>] --json` | the day -- see its own section; `--date` is `MM-DD`, or `YYYY-MM-DD` to count the ages from another year | `bad_date` |
+| `check --languages --json` | the table of languages alone: `languages` (the site's own first) and `rows` (slug, year, title, `cells`: per language `written`, `title_only` or `missing`); empty on a site that publishes one language. Over a `config/site.yml` that cannot be read it refuses and exits 1 | `config_missing`, `config_empty`, `config_syntax`, `config_unreadable` |
+| `doctor --json` | the installation's diagnosis: `errors`, `warnings`, `oks` and `findings` (`level`: error, warn or ok; `kind`: the check it came from, such as `trash`, `scheduler`, `deploy` or `banner`; `text`; `fix`, null where there is no advice), problems first; no `ok` key, and the status is 1 when there is an error | refused with `--strip-location` (status 2, in prose) |
+
+`deploy` in an answer is `done` when the site was rebuilt and deployed,
+`pending` when the rebuild was attempted and the next scheduled run owes
+it (the `.deploy-pending` marker), and `skipped` when the action does
+not rebuild unless asked and `--rebuild` was not given. The actions that
+rebuild without asking at the terminal -- `publish`, `unpublish` -- do so
+here too; the ones the terminal asks about -- `delete`, `restore` --
+wait for the flag, so a program making three changes can rebuild once.
+
+What a refusal's `message` says is the sentence the terminal would have
+printed, in the site's language; the `error` code is the same in every
+language and is what a program should switch on. A new code may appear
+in a later version; an existing one does not change meaning.
+
+A command that writes a post -- `props --set`, `--drop-address`,
+`--rename` and `--restore-version`, `schedule`, `publish`, `unpublish`,
+`delete`, `restore`, `toot`, `bluesky`, a move in the queue -- answers
+`busy` while another run holds the archive: a build, the scheduler,
+another of these. Nothing was written, and the same request a moment
+later is the way through. (A text sent as a file is not among them: it
+says which version it edited and is refused as `changed`.)
+
+An action on a post answers with the same nine keys whichever action it
+was -- `ok`, `slug`, `path`, `state`, `scheduled`, `date` (null for a
+plain draft), `url`, `deploy`, `warnings` -- and with what its row of the
+table adds. `add` of a file through a delivery answers that way too, for
+a new post, an edit and a translation alike. Two answers are about
+something other than the post and have a shape of their own: `delete`
+says where the post went (`trash`, `announcement_kept`, `deploy`,
+`warnings`), and a move in the queue answers with the queue.
+
+One thing about types, for a consumer written in a language that has
+them: a post's `year` is a string wherever a post is named -- it is the
+folder the post is kept in, and what tells two posts of one slug apart --
+and a number only in `on-this-day`, which counts with it.
+
+### Over SSH, from an app
+
+A program on another machine -- the blog.sh app on a phone, a script --
+reaches the engine over the SSH the server already has, on a key of its
+own with a forced command, the way the phone's shortcut does:
+
+    restrict,command="/path/to/blog/scripts/remote.sh" ssh-ed25519 AAAA... app
+
+A request may also say which language its reader reads, `{"args":
+["doctor"], "lang": "cs"}`. A blog speaks its own language, and an app in
+Czech showing an English blog's diagnosis would show English; with
+`lang`, `check` and `doctor` -- the two answers that are sentences for a
+person, and that build nothing -- are said in that language, if the
+engine ships it, and so is what `pair` itself refuses (`device_unknown`,
+`busy`). What the door refuses before the engine is run it says in
+English, as it always has. Every other command answers in the blog's language as
+before, because a command that may rebuild the site must not be handed
+another one. A language the engine does not have is not an error: the
+answer is then in the blog's own. The code is the bare one a locale file
+is named by, in lower case -- `cs`; what a phone calls its language
+(`cs-CZ`, `cs_CZ`, `CS`) is cut down to that by the sender, or it counts
+as a language the engine does not have.
+
+`scripts/remote.sh` allows three words as the SSH command and nothing
+else. **`run`** runs one engine command: its argv arrives on standard
+input as one line of JSON, `{"args": ["props", "venku", "--set",
+"tags=louka, les"]}` and a newline -- the line ends the request, so a
+sender that cannot close its side of the stream is answered all the
+same -- word by word, so nothing is ever parsed as shell and a value
+with spaces or diacritics is one word on both ends. Before the engine sees it,
+`scripts/remote.rb` checks every word: the command has to be one a
+program may run (`version`, `list`, `drafts`, `edit`, `translate`,
+`props`, `queue`, `schedule`, `publish`, `unpublish`, `delete`,
+`restore`, `rebuild`, `empty`, `toot`, `bluesky`, `stats`,
+`on-this-day`, `check`, `doctor`, and `pair` for its list and the
+caller's own way out), each flag one that command has in its
+`--json` form, every positional word a slug, and no word may hold a
+control character or be longer than 4000 bytes. A slug here is a name as a file may have it and a
+reader would read it -- letters and digits of any alphabet, `_`, `.` and
+`-`, not starting with `.` or `-` -- which is wider than what the engine
+itself makes (lowercase, digits, hyphens) because an import keeps the
+names the old system gave: a post `list` hands out can be asked for by
+that name. `--json` is added when it is missing, so the answer is always
+an object -- and with it `edit` and `translate` open no editor: they
+hand the text out, and the changed text comes back as a file through
+`deliver`. What is not on the list is what asks a question, writes
+outside the archive or reaches a network on somebody else's account:
+`add` (a post arrives through `receive`), `export`, `preview`, `browse`,
+`check --repair`, `doctor --online` and `--strip-location`, the wizard
+-- and of `pair` everything but `--list` and `--revoke` with nothing
+after it: showing a code opens a way in, and a device named after
+`--revoke` is somebody else's (see "Letting an app in by a code").
+**`receive`** is the delivery
+`scripts/receive.sh` takes -- pictures and a markdown, or a `publish.txt`
+or `drafts.txt` request -- for the same key. **`deliver`** is the same
+delivery for a sender that cannot close its side of the stream: it ends
+with a line saying `end` instead, which `scripts/remote.rb` reads up to
+and hands to `receive.sh` whole, so every check the receiver makes is
+made; a file may not be called `end`, and a delivery over twice the
+receiver's ceiling is dropped on the wire (`too_large`) before the
+receiver measures it exactly. `version --json` says the ceiling
+(`max_mb`), so a sender can weigh a delivery first.
+
+Every answer to `run` is one object and the status is 0, for the reason
+the receiver gives. A delivery -- `receive` or `deliver` -- is answered
+as the receiver answers, with an object for each file, one after
+another: a line for every picture stored or refused, then each post that
+was written, printed over several lines. That is neither one JSON
+document nor a line apiece; a reader takes it object by object, by its
+braces.
+
+A request that is not JSON, holds a word the whitelist
+refuses or is over 64 kB is refused as one (`bad_json`, `bad_args`,
+`unknown_command`, `too_large`), one that never arrives as `empty_input`,
+a connection that says none of the three words as `no_command`,
+and the engine answering in prose --
+no `env.sh`, a configuration that will not parse -- is wrapped as
+`engine_failed` with its words: the end of what it said, or, where it
+died of an exception, the line that names the error -- and how it left,
+its status or the signal that ended it (a build killed for memory reads
+"ended by signal 9 (KILL)"). Two clocks answer
+`timeout`: the request's one line has `BLOGSH_LINE_SECONDS` (30) to end
+once it has begun, and an engine still running after
+`BLOGSH_RUN_SECONDS` (1800) is stopped with whatever it had started --
+asked to end first, then ended, the whole of what it had run with it.
+A delivery through `deliver` is held to the same: the whole of it has
+the receiver's `BLOGSH_BODY_SECONDS` (600) from its first byte, however
+it trickles and wherever in a line it stops; it is measured against the
+ceiling as it comes, not line by line; and the receiver it is handed to
+has `BLOGSH_RUN_SECONDS` like any engine. Each of the three is a whole
+number of seconds, of eight digits at most, with spaces around it
+ignored; anything else -- a word, a zero, `30m` -- is refused
+as `bad_limit`, naming the variable, rather than read as no time at all.
+An engine that a signal ended -- a build killed for memory on a small
+server -- is `engine_failed` naming the signal, to a request and to a
+delivery alike, and an answer is always valid UTF-8 whatever the engine
+printed.
+Unlike the shortcut's key this one may
+be ed25519; the forced command runs in the same environment
+`receive.sh` does, with the same `BLOGSH_MAX_MB` for deliveries.
+
+**Sending again.** A connection can break after the request has gone
+and before its answer is back, and the sender cannot tell which side of
+the engine that was. What a second send does:
+
+- A question -- `version`, `list`, `props`, `queue`, `drafts`, `edit`,
+  `translate`, `check`, `doctor`, `stats` -- changes nothing and can be
+  asked as often as it takes.
+- `publish`, `unpublish`, `delete`, `restore` and `schedule --cancel`
+  are answered the second time by the state the first one left:
+  `already_published`, `already_draft`, `not_found`, `not_scheduled`.
+  That refusal is the news that the first one arrived.
+- A new post delivered twice is two posts -- unless its file carries
+  `receipt:`, a name the sender makes up once for the post (sixteen
+  hexadecimal characters), and then the second delivery is the first one
+  arriving again and updates the post it wrote ([A delivery that arrives
+  twice is one post](#a-post-sent-from-the-phone-itself)). The line is
+  the apps' as much as the page's, and stays when `/write/` goes.
+- An edit or a translation -- a file saying `edits:` and `base:` --
+  delivered twice is `changed` the second time: `base:` is the digest of
+  the post's file, and the first delivery changed it. The answer to a
+  save does not carry the new digest, so `edit --json` (or `translate
+  --json`) is asked again before the next save, and after a `changed`
+  whose cause may have been the sender's own first try.
+- After `timeout` on an action the engine was stopped where it stood,
+  and the action may be half done: a `publish` written to the archive
+  and not yet on the site answers `already_published` from then on,
+  while its address is a 404 until the site is built -- by the next
+  scheduled run, which owes it, or by `rebuild --json`. Ask `props` what
+  state the post is in, and `rebuild` if it is out.
+
+The forced command runs in the account's non-interactive shell, which
+reads none of the files a terminal session reads -- so a Ruby that lives
+under rbenv or Homebrew is not on its `PATH`, and the engine refuses the
+system's old one. Put the path in the key's line, the way `BLOGSH_MAX_MB`
+goes there: `command="env PATH=/home/me/.rbenv/shims:/usr/bin:/bin
+/path/to/blog/scripts/remote.sh"`. (`env` in front makes it a line every
+login shell runs: `PATH=... script` alone is sh's way of saying it, and
+an account whose shell is csh or tcsh takes it for a command's name.) A
+path with a space in it is single-quoted inside the double quotes; the
+app writes the line that way itself.
+
+Where the blog lives in a container, the forced command is the one that
+enters it, and the word SSH was asked for -- which the script reads from
+`SSH_ORIGINAL_COMMAND` -- does not cross into the container by itself.
+Hand it over as the script's argument, which it takes the same way:
+
+    restrict,command="sudo docker exec -i blog /app/blog/scripts/remote.sh \"$SSH_ORIGINAL_COMMAND\"" ssh-ed25519 AAAA... app
+
+`-i` is what carries the request in; the account needs to run that one
+command without a password. The app writes this line too, from the
+blog's place and the command it is reached through. Keep the quotes
+around `$SSH_ORIGINAL_COMMAND`: the word is handed on as one argument,
+and split into several, what the caller sent would be read as more than
+the command -- as the word a device's line says of itself, below.
+
+### Letting an app in by a code
+
+Writing that line by hand stays what it is, and for whoever would rather
+not there is a second way beside it:
+
+```bash
+./blog.sh pair                    # shows a code and waits for the app
+./blog.sh pair --list             # the devices let in this way
+./blog.sh pair --revoke 2         # takes one out: its number, name or fingerprint from --list
+```
+
+`--list` numbers the devices, and `--revoke` takes that number, the
+device's name (quotes or no quotes: `--revoke motorola edge 70 fusion`)
+or its fingerprint. With nothing after it, somebody at a terminal is
+asked which one, and nothing goes without a yes.
+
+`pair` draws a QR code in the terminal (and prints the same thing as a
+line of text, for an app with no camera to point). The code wants a
+window of some sixty columns by thirty-five rows, which is more than a
+terminal opens with, so a window too small is asked to grow first; one
+that does not is told how large the code is, and the line of text is
+there either way. The app reads it and
+is connected; nobody types an address, a user name or a key. What the
+code holds is where to connect -- the address, the port, the account --
+the fingerprints of this server's own SSH keys, so the app knows it
+reached this machine, and a key that is good for **one thing, once, for
+ten minutes**: handing in the public half of a key the app made itself.
+The engine then replaces the code's line in `~/.ssh/authorized_keys`
+with an ordinary one for the app's key, held to `scripts/remote.sh` like
+a line written by hand. The key the app lives on never leaves the
+device, and the one that was on the screen opens nothing once it has
+been used.
+
+A device's line says one thing a line written by hand does not: whose
+it is. Its command ends `.../scripts/remote.sh' --device=<fingerprint>`,
+the fingerprint of the key on that same line. sshd tells a forced
+command nothing about the key that was used, so that word is how one
+device is told from another -- and the only thing it is told by: not by
+anything a request says, and not by the environment a session arrives
+with. A device let in before lines said this gets the word the next
+time `./blog.sh pair` is run at a terminal -- `--list` is enough -- and
+nothing else on its line moves. (By the account itself: under `sudo`
+the lines are left as they are, because a file replaced by root is
+root's, and sshd reads it as the account.)
+
+What `pair` does to `authorized_keys`, since that is the file that
+decides who may log in:
+
+- It writes only lines that begin `restrict,` and whose `command=` names
+  a script of this installation: `restrict,expiry-time="...",command=`
+  for a code that waits, `restrict,command=` for a device. What an app
+  hands in is taken only if it is exactly one ed25519 public key.
+- Where `authorized_keys` is a link -- kept with your dotfiles, say --
+  the link stays a link and the file it points at is the one rewritten.
+  The file keeps who may read it (one you made read-only stays so) and
+  is never left writable by anybody else.
+- It touches only lines it wrote itself, known by the comment that ends
+  them (`blog.sh:<device>`, and `blog.sh-pair:<id>` while a code waits)
+  together with this installation's path. Every other line -- a key of
+  your own, another blog's devices -- is written back as it was.
+- The file as it was before each change is kept beside it as
+  `authorized_keys.blog-sh.bak`.
+- With a code closed again, or a device come and gone, the file is byte
+  for byte what it was: carriage returns on lines that are not `pair`'s
+  stay, and so does a last line with no line feed after it.
+- `pair --list` only reads: it makes no folder and takes no lock unless
+  there is a run-out code's line to take out, or a device's line from
+  before lines said whose they are to bring up to date. Asked through
+  the door it writes nothing at all.
+- A line names this installation by its folder. Move the folder and its
+  devices' lines still name the old one: sshd finds no script there, the
+  apps are refused, and neither `pair --list` nor `doctor` sees the lines
+  any more, because they are no longer this installation's. Take them
+  out of `authorized_keys` by hand (they end `blog.sh:<device>`) and pair
+  the devices again from the new place.
+
+The ten minutes are kept by the engine: the code's key can do nothing
+but ask it, and it refuses a key that arrives late. The code's line also
+carries sshd's own `expiry-time` as a second lock; that one is coarse
+(sshd reads it to the minute, and in summer time an hour late), so a
+line nobody came for may sit in the file that much longer before sshd
+itself refuses it. The next `./blog.sh pair`, of any kind, removes it,
+and `doctor` mentions one that is left.
+
+It needs the blog and the SSH server in the same account: a plain
+server, or a Mac with Remote Login turned on. `pair` checks that SSH
+answers before it makes a code, and asks for the one thing it cannot
+know -- the address this machine has from where the phone is. What it
+offers is the machine's number on its network, which a phone on the same
+network can always use; a name works where the phone can look it up
+(`--host` and `--port` say it without being asked; `--no-wait` prints
+the code and leaves). Where the blog lives in a container the keys are the host's and
+`pair` cannot reach them; that setup is written by hand, as above.
+`BLOG_SH_AUTHORIZED_KEYS` names the file for an account whose sshd reads
+another one. Write it into `env.sh`: `pair` and `doctor` both read it
+there, so the list of devices and the diagnosis are about the file the
+code was written into. Said only in a terminal it is gone with the
+terminal, and the next `pair --list` looks into the account's default
+file and finds nobody. What sshd itself is set to read the engine
+cannot see; that the two agree is yours to check (`sshd -T | grep -i
+authorizedkeysfile`, as root).
+
+For whoever writes an app: the code is a link,
+`blogsh://pair?v=1&h=<host>&p=<port>&u=<user>&k=<key>&f=<prints>&n=<site>`,
+its values written as a web form writes them -- a space in the site's
+name is a `+`, and a `+` would be `%2B`.
+`k` is the 32 bytes of an ed25519 private key in URL-safe base64 with no
+padding; `f` is the SHA-256 fingerprints of the server's host keys in
+the same alphabet, joined by dots, and may be absent. Connect with that
+key, refuse a server whose key is not among the fingerprints, ask for
+the command `enroll` and write one line of JSON, `{"key": "ssh-ed25519
+AAAA...", "name": "the device's name"}`. The answer is one object:
+`{"ok": true, "device": "..."}`, or `ok: false` with `error` one of
+`expired`, `used`, `unknown_code`, `bad_key`, `bad_request` -- and, when
+it is the machine rather than the code that is at fault,
+`engine_failed` (with the engine's words in `message`), `no_ruby`,
+`no_cd` or `unknown_command`. `key_in_use` is a key that already stands
+on another line of the account's file -- another blog's, or one written
+by hand: sshd runs the first line a key is on and never a second, so an
+app makes one key for each blog it connects to. From then
+on the app's own key works as any app's does.
+
+A device let in this way can show the others and take itself out. Both
+are `run` requests like any other:
+
+```
+{"args": ["pair", "--list"]}
+{"ok": true,
+ "devices": [{"name": "Daniel's iPhone", "fingerprint": "SHA256:k/JB...QCo", "self": true},
+             {"name": "Tablet",          "fingerprint": "SHA256:wL8H...u+w", "self": false}],
+ "self": "SHA256:k/JB...QCo"}
+
+{"args": ["pair", "--revoke"]}
+{"ok": true,
+ "revoked": {"name": "Daniel's iPhone", "fingerprint": "SHA256:k/JB...QCo"},
+ "devices": [{"name": "Tablet", "fingerprint": "SHA256:wL8H...u+w", "self": false}],
+ "self": null}
+```
+
+`devices` are in the order `pair --list` numbers them at the terminal,
+and a fingerprint is written as `ssh-keygen -l` writes it: `SHA256:` and
+43 characters of base64 with no padding (an empty string for a line
+whose key somebody's hand has left unreadable). `self` -- on each
+device, and once beside the list -- says which of them is asking; it is
+`null`, and every device's is `false`, for a key whose line does not say
+whose it is: one written by hand, or one of a pairing older than the
+word, until `./blog.sh pair` has been run at the terminal once -- and
+where the engine reads another key file than sshd does
+(`BLOG_SH_AUTHORIZED_KEYS` belongs in `env.sh`; one a session arrives
+with is not listened to). An app shows the list all the same and offers
+no way out.
+
+`--revoke` takes out the device that is asking and no other; nothing
+may follow it. The request is answered -- sshd does not end a session
+because the key's line has gone -- and the next connection with that
+key is refused by sshd itself, so an app forgets the blog when it reads
+`ok: true`. (Every line of this blog that holds the key goes, should
+there be more than one. A line that is not this blog's -- one written
+by hand, another blog's -- stays, and a key that stands on one still
+opens what that line opens.) The refusals: `device_unknown` when the
+blog cannot tell who is asking (`self` was `null`), `busy` when somebody
+else is changing the file at that moment (nothing was taken out; ask
+again), `write_failed` and `read_failed` when the file could not be
+written or read, `keys_path` when `BLOG_SH_AUTHORIZED_KEYS` names a path
+that cannot be expanded, and `bad_args` for anything else
+after `pair` -- a code, an address, a name. Taking out ANOTHER device is
+done at the terminal, by whoever can sit at it: `./blog.sh pair
+--revoke`. A blog whose app was set up by hand answers `--list` with no
+devices, since none came in by a code.
 
 ## Pinning a post to the front page
 
@@ -1031,16 +1634,19 @@ in publish order and acts on the one you pick:
   anything across.
 - `[p]` publishes it right now, the same flow as publishing a draft by
   hand (announcement included).
-- `[s]` asks for a different time, same prompt as scheduling.
-- `[n]` returns it to the drafts; the post keeps its text, loses only
-  the plan.
+- `[s]` reschedules it, same prompt as scheduling.
+- `[n]` cancels the schedule: back to the drafts, the post keeps its
+  text and loses only the plan. (The post's own screen says the same two
+  words for the same two keys.)
 
 When a post leaves the queue -- published now, or removed -- its time is
 free again, and the screen offers to let the posts behind it each step
 forward into the gap, every one taking over its predecessor's time. It
 only offers: a hand-picked date further down may be deliberate, and
 nothing moves a post's time except you. A post whose time already passed
-is waiting for the cron and can't be reordered.
+can't be reordered: it is the next to go out -- with the next run of the
+publishing cron, or, on a blog where nothing runs the queue, when you
+publish it yourself (below).
 
 If the publishing cron happens to be running at the moment you move
 something, the move is refused rather than written: the two would be
@@ -1049,6 +1655,14 @@ time. Press the key again in a moment.
 
 The preview rebuilds once, when you leave the screen, not after every
 move.
+
+`./blog.sh queue --json` prints the queue as data instead -- one row per
+scheduled post in publish order, with its position, time, slug, year,
+title and whether its time has already passed -- and acts on nothing.
+Beside the rows it says when something last ran the queue
+(`scheduler.last_run`), or null where nothing ever has: on such a blog a
+post past its time is nobody's to wait for, and both the screen and the
+refusal say so and point at `./blog.sh publish <slug>`.
 
 ## Attachments and the document type
 
@@ -1173,7 +1787,15 @@ Three things are worth knowing before you rely on the result:
   ever had goes on answering.
 - **An export can be imported back, into an EMPTY archive.** `./import.sh`
   → *Markdown tree* reads the `blogsh:` block the export writes, so posts
-  keep their series, their redirects and their announcement URLs. That is
+  keep their series, their redirects, their announcement URLs and their
+  other languages -- a post's translations ride under `blogsh:` whole,
+  with the address and the old addresses each language has, since no
+  other engine has a word for them, and with each file their blocks show
+  named by the path it has in the tree, so the import brings it and gives
+  both texts the one name it has afterwards (the body of the file is the post's
+  own language; what the site says about itself in the other ones is
+  `config/site.<lang>.yml`, which is configuration and travels with the
+  backup, not with the export). That is
   the supported way to move an installation to another machine or another
   host, and -- run against a scratch copy -- the way to check that an
   export really did come out whole.
@@ -1197,7 +1819,7 @@ Three things are worth knowing before you rely on the result:
 
 ## Reading the archive
 
-Two pages the build writes for you, both from the posts themselves --
+Three pages the build writes for you, all from the posts themselves --
 there is nothing to configure and nothing to keep up to date.
 
 **`/archive/`** is a map of the site in two levels. The first is a row per
@@ -1210,6 +1832,12 @@ Pagination cannot do that -- it is anchored to the oldest post, so
 post's date badge links into the month it belongs to, so a reader who
 finds one post can see what surrounded it.
 
+Under the map a legend says what the shading means -- the four steps
+between "less" and "more", in the map's own colours. A year's page opens
+with that year's row of the map again, behind the words "jump to a month":
+a month with posts is a link to its section further down the page, shaded
+as it is on the map.
+
 A year nobody wrote in gets a row on the map and no page of its own: an
 empty page is an invitation to a dead end. A post is filed under the year
 of its ADDRESS, so `/archive/2025/` and `/posts/2025/` always agree.
@@ -1219,10 +1847,28 @@ of how often each was used. It is built alphabetically -- folded, so an
 accented name sorts where a reader expects rather than after z -- and a
 reader can switch it to by-count, which is remembered for next time. Only
 tags that have a page of their own appear, so the list never points at an
-address the build did not write.
+address the build did not write. Above the list a row of letters -- the
+ones that have tags under them -- jumps to each letter's band; by-count
+order has no bands, so the row is put away while that order is shown.
 
-Neither page needs a menu item to work, but `nav:` in `site.yml` is where
-you would put one; see **Configuration** in the README.
+**`/series/`** is every series the site has, a line each: the name, how
+many parts, and the years they span. The one still being written comes
+first -- the order is by the newest part. A series is listed once it has a
+page of its own, which is once it has two published parts, and the name in
+a series' own heading leads back here, as a tag's leads to `/tag/`. A site
+with no series has no such page.
+
+None of the three needs a menu item to work, but `nav:` in `site.yml` is
+where you would put one; see **Configuration** in the README.
+
+**A picture post's card carries the picture.** A card in a listing is cut
+by height, and it keeps its first block whatever that weighs -- so a
+photograph under one line of words used to be left off the card of a post
+that is that photograph. For a post whose kind is image or video (the icon
+in its date badge says which) the medium now goes first and the cut runs
+over what follows. A medium taller than it is wide is held to a height
+rather than given a screen to itself. An article with a photograph in it is
+still an article, and its card is cut as it always was.
 
 ## Giving a tag its own icon
 
@@ -1329,6 +1975,11 @@ nothing else on the site ever says it is there.
 ./blog.sh check --online   # also asks whether the links that leave the site still answer
 ./blog.sh check --json     # the findings as data: every one of them, no screen
 ```
+
+Both answer as data when asked: `doctor --json` and `check --json` print
+one object each, every finding in it, for a program rather than a
+reader -- and `check --languages --json` prints the table of languages
+the same way.
 
 `doctor` asks whether the installation is sound and takes a second;
 this asks whether the *archive* is, and walks all of it -- two commands
@@ -1453,7 +2104,9 @@ What it looks for, each with a line saying what to do about it:
   `&amp;` in their text.
 - **Two posts asking for one address in one language** -- a translation
   and another post that both claim `/de/…`, which the build would resolve
-  by serving one of them and dropping the other.
+  by serving one of them and dropping the other. And a text filed under
+  the site's OWN language in `translations`, which nothing reads: in that
+  language the post is its own title and text.
 
 - **A `config/site.<lang>.yml` that nothing reads** -- written for a
   language the site does not publish, carrying a key the engine does not
@@ -1462,12 +2115,23 @@ What it looks for, each with a line saying what to do about it:
   whose menu or footer links go to other places than site.yml's: a
   translation changes the words, not where they lead. A word for a tag no
   published post carries is worth a look rather than an error: it shows
-  nowhere, and nothing is broken.
+  nowhere, and nothing is broken. Worth a look in the same way: a name
+  for a series nobody writes, a menu item or a footer link with no word
+  of its own (shown under the site's), a title given as nothing (the
+  site's own stands), a `fallback` naming a language the site does not
+  publish, and a language with a borrowed interface that does not say
+  what it is called (`language_name`).
 
 - **A language named in `site.locales` that the engine has no locale file
   for.** A typo there is not a typo in one language: the build stops on it
   in EVERY language of the site, its own included, because the menu that
-  offers the other languages needs each one's name.
+  offers the other languages needs each one's name. A language the engine
+  has no words for may borrow another's: `ui_language: <code>` at the top
+  of that language's own file, `config/site.<code>.yml`.
+- **`site.fallback` or `site.ui_language` in `config/site.yml`.** That is
+  where a language's own settings were kept before 1.9 gave each language
+  a file; the build refuses the old place by name, in every language. Each
+  value goes to the top of its language's `config/site.<code>.yml`.
 
 It only reports, unless you ask it not to. On its own -- and that is how
 cron runs it -- nothing here deletes a directory or rewrites a post: the
@@ -1499,7 +2163,12 @@ that finding allows -- nothing is applied without a key press. A dead link
 to an old address is repaired on the **target** post, by writing that
 address into its `redirect_from`: one added line, your own text untouched,
 and every link to the old address answered at once, including the ones
-from outside the site that no check can see. A link written relative to the
+from outside the site that no check can see. That holds for an address of
+the web a post came from. One the site makes itself -- under `/posts/`, or
+under the folder of a language -- is an address no `redirect_from` may
+answer at: `check` says so in its advice, no repair is offered, and what
+answers there is the post's own old address, `former_slugs` (the wrong
+year in a link to `/posts/2025/a-post/` is fixed in the link). A link written relative to the
 post is rewritten to the address it means. A media directory or file no
 post references is moved to the trash the engine already uses --
 `trash/<year>/<slug>/media/` -- and `./blog.sh restore <slug>` puts it
@@ -1560,6 +2229,62 @@ each line is there:
 
 `--json` prints the same figures unlocalized and unrounded, so the
 numbers can go into a post, a cron job or a graph.
+
+## On this day
+
+```bash
+./blog.sh on-this-day                    # today: every post from earlier years, and what the card shows
+./blog.sh on-this-day --date 12-24       # another day of this year
+./blog.sh on-this-day --date 2030-12-24  # ...or of another year, ages counted from then
+./blog.sh on-this-day --json             # the same, as data
+```
+
+The same selection feeds a sidebar card, switched on by its name alone:
+
+```yaml
+widgets:
+  on_this_day:
+    # heading: "On this day"    # optional -- the engine says it in every language
+```
+
+(or in `./style.sh`, under the sidebar). The card reads the site's own
+archive, so there is no account to give and nothing to fetch. What it
+shows, and why each rule is there:
+
+- **Only the day itself.** A post from an earlier year on today's date,
+  in the site's time zone. A day with nothing from an earlier year hides
+  the card, heading and all -- there is no "this week" fallback, which on
+  a small archive showed one post seven days running. A post written on
+  29 February is remembered on the 28th in the years without the day.
+- **One row per year, five at most.** Round anniversaries (5, 10, 15, 20
+  years...) always get a row. The rest are spread along the years with
+  today counted as taken, so the older a year is, the stronger its
+  claim -- "a year ago" appears when there is too little older to fill
+  the card, not every day.
+- **A titled post stands for its year**, the longest first; an untitled
+  one only when the year has nothing titled that day. Titles decide
+  inside a year and never between years: on an archive grown from
+  several platforms they mark where a post came from, not how good it
+  is.
+- **The day rotates.** One window for every five posts the day has,
+  three at most, dividing the day evenly by the clock (0-12-24,
+  0-8-16-24). Anniversaries stay; the other rows go first to years the
+  day has not shown yet, and a year shown again brings its next post.
+  Under the rows, the rest of the day folds away in a list.
+
+Drafts, pages and unlisted posts never take part. The rule has no
+settings: it behaves the same on a hundred posts as on thirteen
+thousand, because what it depends on is how many years an archive
+spans and how many posts one year has on one day.
+
+The card's file (`on-this-day.json`, in the root of every language's
+tree) is written by every build, and turned over after midnight by
+the sidebar cron below -- which is why a site with the card wants that
+cron even with no other widget. The cron chooses from a catalogue each
+build leaves beside the build cache (`.on-this-day.<lang>.json`), so it
+never needs to know what a translation is; a file from another day has
+no window for the page's clock and hides the card rather than show
+yesterday as today.
 
 ## Letting a reader pass a post on
 
@@ -1832,6 +2557,11 @@ network hiccup never blanks the sidebar. Systems without cron: a
 systemd timer or launchd job invoking the same script does the same
 thing. No widgets configured = no cron needed.
 
+The `on_this_day` card (see [On this day](#on-this-day)) fetches nothing,
+but its day turns over only here: its file is rewritten when the date
+changes and left alone on every other tick, in the site root and in
+every language tree.
+
 **With `comments.approval: fav` this job stops being optional.** It is
 what reads which replies you favourited and writes `comments.json`, so
 without it a newly starred comment never reaches the site -- the pages
@@ -1914,6 +2644,7 @@ everything generated is rebuildable:
 | `content.nosync/versions/` | what each edited post said before its last ten saves, which is what `[v]` restores from ([Properties and actions](#properties-and-actions)). It sits beside the content and dies with it, so a backup of the posts alone keeps the archive and loses the undo |
 | `media.nosync/` | their images and videos. A published picture has been a hardlink to this file since 1.6, so a backup still stores it once per name -- this is the copy that matters ([A published picture is the archive's own file](#a-published-picture-is-the-archives-own-file)) |
 | `config/site.yml` | site identity and integrations |
+| `config/site.<lang>.yml` | what the site says about itself in each further language: its title, menu, the words for its tags and series, and where a language without a locale borrows its interface. Gitignored like `site.yml`, so a fresh clone has none -- and a site that names `ui_language` in one does not build without it |
 | `assets/images/header.png`, `assets/images/favicon.png` | your banner and icon -- gitignored, so a fresh clone brings back the engine's defaults instead, silently ([Banner and favicon](install.md#4-banner-and-favicon)) |
 | `env.sh` | tokens (or re-create them; mind the file's 600 mode in backups too) |
 | `trash/` | optional -- deleted-but-recoverable posts |
@@ -1924,12 +2655,17 @@ Not needed: `public.nosync/` (build output), `.deploy_manifest*.json`
 reference; losing it costs one deploy with the growth guard standing down,
 and it is rewritten by that same run), `incoming/` (transient staging),
 `.build_cache*.json` (what the last build wrote, so the next one can skip
-re-making it -- per-machine, and deleting it costs one full build), and
+re-making it -- per-machine, and deleting it costs one full build),
+`.on-this-day.*.json` (the on-this-day catalogues, rewritten by every
+build), `.search_index.json` (the words `browse` and `list --search`
+search, kept between runs so a query reads only the posts that changed
+-- deleting it costs one slow search), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still
 owes the target a deploy; see [Deploying](#deploying)) and
-`.last-scheduled-run` (the scheduled-publish heartbeat above). The
+`.last-scheduled-run` (the scheduled-publish heartbeat above) with
+`.last-sidebar-run` (the same for the sidebar's cron). The
 wizards' `config/site.yml.bak` and `env.sh.bak` are not needed either --
 but the second holds your previous tokens, so delete rather than
 archive it.
@@ -1970,8 +2706,9 @@ whole), but restoring from the archive itself is exact.
 | `Unreadable post file(s) ... build stopped` | A post's JSON is truncated or isn't a post object -- the message names every offending file. Fix or remove them; `list` and the pickers keep working meanwhile and name it too. |
 | `The image size could not be read` when attaching a photo | PNG, JPEG, GIF and WebP are measured; anything else is attached and rendered without reserved space, so the page jumps once while loading. |
 | `HEIC displays only in Safari` when attaching a photo | The iPhone default format. Convert it with the command the message prints, set `media.convert_heic: true` to have the engine do it, or set the phone to Settings → Camera → Formats → Most Compatible. |
-| A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
+| A post sent from the phone came back refused | The answer names a code. `bad_name`, `too_large`, `truncated`, `empty_input`, `empty_file` and `bad_base64` are about the delivery -- send it again, and see [A post sent from the phone itself](#a-post-sent-from-the-phone-itself) for the ceiling and the closing dot. `bad_reference` means the markdown named a picture by a path rather than a bare filename. `bad_markdown` is markdown no blocks can be made of -- a picture inside a sentence, a video with no caption -- and the message says where; `unknown_frontmatter_key` names a header line the engine does not know, `not_text` a file that is not UTF-8 text, `empty` one with nothing under its header. A file is read as the post when its name ends in `.md` (or `.md.txt`); under any other name, `.markdown` included, it is kept as an attachment. `missing_images` means the text arrived before a picture it names: send it again, the pictures already there are found. |
 | `name_taken` from the receiver | Something in `incoming/` under that name is not a plain file -- a directory, or a symlink. Nothing was replaced; clear the name on the server. |
+| `busy` from the receiver | Another delivery was still being taken in when this one had waited as long as it waits (`BLOGSH_TURN_SECONDS`, 300). Nothing of this one was stored; send it again. |
 | `write_failed`, `no_incoming`, `no_engine`, `no_tmp`, `no_cd` | The installation, not the delivery: the path in the shortcut's command is wrong, `incoming/` is missing, or the account behind the key cannot write into it. Every one of them answers with its code and leaves with a zero status, the same as any other refusal: the phone discards the output of a command that failed, and these are the answers a first delivery to a new install most needs to read. |
 | `/markdown/` page missing | `templates/markdown-cheat-sheet.<lang>.md` was removed -- restore it from the repo (`git checkout templates/`). |
 | A published post shows the wrong date | Publishing uses "now" and scheduling uses the date you entered, so a surprising date means a `date:` line was typed into the frontmatter by hand -- it's respected, including past dates (which skip the homepage -- by design). |

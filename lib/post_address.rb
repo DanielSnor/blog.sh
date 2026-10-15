@@ -112,10 +112,25 @@ module PostAddress
   # A draft gets the year/slug key (its file and its media live there like
   # everyone else's) but never the page key: it is served under its token,
   # not at the root.
+  #
+  # One more thing the year/slug key was answering by accident. For a
+  # published PAGE it stands for the file and the media, never for an
+  # address -- a page is served at the root -- and a file is named by the
+  # page's own slug. In a second language a page answers at the slug its
+  # translation gave it, and keyed by THAT under its year, a page and a
+  # post of one year translated to the same word ("Projects") were called
+  # two posts at one address: /en/projects/ and /en/posts/2026/projects/,
+  # two directories, and the build of the whole site stopped on them --
+  # with `translate` having saved both and `check` calling the archive
+  # sound, since both ask about the addresses that are really served
+  # (fleet, 8. 10. 2026). So a page's place under its year is named by
+  # its own slug; its address is the 'page' key, as it always was.
   def collision_keys(post, slug: nil, year: nil)
     name = (slug || address_slug(post)).to_s
-    keys = [[(year || date_year(post)).to_s, name]]
-    keys << ['page', name] if page?(post) && !draft?(post)
+    at_root = page?(post) && !draft?(post)
+    filed = at_root ? (slug || post['slug'] || name).to_s : name
+    keys = [[(year || date_year(post)).to_s, filed]]
+    keys << ['page', name] if at_root
     keys
   end
 
@@ -170,10 +185,14 @@ module PostAddress
   }.freeze
   # Written only by cron -- the widget files by lib/sidebar.rb, comments.json
   # by scripts/refresh_sidebar.rb while moderation is on (the build merely
-  # keeps it from being pruned) -- into the same root.
+  # keeps it from being pruned) -- into the same root. on-this-day.json is
+  # the one of them that exists once per LANGUAGE (lib/on_this_day.rb): its
+  # titles and addresses are the language's own, so it lands in the root of
+  # every language tree rather than only in the site root.
   CRON_FILES = {
     pixelfed: 'pixelfed.json', toots: 'toots.json', commits: 'commits.json',
-    bluesky: 'bluesky.json', rss: 'rss.json', comments: 'comments.json'
+    bluesky: 'bluesky.json', rss: 'rss.json', comments: 'comments.json',
+    on_this_day: 'on-this-day.json'
   }.freeze
   # Every language this installation has a locale file for is a root the
   # build may write: a site published in more than one renders each into
@@ -186,9 +205,26 @@ module PostAddress
   LOCALE_ROOTS = Dir.glob(File.join(__dir__, '..', 'locales', '*.yml'))
                     .map { |path| File.basename(path, '.yml') }.sort.freeze
   RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + LOCALE_ROOTS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
+  # The longest a single segment of a redirect origin may be. POSIX NAME_MAX
+  # is 255 bytes on macOS and Linux alike, and mkdir_p raises ENAMETOOLONG
+  # past it -- which killed the build at its very LAST stage, after the
+  # whole site had already been written, with a backtrace naming no post. An
+  # imported permalink is where such a segment comes from: 36 Japanese
+  # characters percent-encode to 333 bytes, and importers put the source
+  # URL's path straight into redirect_from. One bad imported entry must not
+  # kill the build, so such an origin is refused (and said so) rather than
+  # written.
   REDIRECT_SEGMENT_MAX_BYTES = 255
 
-  def redirect_refusal(origin)
+  #
+  # languages: the codes of the languages the site keeps under a folder
+  # each (/en/, /de/). Such a folder belongs to the run that builds that
+  # language: a stub the site's own run wrote into it is deleted by the
+  # next run of the language, on every build, so the address answers
+  # nothing -- and for as long as nobody was asked about languages here,
+  # the build wrote it, the checker counted it among the addresses the
+  # site answers at, and neither said a word.
+  def redirect_refusal(origin, languages: [])
     text = origin.to_s
     # Broken bytes cannot be matched against without raising, and a
     # segment nobody can print is not an address anybody typed. A leading
@@ -209,6 +245,7 @@ module PostAddress
     # about the segments the engine owns, and an imported address that
     # only differs from one by letter case is not an address anybody meant.
     return :reserved if REDIRECT_RESERVED.include?(parts.first.to_s.downcase)
+    return :reserved if languages.map { |code| code.to_s.downcase }.include?(parts.first.to_s.downcase)
 
     nil
   end

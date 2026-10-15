@@ -32,7 +32,7 @@ case "${1:-}" in
     # help still prints.
     ruby -r./lib/site_header -e "puts SiteHeader.render(tool: './setup.sh')" 2>/dev/null && echo || true
     cat <<'USAGE'
-usage: ./setup.sh
+usage: ./setup.sh [--launcher]
 
 Asks for the settings a site needs to work, checks the answers as it
 goes, and writes them into config/site.yml and env.sh -- leaving every
@@ -56,10 +56,17 @@ What it asks about:
   deploy target     one of the six backends, each asking only for its own
                     values, or "not yet" for a site that has nowhere to go
 
-Every question can be skipped with Enter, which keeps the current value.
+Most questions can be skipped with Enter, which keeps the current value.
+Five cannot while they still hold the template's example: the site's
+title, its short name, its description, its author and its address.
 Nothing is written until you have seen the diff and confirmed it; the
 result is verified by reading it back, and restored from a backup if it
 does not read back the way it was asked for.
+
+On a Mac the last question offers a launcher: an icon in Applications,
+named after the site, that opens Terminal here and runs ./blog.sh.
+./setup.sh --launcher asks nothing and makes just that -- at any later
+time, or again after the site's folder moved.
 
 Related:
   ./style.sh          appearance: palette, header image, fonts, widgets, footer
@@ -90,7 +97,17 @@ fi
 # an AND-list it is what `set -e` sees, so the whole tool died before
 # printing a word. A screen that cannot be cleared is not a reason to
 # refuse to run.
-{ [ -t 1 ] && clear 2>/dev/null; } || true
+#
+# `./setup.sh --launcher` is not a screen: it asks nothing and says two
+# lines, and what stood in the terminal before it is the person's. It
+# wiped that all the same.
+launcher_only=no
+for word in "$@"; do
+  if [ "$word" = "--launcher" ]; then launcher_only=yes; fi
+done
+if [ "$launcher_only" = no ]; then
+  { [ -t 1 ] && clear 2>/dev/null; } || true
+fi
 
 # env.sh is read when it exists and is NOT required when it doesn't --
 # the opposite of blog.sh's guard, and the whole point: this is the

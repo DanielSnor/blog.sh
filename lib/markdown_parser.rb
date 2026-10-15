@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require_relative 'embed'
+require_relative 'i18n'
 
 # lib/markdown_parser.rb -- markdown text -> content blocks (the JSON schema
 # shared with the Tumblr/Twitter importers and build_blog.rb).
@@ -61,7 +62,9 @@ module MarkdownParser
   # published a visible "1\)" the moment anything else in the post was
   # edited. The block sigils
   # (# > - + . _ |) joined for the writer's line-start escaping -- a
-  # paragraph beginning ">50 %" must not round-trip into a quote.
+  # paragraph beginning ">50 %" must not round-trip into a quote; "/" the
+  # same way, for a paragraph beginning "//", which the save reads as a
+  # note to the editor.
   #
   # The link target allows one level of balanced parentheses
   # ("/Page(ID-123).aspx"), matching what CommonMark does; the writer
@@ -107,7 +110,16 @@ module MarkdownParser
   # three spans -- permutations and repeated types included; that matrix
   # is what these positions were settled against, and what will notice
   # if they move.
-  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)-])|\*\*\*(?<bi>(?:(?!\*\*)[^*])+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?!\*)(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:\\.|(?!\*\*).)+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\\)(?<!(?<!\\)\*)\*(?!\*)|~~(?<strike>.+?)(?<!\\)~~|(?<fence>`+)(?<code>.+?)\k<fence>|\[(?<ltext>(?:\\.|[^\]\\])*)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
+  #
+  # A backslash has ONE reading inside `bold` and `btail`: with the
+  # character it escapes. Both used to offer it a second -- as a
+  # character of its own -- and where the closing stars never came, the
+  # engine tried every way of reading every backslash in the paragraph:
+  # twice the time for each one, eight seconds at twenty-six, and a save
+  # that never came back at thirty-seven. An unclosed `**` is ordinary
+  # (`**kwargs`, `2**10`, a glob), and so is a paragraph about regular
+  # expressions after it.
+  INLINE_RE = /\\(?<esc>[*`~\[\]!\\#>|.+_)\/-])|\*\*\*(?<bi>(?:(?!\*\*)[^*])+?)\*\*\*|\*\*\*(?<ihead>(?:(?!\*\*).)+?)\*(?!\*)(?<irest>(?:[^*]|\*[^*]+?\*)*?)\*\*|\*\*\*(?<bhead>(?:(?!\*\*).)+?)\*\*(?<brest>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)*?)\*(?!\*)|\*\*(?<bold>(?:\\.|(?!\*\*)[^\\])+?)\*\*(?!\*)|\*\*(?<bpre>(?:(?!\*\*).)*?)\*(?<itail>(?:(?!\*\*).)+?)\*\*\*|\*(?<ipre>[^*]*?)\*\*(?<btail>(?:\\.|[^*\\])+?)\*\*\*|\*\*(?<badj>(?:(?!\*\*).)+?)\*\*\*(?<iadj>(?:(?!\*\*).)+?)\*(?:(?!\*)|(?=\*\*))|\*(?<ileft>(?:[^*]|\*\*(?:(?!\*\*).)+?\*\*)+?)\*\*\*(?<bright>(?:(?!\*\*).)+?)\*\*(?:(?!\*)|(?=\*[^*]))|\*(?<italic>.+?)(?<!\\)(?<!(?<!\\)\*)\*(?!\*)|~~(?<strike>.+?)(?<!\\)~~|(?<fence>`+)(?<code>.+?)\k<fence>|\[(?<ltext>(?:\\.|[^\]\\])*)\]\((?<lurl>(?:\([^()\s]*\)|[^)\s])+)(?:\s+"(?<ltitle>(?:\\.|[^"\\])*)")?\)/m
 
   # Rewrites markdown inline spans (bold/italic/strikethrough/code/link) into
   # (plain_text, formatting[]) with codepoint offsets into plain_text -- same
@@ -248,6 +260,14 @@ module MarkdownParser
   # a moment later, and the page then shows the author's absolute disk path
   # as text. VIDEO_RE has always been written this way; this one was not.
   #
+  # The name of the file may hold a pair of parentheses -- "IMG (1).jpg" is
+  # what a phone calls the second download of a picture. The target ended
+  # at the first `)`, so such a line was no image at all: refused as "a
+  # picture inside a paragraph", about a picture alone on its line, and a
+  # post that already held one could not be read back from its own text.
+  # One level, as a link's address has; the video's and the attachment's
+  # lines read their names the same way.
+  #
   # 🪤 The title may be in straight quotes or in typographic ones -- \u201E\u201C as
   # Czech and German write them, \u201C\u201D as English does. Only straight ones
   # were read, and the failure was silent in the worst way: the quotes and
@@ -257,7 +277,7 @@ module MarkdownParser
   # keyboard produces the typographic pair, so refusing to read it is a
   # trap rather than a rule (Daniel, 21. 9. 2026, on a translated post
   # whose two pictures vanished).
-  IMAGE_RE = /\A!\[(?<alt>.*?)\]\((?<target>[^)"\u201E\u201C\u201D]+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
+  IMAGE_RE = /\A!\[(?<alt>.*?)\]\((?<target>(?:[^()"\u201E\u201C\u201D]|\([^()"\u201E\u201C\u201D]*\))+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
   # Two exclamation marks = video, whether a local file or YouTube.
   # Deliberately explicit: a bare address on its own line stays a plain
   # paragraph, so a video can also just be linked to instead of every link
@@ -266,7 +286,7 @@ module MarkdownParser
   # brackets -- imported videos can have captions like [Video] or [YT Video].
   # The greedy match stops at the last "](" before the address, so the
   # caption doesn't get cut short.
-  VIDEO_RE = /\A!!\[(.*)\]\(([^)"]+?)\)\z/
+  VIDEO_RE = /\A!!\[(.*)\]\(((?:[^()"]|\([^()"]*\))+?)\)\z/
   HEADING_RE = /\A(\#{1,6})\s+(.+)\z/
   HR_RE = /\A(?:-{3,}|_{3,}|\*[ \t]*\*[ \t]*\*[ \t*]*)\z/
   # Where the teaser ends: everything above this line is the post's own
@@ -313,7 +333,7 @@ module MarkdownParser
   # one into an upload would both discard the title and demand a file
   # the author never meant to publish.
   # Typographic quotes here too, for the reason IMAGE_RE gives.
-  LINK_LINE_RE = /\A\[(?<label>[^\]]*)\]\((?<target>[^)"\u201E\u201C\u201D]+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
+  LINK_LINE_RE = /\A\[(?<label>[^\]]*)\]\((?<target>(?:[^()"\u201E\u201C\u201D]|\([^()"\u201E\u201C\u201D]*\))+?)(?:\s+(?:"(?<title>(?:\\.|[^"\\])*)"|\u201E(?<title>[^\u201C]*)\u201C|\u201C(?<title>[^\u201D]*)\u201D))?\)\z/
 
   # A private-use character standing in for a hard break while the paragraph
   # goes through parse_inline -- it's one codepoint, so swapping it back for
@@ -760,8 +780,17 @@ module MarkdownParser
   # text is a second set of rules, and the gap between them is where the
   # hole would be. One parser, one rule.
   # Raise for a caller that has to answer in JSON; abort for a person.
+  #
+  # Which of the two a caller is does not follow from where its markdown
+  # came from. `add <file> --json` at a desk reads a file its owner wrote,
+  # so nothing confines it -- and it promised an object all the same. Its
+  # refusal here was prose and a status of 1, the one answer the command's
+  # documentation says it never gives. So a caller can say it catches,
+  # apart from saying whom it trusts.
+  ANSWERS = { catchable: false }
+
   def reject(message, confined)
-    raise Rejected, message if confined
+    raise Rejected, message if confined || ANSWERS[:catchable]
 
     abort message
   end
@@ -819,7 +848,7 @@ module MarkdownParser
     # published picture. A name that resolves to nothing yet is left
     # alone here; the missing-picture answer is the one for that.
     if File.exist?(expanded) || File.symlink?(expanded)
-      reject("#{path} is not a file: a directory or a device cannot be a picture", confined) unless File.file?(expanded)
+      reject(I18n.t('cli.markdown_not_a_file', path: path), confined) unless File.file?(expanded)
       if confined
         real_dir = File.dirname((File.realpath(expanded) rescue expanded))
         allowed = [incoming_dir, media_dir].compact.map do |d|
@@ -981,7 +1010,7 @@ module MarkdownParser
   def parse_prose_block(para, media_dir, media_files, counter, incoming_dir: nil, confined: false)
     if (m = VIDEO_RE.match(para))
       caption, target = m[1].strip, m[2].strip
-      reject("Video needs a caption: !![caption](#{target})", confined) if caption.empty?
+      reject(I18n.t('cli.markdown_video_needs_caption', target: target), confined) if caption.empty?
 
       # Same !! marker, told apart by extension -- a third sigil would be one
       # more thing to remember for what is the same gesture: "embed this
@@ -1077,8 +1106,7 @@ module MarkdownParser
       # An image in the middle of a paragraph can't be rendered -- the
       # schema only knows image blocks. This used to silently turn into a
       # link to the file plus a stray exclamation mark.
-      reject("Both images and videos must be on their own line, separated by " \
-             "blank lines. The problem is here:\n#{para}", confined)
+      reject(I18n.t('cli.markdown_media_own_line', para: para), confined)
     elsif !para.include?("\n") && HR_RE.match?(para)
       return [{ 'type' => 'hr' }, counter]
     elsif !para.include?("\n") && TEASER_END_RE.match?(para)

@@ -415,7 +415,7 @@ module Import
           post['former_slugs'] = (Array(post['former_slugs']) + [former]).uniq
         end
       end
-      apply_own_keys(post, meta)
+      apply_own_keys(post, meta, media)
       # After apply_own_keys on purpose: `type: page` in the front matter
       # and a returning export's own `state` both land there, and either
       # can change the answer. Only a published page goes on the list --
@@ -452,12 +452,12 @@ module Import
     # handed us, and a post is not a place to let arbitrary keys in.
     OWN_NESTED_KEYS = %w[source former_slugs redirect_from unpublished_from
                          mastodon_url bluesky_url bluesky_uri draft_token
-                         created_at scheduled state page].freeze
+                         created_at scheduled state page translations].freeze
     # The ones that sit flat, because a destination engine plausibly
     # understands them too -- Hugo has series, most engines have a pinned.
     OWN_FLAT_KEYS = %w[series series_part pinned hero toc unlisted].freeze
 
-    def apply_own_keys(post, meta)
+    def apply_own_keys(post, meta, media)
       own = meta['blogsh']
       # Read per post rather than per tree: a folder can hold both an
       # export and something somebody wrote by hand, and only the posts
@@ -505,8 +505,57 @@ module Import
         # because that source has a key and wins here.
         next if key == 'source' && PostWriter.source_key(value).nil?
 
-        post[key] = value
+        post[key] = key == 'translations' ? own_translations(value, media) : value
       end
+    end
+
+    # The post's words in its other languages, with their files brought
+    # along. The export names each file where it sits in the tree
+    # (/assets/<year>/<slug>/06.png) and from_file copies it into this
+    # archive under the number it gets here -- the path own_block takes,
+    # and through the same ledger, so a picture the body already brought
+    # comes back under the one name both texts then use, and a picture
+    # only a translation shows is brought for it. Called after the body
+    # is read, on purpose: the body's files are numbered first, in the
+    # order the page shows them, as they are in a post that has no
+    # translation.
+    #
+    # Restored as it stood, a translation went on naming the file by the
+    # number it had in the archive it left, while the import had numbered
+    # the files again from 01 -- so the English page of a post whose
+    # pictures had once been replaced showed none of them, and a picture
+    # of its own stayed behind in the tree (fleet, 10. 10. 2026).
+    def own_translations(translations, media)
+      return translations unless translations.is_a?(Hash)
+
+      translations.transform_values do |one|
+        next one unless one.is_a?(Hash) && one['content'].is_a?(Array)
+
+        one.merge('content' => one['content'].map { |block| block.is_a?(Hash) ? with_own_media(block, media) : block })
+      end
+    end
+
+    # A bare name is left as it is: that is a tree written before the
+    # export said where a translation's files are, or one somebody edited,
+    # and there is no path in it to follow. A file the tree names and does
+    # not hold keeps its block, under the name the tree used -- the rule
+    # image_block states, for the reason it states it.
+    def with_own_media(block, media)
+      copy = block.dup
+      %w[media poster].each do |key|
+        entries = copy[key]
+        next unless entries.is_a?(Array)
+
+        copy[key] = entries.map do |entry|
+          next entry unless entry.is_a?(Hash) && entry['url'].to_s.start_with?('/')
+
+          local = root_relative(entry['url'].to_s)
+          name = media.from_file(local, src: entry['src'] || own_media_src(local))
+          @missing_media[local] = true unless name
+          entry.merge('url' => name || File.basename(local))
+        end
+      end
+      copy
     end
 
     # Not writing: _site/ is what Jekyll BUILT (every page a second
@@ -920,6 +969,13 @@ module Import
       body = outside_fences(body) { |prose| join_lazy_list_lines(prose) }
       body = outside_fences(body) { |prose| free_inline_images(prose) }
       body = outside_fences(body) { |prose| images_to_sentinels(prose) }
+      # The line a teaser ends at. `<!--more-->` is how Jekyll and Hugo
+      # spell it and how `./blog.sh export` writes this engine's own
+      # `//--more--//` for them -- and nothing read it back: a moved
+      # installation came home with a paragraph that says <!--more-->, on
+      # the post's page and in every card, and with no teaser. On a line
+      # of its own, as both generators want it; a fence keeps its lines.
+      body = outside_fences(body) { |prose| prose.gsub(/^[ \t]*<!--[ \t]*more[ \t]*-->[ \t]*$/i) { "\n//--more--//\n" } }
       blocks, = MarkdownParser.parse_body(body, nil)
       blocks
     end
@@ -938,12 +994,14 @@ module Import
       # not countable any more.
       body = body.gsub(MarkdownParser::IMAGE_RE) do
         m = Regexp.last_match
-        image_sentinel(m[:target], m[:alt], m[:title])
+        image_sentinel(m[:target], m[:alt], MarkdownParser.unescape_title(m[:title]))
       end
       # Line-anchored form ([ \t], NOT \s -- \s eats the newlines and
-      # with them the paragraph break after the image).
-      body.gsub(/^!\[([^\]]*)\]\(([^)"]+?)(?:[ \t]+"([^"]*)")?\)[ \t]*$/) do
-        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), Regexp.last_match(3))
+      # with them the paragraph break after the image). The title as the
+      # writer writes it: a quote inside it escaped, which lost the whole
+      # caption here (third fleet, 10. 10. 2026).
+      body.gsub(/^!\[([^\]]*)\]\(((?:[^()"]|\([^()"]*\))+?)(?:[ \t]+"((?:\\.|[^"\\])*)")?\)[ \t]*$/) do
+        image_sentinel(Regexp.last_match(2), Regexp.last_match(1), MarkdownParser.unescape_title(Regexp.last_match(3)))
       end
     end
 
@@ -1221,7 +1279,12 @@ module Import
     # a silent rewrite of somebody's archive is exactly what an import
     # must not do.
     LINKED_IMAGE = /\[!\[([^\]]*)\]\(([^)\s]+)[^)]*\)\]\(([^)\s]+)[^)]*\)/
-    INLINE_IMAGE = /(?<!\\)!\[[^\]]*\]\([^)\s]+[^)]*\)/
+    # The target may hold one level of parentheses and the title anything
+    # between its quotes, an escaped quote included: read up to the first
+    # ")", an image whose caption held one was cut there, and the rest of
+    # the caption -- with the paragraph break after the picture -- came
+    # back inside it (third fleet, 10. 10. 2026).
+    INLINE_IMAGE = /(?<!\\)!\[[^\]]*\]\((?:[^()"\s]|\([^()"]*\))+(?:\s+"(?:\\.|[^"\\])*")?\s*\)/
 
     def free_inline_images(body)
       body = body.gsub(LINKED_IMAGE) do
@@ -1275,7 +1338,7 @@ module Import
     TRAILING_CAPTION = /\A[ \t]*(?:\*([^*\n]+)\*|_([^_\n]+)_)[ \t]*(?=\n|\z)/
 
     def fold_caption(image, rest)
-      return [image, rest] if image.match?(/\s"[^"]*"\)\z/)
+      return [image, rest] if image.match?(/\s"(?:\\.|[^"\\])*"\)\z/)
       return [image, rest] unless (m = TRAILING_CAPTION.match(rest))
 
       caption = (m[1] || m[2]).strip

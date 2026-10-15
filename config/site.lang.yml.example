@@ -30,7 +30,7 @@
 #
 # The keys it takes, and nothing else:
 #
-#   fallback, ui_language
+#   fallback, ui_language, language_name
 #   site        title, short_name, description
 #   banner      claim, alt
 #   about       heading, html
@@ -39,6 +39,7 @@
 #   nav
 #   widgets     <name>: heading
 #   tags        <tag>: the word for it
+#   series      <series>: the name for it
 #
 # Everything else in site.yml -- the banner's picture, the author, the
 # address, the colours, a widget's account -- is a fact about the site,
@@ -57,6 +58,14 @@
 # branch would say `ui_language: cs`.
 # ui_language: cs
 # --- end of ui_language ---
+
+# What the language is called in itself -- the name its reader looks for,
+# and the one word a borrowed interface cannot lend. The engine knows it
+# for every language it speaks, so German needs no line here; without one
+# the Slovak branch above would be "SK" in the title of the switch that
+# leads to it.
+# language_name: "Slovenčina"
+# --- end of language_name ---
 
 site:
   title: "Dein Name - persönliches Web/Log"
@@ -129,3 +138,13 @@ footer:
 #   photography: "Fotografie"
 #   travel: "Reisen"
 # --- end of tags ---
+
+# What a reader of this language sees for a series. Like a tag, a series
+# is written once on its posts and keeps its address in every language
+# (/de/series/the-new-site/); the name over its page, in the sentence that
+# places each part and in the list of series is the one given here. Keyed
+# by the name as the posts write it, or by the series' slug. A series with
+# no name here shows as written.
+# series:
+#   "The new site": "Die neue Website"
+# --- end of series ---

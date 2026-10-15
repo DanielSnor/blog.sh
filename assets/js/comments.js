@@ -62,13 +62,21 @@
     return null;
   }
 
+  // A count of nothing is marked, not left out: most posts on a long archive
+  // read "0 0 0", which is noise a stylesheet may want to quieten -- but a
+  // row that sometimes has three numbers and sometimes none would move
+  // everything beside it, and whether zero is worth saying is the site's call.
+  function statClass(count) {
+    return Number(count) === 0 ? 'post-stat post-stat--zero' : 'post-stat';
+  }
+
   function renderPostStats(stats, key) {
     var known = threadCounts[key];
     var comments = known === undefined ? stats.comments : known;
     return (
-      '<span class="post-stat" title="' + esc(i18n.stats_favourited) + '">' + STAR_ICON + ' ' + esc(stats.favourites) + '</span>' +
-      '<span class="post-stat" title="' + esc(i18n.stats_boosted) + '">' + BOOST_ICON + ' ' + esc(stats.reblogs) + '</span>' +
-      '<span class="post-stat" title="' + esc(i18n.stats_comments) + '">' + COMMENT_ICON + ' <span class="reply-count">' + esc(comments) + '</span></span>'
+      '<span class="' + statClass(stats.favourites) + '" title="' + esc(i18n.stats_favourited) + '">' + STAR_ICON + ' ' + esc(stats.favourites) + '</span>' +
+      '<span class="' + statClass(stats.reblogs) + '" title="' + esc(i18n.stats_boosted) + '">' + BOOST_ICON + ' ' + esc(stats.reblogs) + '</span>' +
+      '<span class="' + statClass(comments) + '" title="' + esc(i18n.stats_comments) + '">' + COMMENT_ICON + ' <span class="reply-count">' + esc(comments) + '</span></span>'
     );
   }
 
@@ -79,7 +87,11 @@
     threadCounts[key] = count;
     var stats = statsContainerFor(key);
     var value = stats && stats.querySelector('.reply-count');
-    if (value) value.textContent = count;
+    if (value) {
+      value.textContent = count;
+      // The live thread can disagree with what cron counted, in either direction.
+      value.parentNode.className = statClass(count);
+    }
   }
 
   // --- rendering --------------------------------------------------------
@@ -121,7 +133,28 @@
     );
   }
 
-  function renderComment(comment) {
+  // Whose post the thread hangs under, read off the address of the post's
+  // own announcement: https://instance/@name/123 was posted by @name on
+  // that instance, at://did:plc:.../... by that DID. A reply from the same
+  // account is the author answering under their own post -- and it was
+  // drawn exactly like everybody else's, so a thread read as strangers
+  // talking among themselves. It is marked, and what the mark looks like
+  // is the stylesheet's business.
+  function ownerOf(key) {
+    var web = /^https?:\/\/([^/]+)\/(?:@|users\/)([^/]+)\//.exec(key || '');
+    if (web) return { profile: (web[1] + '/@' + web[2]).toLowerCase() };
+    var at = /^at:\/\/([^/]+)\//.exec(key || '');
+    return at ? { id: at[1] } : {};
+  }
+
+  function byOwner(comment, owner) {
+    if (owner.id) return comment.author_id === owner.id;
+    if (!owner.profile) return false;
+    var web = /^https?:\/\/([^/]+)\/(?:@|users\/)([^/?#]+)/.exec(comment.author_url || '');
+    return !!web && (web[1] + '/@' + web[2]).toLowerCase() === owner.profile;
+  }
+
+  function renderComment(comment, owner) {
     var favs = comment.favourites > 0
       ? ' <span class="comment-favs">❤ ' + esc(comment.favourites) + '</span>'
       : '';
@@ -129,7 +162,12 @@
       ? comment.html
       : esc(comment.text || '').replace(/\n/g, '<br>');
     return (
-      '<div class="comment">' +
+      // An answer to another comment rather than to the post is set in under
+      // it -- one step, however deep the exchange goes: the list arrives in
+      // thread order, so an answer already stands under what it answers,
+      // and a staircase of six steps is unreadable on a phone.
+      '<div class="comment' + (byOwner(comment, owner || {}) ? ' comment--author' : '') +
+        (comment.reply ? ' comment--reply' : '') + '">' +
         // 40x40 is what .comment-avatar is in the stylesheet, said here too
         // so the row is its right height before the picture arrives -- a
         // thread of twenty replies used to shuffle downwards as they landed.
@@ -169,13 +207,14 @@
 
   function render(container, key, replyLink, moderated, comments) {
     var note = moderated ? moderationNote() : '';
-    container.innerHTML = note + replyLink + comments.map(renderComment).join('');
+    var owner = ownerOf(key);
+    container.innerHTML = note + replyLink + comments.map(function (c) { return renderComment(c, owner); }).join('');
     applyThreadCount(key, comments.length);
   }
 
   // --- Mastodon (live thread) -------------------------------------------
 
-  function mastodonComment(status) {
+  function mastodonComment(status, rootId) {
     var acct = status.account || {};
     // Attachments live outside the sanitised content, so without this
     // mapping an approved picture reply rendered as just its words. A
@@ -194,7 +233,8 @@
       date: status.created_at,
       favourites: status.favourites_count,
       html: status.content,
-      media: media
+      media: media,
+      reply: status.in_reply_to_id != null && String(status.in_reply_to_id) !== String(rootId)
     };
   }
 
@@ -217,7 +257,7 @@
       .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
       .then(function (ctx) {
         var replies = (ctx.descendants || []).filter(function (s) { return !s.sensitive; });
-        render(container, tootUrl, replyLink, false, replies.map(mastodonComment));
+        render(container, tootUrl, replyLink, false, replies.map(function (s) { return mastodonComment(s, parsed.id); }));
       })
       .catch(function () {
         container.innerHTML = replyLink;
@@ -245,8 +285,9 @@
     return 'https://bsky.app/profile/' + post.author.handle + '/post/' + rkey;
   }
 
-  function blueskyComment(post) {
+  function blueskyComment(post, rootUri) {
     var author = post.author || {};
+    var parent = post.record && post.record.reply && post.record.reply.parent && post.record.reply.parent.uri;
     // The view embed carries the images (thumb + fullsize, alt included);
     // a labelled post keeps them folded away, same instinct as Mastodon's
     // sensitive flag.
@@ -259,13 +300,17 @@
       });
     return {
       author: author.displayName || author.handle,
+      // The DID, not the handle: a handle is a name somebody can change,
+      // and the post's own address (at://did/...) names its author by DID.
+      author_id: author.did,
       author_url: 'https://bsky.app/profile/' + author.handle,
       avatar: author.avatar,
       url: blueskyPostUrl(post),
       date: post.record.createdAt,
       favourites: post.likeCount,
       text: post.record.text,
-      media: media
+      media: media,
+      reply: !!parent && parent !== rootUri
     };
   }
 
@@ -277,7 +322,7 @@
       .then(function (res) { return res.ok ? res.json() : Promise.reject(res.status); })
       .then(function (data) {
         var replies = flattenBlueskyReplies(data.thread && data.thread.replies, []);
-        render(container, uri, replyLink, false, replies.map(blueskyComment));
+        render(container, uri, replyLink, false, replies.map(function (p) { return blueskyComment(p, uri); }));
       })
       .catch(function () {
         container.innerHTML = replyLink;

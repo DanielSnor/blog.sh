@@ -69,7 +69,10 @@ a site you can see at `http://localhost:8000/` -- and from there,
 
 `./setup.sh` is the config step: it asks for the settings a site needs,
 checks the answers as it goes, and writes `config/site.yml` and `env.sh`
-for you. Every question can be skipped with Enter, and nothing is
+for you. Most questions can be skipped with Enter, which keeps what is
+there -- the ones that cannot are the site's title, short name,
+description, author and address for as long as they still hold the
+template's examples -- and nothing is
 written until you have seen the diff and confirmed it -- so it is also
 the way to change any of this later. If you would rather edit the files
 yourself, the numbered sections below are the full reference and
@@ -111,6 +114,37 @@ cd myblog
 The system nano is as old as the system Ruby -- if the editor step
 complains about options, set your own: `export EDITOR=vim` (or `code -w`,
 or plain `nano`).
+
+**An icon instead of `cd myblog && ./blog.sh`.** On a Mac `./setup.sh`
+ends by offering to put a launcher in Applications: an icon, named after
+the site and wearing its favicon, that opens Terminal in the site's folder
+and runs `./blog.sh`. It is nothing more than that -- no window of its
+own, nothing blog.sh does not do -- and the answer to Enter is no, since a
+yes puts something outside this folder. `./setup.sh --launcher` makes it
+at any later time, and makes it again for a site whose folder moved: the
+folder is written into the launcher, so one site has one launcher --
+under one name. The launcher is called what the site is called: after a
+change of `site.short_name` the next `--launcher` makes one under the new
+name, and the old one stays where it was until it is dragged to the Trash.
+
+Three things to know about it, all of them macOS's:
+
+- The first double-click asks whether the launcher may control Terminal,
+  and under the question stands one sentence, in the site's language,
+  saying what the launcher does. Allow it. Refused, the icon does nothing,
+  and the question is not asked again -- the switch is then in System
+  Settings → Privacy & Security → Automation.
+- blog.sh runs in the window Terminal opens as it starts, or in a new one
+  when Terminal was already running. Either way Terminal keeps the window
+  open after blog.sh ends, saying the process completed. Whether it closes
+  instead is Terminal's own setting: Settings → Profiles → Shell → "When
+  the shell exits".
+- It lands in `/Applications`, or in `~/Applications` for an account that
+  may not write there. An application of the same name that blog.sh did
+  not make is never replaced, and neither is the launcher of ANOTHER site
+  called the same -- two sites nobody has named yet are both "blog.sh";
+  give one a `site.short_name` of its own. `BLOG_SH_LAUNCHER_DIR=<folder>`
+  puts the launcher somewhere else.
 
 ### Linux (Debian/Ubuntu shown; any distro works)
 
@@ -223,14 +257,21 @@ The example is fully commented. The short version:
 
 - **Required:** `site` (title, short_name, description, author, lang,
   locale, base_url) and `banner`. That alone is a complete, working
-  site.
+  site. `site.author_name` is the optional other half of `author`, for a
+  language that inflects names: `author` is the form the site's sentences
+  use ("na webu Daniela Šnora"), `author_name` the name as it stands
+  alone -- under a hero title, as the person the structured data names,
+  and on the pages of another language. Without it `author` is used
+  everywhere.
 - **`about` and `footer`** introduce the site and close every page; the
   example ships both filled in. Neither is required: an emptied value
   takes its section with it -- heading and all -- rather than rendering
   empty, and a deleted block reads the same as an emptied one.
 - **Optional, each activates only when present:** `analytics`, `social`,
-  `widgets` (toots / pixelfed / commits / bluesky / rss, each
-  independently), `mastodon` **or** `bluesky` (comments + auto-announce
+  `widgets` (toots / pixelfed / commits / bluesky / rss / on_this_day, each
+  independently -- `on_this_day` is the archive's own posts from this day in
+  earlier years, see
+  [operations.md](operations.md#on-this-day)), `mastodon` **or** `bluesky` (comments + auto-announce
   -- exactly one, see [step 8](#8-comments-network-optional-mastodon-or-bluesky)),
   `comments` (which replies get published -- same step),
   `colors` (7 keys per light/dark mode -- omitted keys fall back to the
@@ -245,6 +286,9 @@ The example is fully commented. The short version:
   `publishing.slots` (the times posts usually go out, so scheduling stops
   asking for a date --
   [operations.md](operations.md#publishing-slots)),
+  `publishing.allow_partial` (on a site of several languages, lets a post
+  out without the words of every one of them, unasked --
+  [localization.md](localization.md#publishing-a-post-that-is-not-in-every-language)),
   `media` (`convert_heic`, `remux_video` and `strip_location`, all discussed under
   [Writing from a phone](operations.md#writing-from-a-phone)),
   `tag_icons` (an icon a tag carries, on its own listing and on the date
@@ -387,7 +431,12 @@ for one either way with `hero:` in its own header (see
 [operations.md](operations.md#writing-and-publishing)). They are switches
 for regions, not for how a region looks: what things look like belongs in
 a stylesheet, and a key per visual property would turn this file into a
-stylesheet written in YAML.
+stylesheet written in YAML. `layout.lead_card` is the third: the card
+that opens the front page leads with its post's first picture -- a card
+is otherwise cut by height, so a picture after the opening paragraph is
+usually left out -- and carries `post-list-item--lead` for a skin, with
+or without a picture. Off unless you ask; what a skin can do with it is in
+[skinning.md](skinning.md).
 
 `site.extra_css` is that stylesheet -- one path, or a list of them, loaded
 after the site's own, so a skin can live in a file of yours instead of in
@@ -507,11 +556,23 @@ whether they render at all, and `colors.<mode>.banner_title` /
 the meta description and the feed. Their typeface and size are
 [`fonts`](#the-palette-and-the-headers-type).
 
+`banner.show_image: false` leaves the picture out of the header. The short
+name and the description then stand on the page itself, one under the other
+at the left edge, and the whole header is still the link home. Their colours
+default to the page's own `text` and `meta_text` instead of the pair chosen
+for reading over a picture -- `banner_title` / `banner_claim` still override
+them -- and their sizes are scaled down from the configured ones (32px and
+16px with the defaults), since 45px is a size for a line laid across a
+picture. Leave `src`, `alt`, `width` and `height` as they are: `src` is
+also the picture a page with none of its own is shared with, and `alt`
+becomes the name of the link. It is a key to set by hand; `./style.sh` does
+not ask about it.
+
 ## 5. First build and local preview
 
 ```bash
 ./blog.sh add                  # write your first post (opens $EDITOR)
-ruby build/build_blog.rb       # build into public.nosync/
+ruby build/build_blog.rb       # build into public.nosync/ (one language; ./blog.sh rebuild builds all and deploys)
 ./blog.sh preview               # preview at http://localhost:8000 (Ctrl-C stops it)
 ```
 
@@ -727,7 +788,11 @@ variant:
    ceiling are in
    [operations.md](operations.md#a-post-sent-from-the-phone-itself).
    Nothing new listens on the network; it travels over the SSH the
-   server already has.
+   server already has. The blog.sh app on a phone or a tablet uses the
+   same SSH with a key of its own, held to `scripts/remote.sh`: written by
+   hand as [operations.md](operations.md#over-ssh-from-an-app) shows, or
+   let in by a code that `./blog.sh pair` draws in the terminal
+   ([operations.md](operations.md#letting-an-app-in-by-a-code)).
 5. In a container setup (Cloudron and similar), the engine lives inside
    the container's persistent data directory and commands run via
    `docker exec` / the platform's terminal -- the engine itself doesn't
@@ -853,16 +918,22 @@ Worth knowing before switching it on:
 
 ```bash
 git pull
-ruby build/build_blog.rb && ./scripts/deploy-web.sh
+./blog.sh rebuild
 ```
 
+`rebuild`, not `ruby build/build_blog.rb`: the build script renders one
+language per run, and `rebuild` runs it for every language the site
+publishes and then deploys. On a site in two languages the bare script
+followed by a deploy leaves the second language's pages as the previous
+version built them -- and uploads them that way.
+
 `main` is the release branch: a clone on it gets each release by `git
-pull`. A clone that was put on a release tag (`git checkout v1.8`) is on
+pull`. A clone that was put on a release tag (`git checkout v1.9`) is on
 no branch, and `git pull` refuses with "You are not currently on a
 branch"; move it to the next release by name instead:
 
 ```bash
-git fetch --tags && git checkout v1.9
+git fetch --tags && git checkout v1.10
 ```
 
 The first build after an upgrade may be a full one -- the engine's own
@@ -872,8 +943,32 @@ is per-machine, gitignored and always safe to delete. Deploy the assets
 with it: a page that cannot fetch `assets/js/share.js` logs a 404 on
 every load.
 
+**Going back a version** is `git checkout <tag>` and a rebuild, and what
+the newer version was given to work with is looked at first, because the
+older one does not treat all of it alike. From 1.10 back to 1.9: take
+`series:` and `language_name:` out of every `config/site.<lang>.yml`, or
+the build stops on them and nothing is deployed -- a language's file is
+where 1.9 refuses a key it does not know. `on_this_day` under `widgets:` it does not refuse: the
+build says one line about it, `doctor` marks it, and the card is simply
+not drawn. And `site.author_name`, `banner.show_image`,
+`layout.lead_card` and `publishing.allow_partial` it passes over without
+a word, so the pages go back to what 1.9 makes without them -- the
+banner's picture is shown again, for one, and a site of several
+languages is asked about every post again. Old addresses a translation was given
+(`translations.<lang>.former_slugs`) stop being answered -- 1.9 does not
+read them, and a translation saved there is written without the list, so
+those addresses are not in the post on the way forward again either.
+What 1.10 left in the installation folder for itself
+(`.on-this-day.*.json`, `.search_index.json`, `.last-sidebar-run`,
+`tmp/pairing/`) is safe to delete. The apps stop reaching the blog: the
+door they come through, `scripts/remote.sh`, is new in 1.10 and 1.9 does
+not have it. A line `./blog.sh pair` wrote into `~/.ssh/authorized_keys`
+(it ends `blog.sh:<device>`) then points at nothing -- take it out by
+hand. The posts, the media and the rest of the configuration
+are otherwise untouched in both directions.
+
 Per-deployment files (`content.nosync/`, `media.nosync/`,
-`config/site.yml`, `env.sh`, `incoming/`, `trash/`, `drafts/`,
+`config/site.yml`, `config/site.<lang>.yml`, `env.sh`, `incoming/`, `trash/`, `drafts/`,
 manifests) are gitignored and survive any pull untouched. The one thing
 to watch: if you've **edited engine files in place** (templates, CSS),
 a pull can conflict -- keep such customizations as commits on your own

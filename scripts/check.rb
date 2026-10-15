@@ -24,7 +24,14 @@ ROOT = File.expand_path('..', __dir__)
 lang = ConfigLang.of(File.join(ROOT, 'config', 'site.yml'))
 
 require_relative '../lib/i18n'
-I18n.force_lang(lang.to_s.empty? ? 'en' : lang.to_s)
+# The language this is SAID in: the blog's own, unless whoever asks reads
+# another one and said so (scripts/remote.rb hands an app's language over
+# in BLOG_SH_SPEAK). Safe here and only here: this script reports, it
+# builds nothing, so the language of its sentences is nobody's but the
+# reader's -- the pages of the site are written by the build, in theirs.
+spoken = ENV['BLOG_SH_SPEAK'].to_s
+spoken = '' unless spoken.match?(/\A[a-z]{2,3}\z/) && File.file?(File.join(ROOT, 'locales', "#{spoken}.yml"))
+I18n.force_lang(spoken.empty? ? (lang.to_s.empty? ? 'en' : lang.to_s) : spoken)
 
 require_relative '../lib/tui'
 require_relative '../lib/site_header'
@@ -87,9 +94,36 @@ end
 # printed, so accepting the pair would answer "done" about a table nobody
 # was shown -- which is exactly what the refusal of an unknown switch
 # above exists to prevent.
-if languages && (as_json || repair)
+if languages && repair
   warn(I18n.t('check.languages_alone'))
   exit 2
+end
+
+# The table of languages as a document: which posts have a text in which
+# language, for a program that cannot read the table. `check --languages
+# --json` used to be refused with the pair above, which made the switch
+# useless to exactly the caller that always adds --json -- a program with
+# a key (scripts/remote.rb lists --languages and then appends --json, so
+# the request failed every time). The table alone, not the findings: it
+# is the answer to a different question, and `check --json` is still
+# there for the other one.
+#
+# ...and a refusal when config/site.yml cannot be read. The languages are
+# named there, so a file that is missing, empty or not YAML names none --
+# which this answered as the empty table of a site that publishes one
+# language, with a zero exit: a program showed "one language" over a site
+# with three. The refusal has the shape every other answer for a program
+# refuses in, and carries what `check` itself says about that file.
+if languages && as_json
+  require 'json'
+  unread = Checker.check_config(ROOT).first
+  if unread
+    puts JSON.pretty_generate('ok' => false, 'error' => unread.kind.to_s,
+                              'message' => [unread.text, unread.fix].compact.join(' '))
+    exit 1
+  end
+  puts JSON.pretty_generate(Checker.language_matrix(Checker.load_posts(ROOT), root: ROOT))
+  exit 0
 end
 
 if as_json
@@ -162,7 +196,7 @@ if repair
     exit 0
   end
 
-  idx = Repair.index(Checker.posts_of_last_run || Checker.load_posts(ROOT))
+  idx = Repair.index(Checker.posts_of_last_run || Checker.load_posts(ROOT), languages: Checker.published_languages(ROOT))
   applied = 0
   skipped = 0
   no_offer = 0
@@ -244,8 +278,13 @@ SLUG_COLUMN_MAX = 48
 if languages
   matrix = Checker.language_matrix(Checker.posts_of_last_run || Checker.load_posts(ROOT), root: ROOT)
   if matrix['languages'].empty?
-    puts I18n.t('check.languages_none')
-    puts
+    # Not said over a config that could not be read: no language was named
+    # because nothing was read, and the finding below says which of the two
+    # it is.
+    if Checker.check_config(ROOT).empty?
+      puts I18n.t('check.languages_none')
+      puts
+    end
   else
     marks = { 'written' => '✅', 'title_only' => '◐', 'missing' => '·' }
     # The slug column is as wide as the slugs, up to a limit: one imported

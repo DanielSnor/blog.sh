@@ -14,6 +14,7 @@ require_relative '../lib/post_address'
 require_relative '../lib/public_file'
 require_relative '../lib/post_stats'
 require_relative '../lib/site_config'
+require_relative '../lib/on_this_day'
 
 # Under cron stdout is a pipe, which Ruby block-buffers while warn goes
 # straight out -- every warning in the mail then jumps ahead of the
@@ -37,6 +38,16 @@ require_relative '../lib/run_lock'
 require_relative '../lib/i18n'
 RunLock.acquire!(ROOT, label: 'sidebar', busy_exit: 3, quiet_when_busy: true)
 
+# The heartbeat: that this ran, and when. `doctor` reads it to say whether
+# anything turns the day over for the card of this day -- which, without
+# this run, shows the day of the last build and then nothing. Never worth
+# stopping for: a moment that cannot be written down is still a run.
+begin
+  File.write(File.join(ROOT, '.last-sidebar-run'), Time.now.strftime('%Y-%m-%dT%H:%M:%S%z'))
+rescue StandardError
+  nil
+end
+
 # Not an abort: this runs every half hour under cron, where a non-zero
 # exit with a line on stderr is a mail, and "you have not built the site
 # yet" is not news worth mailing forty-eight times a day. Saying it and
@@ -52,6 +63,20 @@ end
 # mail: a blank one every half hour is still a half-hourly mail.
 sidebar_line = Sidebar.summary(Sidebar.write_all(PUBLIC_DIR))
 puts sidebar_line unless sidebar_line.strip.empty?
+
+# On this day turns over at midnight, and this is the only thing that runs
+# then. It chooses from the catalogue each language's last build left
+# behind (lib/on_this_day.rb), so it needs to know nothing about titles,
+# translations or addresses -- and it writes a file only when the day, or
+# the window list, actually changed: forty-seven ticks a day are no news.
+# Said only when something was written, for the same reason.
+if Sidebar.enabled? && SiteConfig::Chrome.widgets(SiteConfig.data).key?('on_this_day')
+  OnThisDay.refresh(root: ROOT, public_dir: PUBLIC_DIR).each do |done|
+    next unless done[:changed]
+
+    puts I18n.t('cron.on_this_day', file: done[:path].delete_prefix("#{PUBLIC_DIR}/"), count: done[:posts])
+  end
+end
 
 # Stats for tooted posts are only fetched here, not on every build.
 #

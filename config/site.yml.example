@@ -34,17 +34,18 @@
 # (brackets) is optional and commented out where it lives; the rest of
 # this file explains each one where it stands.
 #
-#   site        title, short_name, description, author, lang, locale, (locales),
+#   site        title, short_name, description, author, (author_name), lang, locale, (locales),
 #               timezone, base_url, (page_size), (extra_css)
-#   banner      src, alt, width, height, (show_title), (show_claim), (claim)
+#   banner      src, alt, width, height, (show_title), (show_claim), (claim),
+#               (show_image)
 #   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
 #               pill_bg, (banner_title), (banner_claim)
 #   fonts       (faces), (banner_title), (banner_title_size),
 #               (banner_claim), (banner_claim_size)
-#   layout      (sidebar), (hero)
+#   layout      (sidebar), (hero), (lead_card)
 #   nav         (the menu bar: label with tag or url -- or [] for none)
 #   about       (heading), html
-#   widgets     (toots, pixelfed, commits, bluesky, rss)
+#   widgets     (toots, pixelfed, commits, bluesky, rss, on_this_day)
 #   footer      (links_heading), links, note_heading, note_html, copyright,
 #               (social_heading)
 #   social      name, url, icon or icon_svg, (rel)
@@ -54,7 +55,7 @@
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
 #   comments    (approval)
-#   publishing  (slots)
+#   publishing  (slots), (allow_partial)
 #   media       (convert_heic), (remux_video), (strip_location)
 #   seo         (block_ai_crawlers), (robots_extra)
 #   analytics   (src), (website_id)
@@ -81,6 +82,13 @@ site:
   # listing-page descriptions, none of which should ever see raw HTML.
   description: "Personal web/log of Your Name"
   author: "Your Name"
+  # The same name as it stands alone -- under a hero title, in what search
+  # engines read as the author, and on the pages of a language other than
+  # the site's own. Only a language that inflects names needs it: there
+  # `author` is the form its sentences take (a Czech site says whose it
+  # is with "Petra Marka") and this is the name itself ("Petr Marek").
+  # Left out, `author` is used.
+  # author_name: "Petr Marek"
   # Selects locales/<lang>.yml (see lib/i18n.rb). "en", "cs" and "de" ship with the
   # engine; add another locales/<code>.yml to support a different language --
   # any key missing from it falls back to English.
@@ -150,6 +158,12 @@ banner:
   # banner image. Turn either off if the image is busy enough on its own.
   # show_title: true
   # show_claim: true
+  # Optional (default true): false leaves the picture out of the header.
+  # The short name and the description then stand on the page itself, in
+  # the page's own text colours, and the whole header is still the way
+  # home. Everything above stays as it is: `src` is also the picture a
+  # page with none of its own is shared with.
+  # show_image: true
   # Optional: overrides ONLY the banner overlay's claim text -- everywhere
   # else (meta description, RSS, listing pages) keeps using site.description
   # unchanged. Exists because site.description must stay plain text (see
@@ -256,6 +270,14 @@ colors:
 #   # that doesn't use them. A post with no usable image (or only a 1x1
 #   # tracking pixel out of an old import) keeps the ordinary layout.
 #   hero: false
+#   # Open the front page's first card with its post's first picture, under
+#   # the title and above the opening words. A card is otherwise cut by
+#   # height, so a picture that comes after the first paragraph is usually
+#   # left out of it. Only that one card (the pinned post, where there is
+#   # one), only on the front page itself, and it carries the class
+#   # post-list-item--lead for a stylesheet to dress -- also when its post
+#   # has no picture, which leaves the card's body as it was. Default: false.
+#   lead_card: false
 # --- end of layout ---
 
 # Optional. The menu across the top. Without this key the menu is what the
@@ -342,6 +364,15 @@ about:
 #     # podcast -- or X through a self-hosted Nitter instance.
 #     feed_url: "https://example.com/feed.xml"
 #     limit: 3
+#   # Posts from this day in earlier years, from the site's own archive --
+#   # no account, nothing to fetch. The name alone switches it on; a day
+#   # with nothing from an earlier year hides the card. See
+#   # `./blog.sh on-this-day` for what it shows today, and why.
+#   # It needs scripts/refresh-sidebar.sh in cron: that is what turns the
+#   # day over. Without it the card shows the day of the last build and is
+#   # gone the day after (`./blog.sh doctor` says when nothing runs it).
+#   on_this_day:
+#     # heading: "On this day"
 # --- end of widgets ---
 
 # Three columns: links, a note with the copyright line, social icons.
@@ -551,11 +582,24 @@ social:
 # a slot never moves a post that is already scheduled. Format is
 # "<day> HH:MM" (mon/tue/.../sun, or daily); omit the key entirely and
 # scheduling behaves exactly as before.
+#
+# allow_partial is for a site of several languages (site.locales) where a
+# translation is the exception rather than the rule. Such a site is asked
+# about every post whether it may go out without the words of every one
+# of them -- `publish` and `schedule` refuse until --allow-partial is
+# said, the wizard asks, and a post sent from a phone marked to be
+# published stays a draft. true is that answer given once, for every
+# post. A post then goes out in the languages it has, and the others show
+# it as they show any post that was never translated. Only true says it;
+# left out, or false, nothing changes. A site of one language has no use
+# for it. Two '#' below: switching the block on for its slots does not
+# switch this on with it.
 # publishing:
 #   slots:
 #     - "mon 09:30"
 #     - "wed 09:30"
 #     - "fri 09:30"
+#   # allow_partial: true
 # --- end of publishing ---
 
 # Optional. HEIC photos (the iPhone default) display only in Safari --

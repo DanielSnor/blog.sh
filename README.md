@@ -75,7 +75,8 @@ around one workflow rather than around the general case.
 - **The archive is a directory of JSON files.** One post, one file. It is
   readable, greppable and backed up by copying it.
 - **Authoring is a command.** `./blog.sh` writes, edits, publishes,
-  schedules and deploys. A phone writes at `/write/` and sends over SSH.
+  schedules and deploys. A phone writes in an app over the SSH the server
+  already has; the `/write/` page does it too, until 1.11.
 - **The deploy is paranoid.** A SHA-256 manifest ships only what changed,
   and refuses when the file count or the byte total swings too far from
   the last build it accepted.
@@ -90,22 +91,22 @@ What you give up: themes, plugins, and a second author.
 Each part says where it is described in full.
 
 - **Content.** One post is one JSON file, `content.nosync/posts/<year>/<slug>.json`, holding typed blocks. Drafts, scheduled posts, pages, unlisted posts, series, tags and a trash with restore. → [architecture.md](docs/architecture.md#content-model)
-- **Writing.** `./blog.sh` bare is a menu; every command also works directly: add, edit, publish, schedule, unpublish, delete, restore, rename, re-announce. `add <file>` takes a markdown file and asks nothing; `--json` answers as one object. → [operations.md](docs/operations.md#writing-and-publishing)
-- **From a phone.** `/write/` is a page on the blog itself: title, text, tags, photographs, video. It sends over the SSH the server already has, publishes, and polls for the answer. → [operations.md](docs/operations.md#writing-from-a-phone)
+- **Writing.** `./blog.sh` bare is a menu; every command also works directly: add, edit, publish, schedule, unpublish, delete, restore, rename, re-announce. `add <file>` takes a markdown file and asks nothing; `--json` answers as one object. On a Mac, `./setup.sh --launcher` puts an icon in Applications that opens it. → [operations.md](docs/operations.md#writing-and-publishing), [install.md](docs/install.md#macos)
+- **From a phone.** Native apps for iOS and Android, in preparation, reach the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut work as before and leave in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
 - **Markdown.** One parser, shared by the build and the authoring tool, with a cheat sheet the parser generates for your own site at `/markdown/`. Editing a post round-trips through it. → [operations.md](docs/operations.md#writing-and-publishing)
 - **Search, and the other ways to find a post.** Full text over the whole archive, entirely in the
   reader's browser -- no server, no index service, nothing called from outside, on a site of any
   size. Quoted phrases, `-word` to exclude, and diacritics never decide a match, so *nemecko*
   finds *Německo*. The index is split so the page is not made to wait for it: the recent half
   loads with the page, the archive only when a search reaches past it -- on a 6,600-post site,
-  432 kB against 4.3 MB. Beside it, `/archive/` maps the whole site in two levels and `/tag/`
-  lists every tag with its count. → [architecture.md](docs/architecture.md#the-client-side),
+  432 kB against 4.3 MB. Beside it, `/archive/` maps the whole site in two levels, `/tag/`
+  lists every tag with its count and `/series/` every series with its parts. → [architecture.md](docs/architecture.md#the-client-side),
   [operations.md](docs/operations.md#reading-the-archive)
 - **More than one language.** A post keeps one set of metadata and a text per language; each language gets a root of its own (`/de/`) with its own addresses, feed and listings, the site's own language keeps the root, and a post nobody translated is shown with a link to the one copy it has. The site's own words -- title, about, footer, menu, tags -- are translated in `config/site.<lang>.yml`; the engine's words already are, in English, Czech and German. → [localization.md](docs/localization.md#publishing-in-more-than-one-language)
 - **Build.** Static HTML from JSON through ERB templates: stable pagination, tag, series and type archives, RSS, sitemap, `robots.txt`, a generated favicon, a 404 in the site's own chrome. A page whose inputs have not moved is not rendered again. → [architecture.md](docs/architecture.md#build-pipeline-buildbuild_blogrb)
 - **Deploy.** Cloudron Surfer, a local directory, rsync over SSH, a git-pages push, any rclone remote, or SFTP. A SHA-256 manifest ships only what changed and refuses a build that swings too far from the last one. → [operations.md](docs/operations.md#deploying)
 - **Comments.** The announcement's replies are the thread; `comments.approval: fav` publishes only the ones you favourite. → [Why this exists](#why-this-exists)
-- **Sidebar widgets.** Toots, Bluesky posts, Pixelfed posts, commits, any RSS feed, per-post stats -- each optional, all fetched server-side on a cron. → [operations.md](docs/operations.md#cron-sidebar-widgets-and-post-stats)
+- **Sidebar widgets.** Toots, Bluesky posts, Pixelfed posts, commits, any RSS feed, per-post stats -- each optional, all fetched server-side on a cron -- and the archive's own posts from this day in earlier years. → [operations.md](docs/operations.md#cron-sidebar-widgets-and-post-stats), [operations.md](docs/operations.md#on-this-day)
 - **Appearance.** Light and dark from CSS custom properties, a three-state toggle, and a seven-key palette in `config/site.yml` that the wizard previews before writing. A listing card is cut to a size budget as it is written rather than drawn in full and hidden with CSS. → [install.md](docs/install.md#the-palette-and-the-headers-type)
 - **Reachable without a mouse.** One focus ring for the whole site, skip links, and motion that respects `prefers-reduced-motion`. → [architecture.md](docs/architecture.md#the-client-side)
 - **Security.** A Content-Security-Policy on every page, self-hosted fonts, nothing third-party in post data, `env.sh` out of git at mode 600. → [architecture.md](docs/architecture.md#security)
@@ -139,6 +140,8 @@ scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers
                            refresh-sidebar.sh cron: refreshes only the sidebar widgets (no site rebuild)
                            publish-scheduled.sh cron: publishes whatever the queue has come due
                            receive.sh         takes a whole post over one SSH connection into incoming/
+                           remote.sh          the forced command for an app's key: one engine command (remote.rb) or one delivery per connection
+                           pair.rb            ./blog.sh pair: lets an app in by a code it reads (enroll.sh takes its key)
                            migrate_*.rb       one per import source, scriptable alternative to import.sh
 lib/                     Shared Ruby libraries (Surfer client, fetchers, post writer, i18n, ...)
 lib/import/              Import adapters plus the layer they share (media, run, CLI)
@@ -232,36 +235,62 @@ says what you are running.
                                # creates a draft, shows a preview, asks what's next;
                                # with a markdown file it asks nothing, and --json answers as data;
                                # --untrusted refuses a picture reference that is not a bare filename
-./blog.sh edit [<slug>]        # without a slug, offers the last 50 posts
-./blog.sh translate <slug> --lang <code>
-                               # writes the post's text in another language the site publishes
-./blog.sh props [<slug>]       # a post's state and its actions; [e] changes what the post IS --
-                               # its series and part, tags, type, and the unlisted/hero/toc flags
-./blog.sh publish [<slug>] [--yes] [--no-announce] [--json]
+./blog.sh edit [<slug>] [--json]
+                               # without a slug, offers the last 50 posts; --json hands the text out as data
+./blog.sh translate <slug> --lang <code> [--json]
+                               # writes the post's text in another language the site publishes;
+                               # --json hands the text out as data
+./blog.sh props [<slug>] [--json]
+                               # a post's state and its actions; [e] changes what the post IS --
+                               # its series and part, tags, type, and the unlisted/hero/toc flags;
+                               # --json prints it all as data, with the actions that apply, and takes
+                               # the screen's keys as flags: --set k=v, --drop-address [--kind], --rename --yes,
+                               # --versions, --restore-version --yes, --rebuild
+./blog.sh publish [<slug>] [--yes] [--no-announce] [--allow-partial] [--json]
                                # shows the draft's preview, asks what's next;
                                # --yes publishes without asking, --no-announce keeps it off Mastodon and Bluesky;
-                               # --json (with --yes) answers as one object, for a script or a phone
-./blog.sh schedule [<slug>]    # asks for a date, then auto-publishes the draft when it arrives
-./blog.sh queue                # what is scheduled, when each one goes, and the slots it uses
-./blog.sh unpublish [<slug>]   # moves a published post back to draft (also deletes its announcement)
-./blog.sh delete [<slug>]      # deletes a post to trash/
-./blog.sh restore [<slug>]     # restores a post from trash
-./blog.sh empty trash          # deletes everything in the trash, for good
-./blog.sh empty versions       # keeps each post's newest version, removes the older ones
-./blog.sh toot [<slug>]        # (re-)sends the comment toot (Mastodon sites)
-./blog.sh bluesky [<slug>]     # (re-)sends the announcement (Bluesky sites)
-./blog.sh rebuild [--full] [--force]
+                               # --json (with --yes) answers as one object, for a script or a phone;
+                               # --allow-partial lets it out without the words of every language the site publishes
+./blog.sh schedule [<slug>] [--allow-partial] [--at <time>] [--cancel] [--compact] [--json]
+                               # asks for a date, then auto-publishes the draft when it arrives;
+                               # --json with --at writes that date, --cancel takes the post out of the queue
+./blog.sh queue [--json] [--up <slug>] [--down <slug>] [--move <slug> --to <n>]
+                               # what is scheduled, when each one goes, and the slots it uses
+./blog.sh unpublish [<slug>] [--yes] [--json]
+                               # moves a published post back to draft (also deletes its announcement);
+                               # --yes belongs to --json: at the keyboard it asks
+./blog.sh delete [<slug>] [--yes] [--rebuild] [--json]
+                               # deletes a post to trash/ (--yes belongs to --json here too)
+./blog.sh restore [<slug>] [--rebuild] [--json]
+                               # restores a post from trash; --json without a slug lists the trash
+./blog.sh empty trash [--yes] [--json]
+                               # deletes everything in the trash, for good
+./blog.sh empty versions [--yes] [--json]
+                               # keeps each post's newest version, removes the older ones
+./blog.sh toot [<slug>] [--force] [--json]
+                               # (re-)sends the comment toot (Mastodon sites)
+./blog.sh bluesky [<slug>] [--force] [--json]
+                               # (re-)sends the announcement (Bluesky sites)
+./blog.sh rebuild [--full] [--force] [--json]
                                # rebuilds and deploys the whole site, every language it publishes;
                                # --full builds every page again instead of only the changed ones;
                                # --force lets the deploy past its guards and uploads everything
 ./blog.sh preview [<port>]     # serves public.nosync locally (default 8000)
 ./blog.sh browse [--type=image] [--tag=foo] [--drafts]
                                # the archive on screen: filters, search, preview, Enter opens the post
-./blog.sh list [--type=image] [--tag=foo] [--drafts]
-                               # the same, printed one line per post
-./blog.sh doctor [--online]    # reads the configuration and says what is wrong with it;
+./blog.sh list [--type=image] [--tag=foo] [--drafts] [--search="words"] [--json]
+                               # the same, printed one line per post; --json as data
+./blog.sh doctor [--online] [--json]
+                               # reads the configuration and says what is wrong with it;
                                # --online also asks the feeds, the analytics script, the access
-                               # token and the deploy target -- whether it answers, what is in its root
+                               # token and the deploy target -- whether it answers, what is in its root;
+                               # --json prints the findings as data instead of a screenful
+./blog.sh pair [--list] [--revoke [<device>]] [--json] [--host <address>] [--port <n>] [--no-wait]
+                               # shows a code an app reads to connect, with no key or address typed;
+                               # --list names the devices let in this way, --revoke takes one out
+                               # (by its number, name or fingerprint, or asked which);
+                               # --list --json and --revoke --json are what an app asks through its key:
+                               # the list, and its own way out
 ./blog.sh doctor --strip-location
                                # removes the place of capture from photos already in the archive
 ./blog.sh check [--online] [--json] [--repair] [--languages]
@@ -272,7 +301,11 @@ says what you are running.
 ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
                                # writes the whole archive out as a tree of markdown files
 ./blog.sh stats [--json]       # counts the archive: posts by year and kind, words, tags, media, sources
-./blog.sh version              # which version this installation is running
+./blog.sh drafts [--json] [<slug>]
+                               # the drafts; --json with each one's text, as the phone opens it
+./blog.sh on-this-day [--date MM-DD] [--json]
+                               # what this day holds from earlier years, and what the on_this_day card shows of it
+./blog.sh version [--json]     # which version this installation is running
 ./blog.sh help
 ```
 
@@ -377,7 +410,9 @@ The sidebar widgets and per-post stats are refreshed by
 `scripts/refresh-sidebar.sh` -- it fetches the data, rewrites only the
 JSON files (six at most: toots, Pixelfed, commits, Bluesky, RSS, stats)
 and uploads just the ones the site's configured widgets produce, no site
-rebuild. Run it from cron wherever the site is built:
+rebuild. With the `on_this_day` card it also turns the day over: that
+card's file changes once a day, and this is the job that runs after
+midnight. Run it from cron wherever the site is built:
 
 ```
 */30 * * * * /path/to/blog.sh/scripts/refresh-sidebar.sh

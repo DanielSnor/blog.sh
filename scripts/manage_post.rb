@@ -14,6 +14,7 @@ require 'securerandom'
 require 'shellwords'
 require 'stringio'
 require 'tempfile'
+require 'digest'
 require_relative '../lib/post_writer'
 require_relative '../lib/post_versions'
 require_relative '../lib/atomic_write'
@@ -34,6 +35,7 @@ require_relative '../lib/translations'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
+require_relative '../lib/search_index'
 require_relative '../lib/post_address'
 require_relative '../lib/address_guard'
 require_relative '../lib/path_safety'
@@ -168,7 +170,7 @@ FRONTMATTER_KEYS = %w[title tags type date pinned hero page unlisted series seri
 # Read by `add <file>` alone. On every other route -- the wizard, edit --
 # the key would be accepted and do nothing, which is the one thing the
 # unknown-key rule below exists to prevent; so it is unknown there.
-FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt].freeze
+FILE_ONLY_FRONTMATTER_KEYS = %w[publish receipt edits base lang].freeze
 # What an edit decides: every key the editor shows in the header, and the
 # few the save computes on purpose (the address history, the state). Any
 # other key the post carries is kept as it was -- see edit_post.
@@ -762,13 +764,19 @@ def arm_editor_buffer_notice
   end
 end
 
-def edit_in_editor(initial_content, hint_comment, origin = nil)
+# untouched: what else an untouched editor hands back. A buffer that went
+# in carrying `//` notes never returns the bytes it went in with -- the
+# notes are dropped on the way out -- so `translate`, which opens with the
+# original as notes, got an empty template back, kept THAT as rescued
+# text, said "your text was not lost", and had the next `add` ask about
+# five lines starting with nothing (fleet trial, 8. 10. 2026).
+def edit_in_editor(initial_content, hint_comment, origin = nil, untouched: [])
   text = editor_round_trip(initial_content, hint_comment)
   # An editor closed on an untouched template has nothing worth keeping --
   # and writing it anyway would overwrite a buffer the author had just been
   # told was still there. Opening `add` to look at something, changing your
   # mind and quitting must not be how an interrupted post gets lost.
-  if text != initial_content
+  if text != initial_content && !untouched.include?(text)
     keep_editor_buffer(text, origin)
     arm_editor_buffer_notice
   end
@@ -786,8 +794,7 @@ def editor_round_trip(initial_content, hint_comment)
     # before giving up. A user's own $EDITOR gets no second-guessing.
     ok ||= ENV['EDITOR'].nil? && ENV['VISUAL'].nil? && system('nano', path)
     unless ok
-      abort("$EDITOR (#{editor}) failed -- set the EDITOR environment variable " \
-            'to an editor that exists here (e.g. export EDITOR=vim) and rerun.')
+      abort(t('cli.editor_failed', editor: editor))
     end
     strip_editor_notes(File.read(path, encoding: 'utf-8'))
   end
@@ -1375,9 +1382,12 @@ end
 class Refused < StandardError
   attr_reader :code
 
+  # Without the line ends a sentence for the terminal closes on: several
+  # of them end "\n\n" to leave a blank line under themselves, and a
+  # program was handed that as part of the message.
   def initialize(code, message)
     @code = code
-    super(message)
+    super(message.to_s.rstrip)
   end
 end
 
@@ -1407,6 +1417,9 @@ end
 # could, because a post sent from a phone has no desk to come back to.
 def add_from_file(source, json: false, confined: false)
   JSON_REFUSALS[:enabled] = json
+  # The parser's own refusals with the rest: markdown it cannot turn into
+  # blocks is `bad_markdown` whoever wrote the file.
+  MarkdownParser::ANSWERS[:catchable] = json
   file = IncomingPath.resolve(source, INCOMING_DIR)
   refuse('not_found', t('cli.add_file_not_found', file: source)) if file.nil?
   # Said apart from "there is nothing there", because they send the
@@ -1433,6 +1446,14 @@ def add_from_file(source, json: false, confined: false)
   # here, where the file can still be named, rather than as an encoding
   # error thrown from somewhere inside the markdown parser.
   refuse('not_text', t('cli.add_file_not_text', file: file)) unless raw.valid_encoding?
+  # A file is read as the editor's buffer is: a line starting with // is a
+  # note to oneself and does not reach the post, and neither does a comment
+  # block. The cheat sheet every site publishes says so of any text, and
+  # the editor has always done it -- while a note left in a file handed
+  # over here was saved as a paragraph, and with `publish: yes` stood on
+  # the public page (trial of a clean installation, 9. 10. 2026). A file
+  # that holds nothing but notes is an empty one.
+  raw = strip_editor_notes(raw)
   refuse('empty', t('cli.add_file_empty', file: file)) if raw.strip.empty?
 
   # created_at == date marks an auto-suggested date, the same contract the
@@ -1455,6 +1476,9 @@ def add_from_file(source, json: false, confined: false)
   # Absent, or anything but yes/true/1, means what it always meant: draft.
   meta, = MarkdownParser.parse_frontmatter(raw)
   publish = truthy_frontmatter?(meta['publish'])
+  # A file that names the draft it edits is not a new post: see edit_from_file.
+  return edit_from_file(file, raw, meta, json: json, confined: confined, publish: publish) unless meta['edits'].to_s.strip.empty?
+
   path, warnings = quietly(json, keep_stdout: true) do
     compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined,
                  extra_keys: FILE_ONLY_FRONTMATTER_KEYS)
@@ -1598,17 +1622,106 @@ end
 # the public one, and its `deploy` is what the rebuild it just ran
 # returned rather than what the marker file says afterwards. Two shapes,
 # one for a post that is out and one for a post that is not.
+#
+# The same keys every action answers with (acted_answer): `ok`, and when
+# the post is dated. They were missing here and on the draft answer below
+# -- so one command, `add <file> --json`, said three different sets of
+# keys depending on what the file held, and a caller that knows success
+# by `ok` did not know these two.
 def post_answer(path, warnings)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
   {
+    'ok' => true,
     'slug' => post['slug'],
     'path' => path,
     'state' => post['state'],
+    'scheduled' => post['scheduled'] == true,
+    'date' => draft?(post) && !post['scheduled'] ? nil : post_time!(post).iso8601,
     'url' => SITE_BASE_URL.to_s.empty? ? '' : published_url(post['slug'], post_time!(post).year,
                                                             page: PostAddress.page?(post)),
     'deploy' => File.exist?(Publishing::DEPLOY_PENDING) ? 'pending' : 'done',
     'warnings' => warnings
   }
+end
+
+# `add` of a file whose header says `edits: <slug>` saves it over that
+# draft rather than making a new post -- the way the phone saves a draft
+# it opened through `drafts --json`, and a way for any script to edit
+# without the $EDITOR trick. The same save `edit` does (apply_post_edit),
+# with every question turned into a refusal.
+#
+# Drafts only. A published post is live, announced and linked to; editing
+# one is a decision for somebody at their desk, not a side effect of a
+# file arriving.
+#
+# `base:` is the digest of the draft as it was when its text was handed
+# out. When the draft has changed since -- edited at the desk, published
+# by the scheduler -- the file is refused rather than saved over it: the
+# phone would otherwise quietly undo whatever happened in between.
+def edit_from_file(file, raw, meta, json:, confined:, publish:)
+  slug = meta['edits'].to_s.strip
+  # ask: false -- a file is handed over where nobody is at a keyboard, and
+  # a slug that two years have used to open the picker here: a question in
+  # prose, "Cancelled." and a status of 1 where an object was promised.
+  path = PathSafety.safe_segment?(slug) ? find_post_path(slug, ask: false) : nil
+  refuse('not_found', t('cli.edit_from_not_found', slug: slug)) unless path
+  original_raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(original_raw)
+  base = meta['base'].to_s.strip
+  # A published post may be edited this way too, since 1.10: the app on a
+  # phone is a desk now. It has to say which version it edited -- `base:`
+  # is optional for a draft and required here, because the post is live
+  # and a change made elsewhere in the meantime would be overwritten in
+  # silence. The save rebuilds and deploys, as `edit` does at the desk.
+  refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty? && !draft?(post)
+  if !base.empty? && base != Digest::SHA256.hexdigest(original_raw)
+    refuse('changed', t('cli.edit_from_changed', slug: slug))
+  end
+  # `lang:` makes it a translation: the words of one language, not the post.
+  # The LINE makes it one, not what the line holds: `lang:` with nothing
+  # after it was read as no line at all, and what a program had written as
+  # a translation was saved over the post's own text, with a success for
+  # an answer. An empty code is no language this site has, and is refused
+  # as one (translate_language!).
+  if meta.key?('lang')
+    refuse('base_required', t('cli.translate_base_required', slug: slug)) if base.empty?
+    return translation_from_file(file, raw, meta, path, original_raw, post, json: json, confined: confined)
+  end
+  # A file that edits a post and carries no text is not an edit. Making a
+  # post shorter is one -- the app showed the text and a person took a
+  # paragraph out. But a file with nothing under its header is what an app
+  # sends when the editor was saved empty, and what one that never loaded
+  # the text would send, and neither is somebody deciding that a post
+  # should have no title, no words and no pictures. It was taken for
+  # exactly that: the post written empty, its pictures deleted past the
+  # trash, the site deployed, and a success for an answer. The refusal is
+  # the one `add` of a new file has always given an empty body, and
+  # nothing is written. (A translation is another matter: an empty one
+  # takes the language off the post, which is said where that is done.)
+  _, body = MarkdownParser.parse_frontmatter(raw)
+  # ...and only of a post that HAD a body. One that is a title and its
+  # tags, or a link card -- which travels in the header -- has nothing
+  # under the header to begin with, and a change to its title or its tags
+  # from a file was refused as empty every time (third fleet, 10. 10. 2026).
+  refuse('empty', t('cli.add_file_empty', file: file)) if body.to_s.strip.empty? && stored_body?(post)
+  # `edits:` and `base:` stay in the text: they belong to the delivery, and
+  # the save reads them as file-only keys, like `publish:` and `receipt:`.
+  (new_path, _updated), warnings = quietly(json, keep_stdout: true) do
+    apply_post_edit(slug, path, post, original_raw, raw, interactive: false, confined: confined,
+                    extra_keys: FILE_ONLY_FRONTMATTER_KEYS, consume: [file], receipt: meta['receipt'])
+  end
+  report_added(new_path, warnings, json: json, publish: publish)
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
+end
+
+# Whether a post's own text, as it is handed out, has anything under the
+# header at all.
+def stored_body?(post)
+  !MarkdownParser.parse_frontmatter(edit_markdown_for(post, nil)).last.to_s.strip.empty?
+rescue StandardError
+  true
 end
 
 def report_added(path, warnings, json:, publish: false)
@@ -1620,7 +1733,7 @@ def report_added(path, warnings, json:, publish: false)
   # site, published in one language without a word. It stays a draft here,
   # and says why and how to send it anyway -- the answer carries the
   # sentence, so the phone shows it too.
-  missing = publish ? missing_translations(post) : []
+  missing = publish && !partial_allowed? ? missing_translations(post) : []
   if missing.any?
     kept = t('cli.add_publish_partial', slug: post['slug'], langs: missing.join(', '))
     # Into the answer under --json; said on the terminal otherwise, where
@@ -1702,9 +1815,13 @@ def report_added(path, warnings, json:, publish: false)
   end
 
   puts JSON.pretty_generate(
+    'ok' => true,
     'slug' => post['slug'],
     'path' => path,
     'state' => post['state'],
+    'scheduled' => post['scheduled'] == true,
+    # nil for a plain draft, as everywhere (acted_answer).
+    'date' => post['scheduled'] ? post_time!(post).iso8601 : nil,
     # An address only where there is one. A key called url whose value is
     # "/draft/ab12/x/" is worse than an empty one: a caller cannot tell a
     # deliberately relative answer from a hostless mistake.
@@ -2213,7 +2330,12 @@ end
 # can't outlive its post.
 RESOLVED_PATHS = {}
 
-def find_post_path(slug, ask: true)
+# sentence: what is said when nobody can be asked. The one about --yes and
+# publishing through `props` was said by every command that looks a post
+# up for a program -- so an app opening a post to read it was told to
+# publish it (fleet, 8. 10. 2026). Publishing keeps that sentence; the
+# rest say what happened.
+def find_post_path(slug, ask: true, sentence: 'cli.slug_ambiguous')
   chosen = RESOLVED_PATHS[slug]
   return chosen if chosen && File.exist?(chosen)
 
@@ -2221,7 +2343,9 @@ def find_post_path(slug, ask: true)
   # every command that resolves a post by slug ("foto[1]", which a hand
   # edit or an import can mint) answered "post not found" over a post the
   # build was publishing.
-  matches = PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").sort
+  # ...and a name to the letter, whatever the volume makes of letters
+  # (PathGlob.named?).
+  matches = PathGlob.under(CONTENT_DIR, '*', "#{PathGlob.literal(slug)}.json").select { |found| PathGlob.named?(found, "#{slug}.json") }.sort
   return matches.first if matches.size <= 1
 
   # A caller that cannot be asked is told which years exist and stopped.
@@ -2233,8 +2357,7 @@ def find_post_path(slug, ask: true)
     # the phone throws away, and a status of 1 where the caller was
     # promised an object and a zero. Without --json refuse IS abort.
     refuse('ambiguous_slug',
-           t('cli.publish_yes_ambiguous', slug: slug,
-                                          years: matches.map { |m| File.basename(File.dirname(m)) }.join(', ')))
+           t(sentence, slug: slug, years: matches.map { |m| File.basename(File.dirname(m)) }.join(', ')))
   end
 
   RESOLVED_PATHS[slug] = pick_among_years(slug, matches)
@@ -2433,9 +2556,9 @@ end
 # draft dialog would be waiting for a keypress that a program is never
 # going to send, and a promise that the whole output is one object cannot
 # be kept by a run that stops to ask something.
-def cmd_publish(slug, yes: false, announce: true, json: false, allow_partial: false)
+def cmd_publish(slug, yes: false, announce: true, json: false, allow_partial: false, compact: false)
   JSON_REFUSALS[:enabled] = json
-  return publish_as_json(slug, announce: announce, allow_partial: allow_partial) if json
+  return publish_as_json(slug, announce: announce, allow_partial: allow_partial, compact: compact) if json
 
   publish_interactively(slug, yes: yes, announce: announce, allow_partial: allow_partial)
 end
@@ -2445,8 +2568,18 @@ end
 # status stays 0 because the object IS the answer. iOS Shortcuts throws
 # away the output of a command that failed, which is the same reason
 # `add --json` leaves with zero.
-def publish_as_json(slug, announce: true, allow_partial: false)
-  path = find_post_path(slug, ask: false)
+# --compact: the post was scheduled, and the posts behind it in the queue
+# step forward into its slot -- the question the queue screen asks after
+# [p], answered in advance.
+def publish_as_json(slug, announce: true, allow_partial: false, compact: false)
+  as_the_one_writer('publish') { publish_and_answer(slug, announce: announce, allow_partial: allow_partial, compact: compact) }
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
+end
+
+def publish_and_answer(slug, announce:, allow_partial:, compact:)
+  path = find_post_path(slug, ask: false, sentence: 'cli.publish_yes_ambiguous')
   refuse('not_found', t('cli.post_not_found', slug: slug)) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
@@ -2461,15 +2594,27 @@ def publish_as_json(slug, announce: true, allow_partial: false)
   end
   refuse_partial!(post, slug, allow_partial, json: true)
 
+  rest = []
+  freed = nil
+  if compact && post['scheduled']
+    entries = queue_entries
+    index = entries.index { |e| File.expand_path(e[:path]) == File.expand_path(path) }
+    rest = index ? entries[(index + 1)..] : []
+    freed = post_time!(post)
+  end
   moved, warnings = begin
     quietly(true) { publish_draft(slug, path: path, announce: announce, asked: false) }
   rescue SystemExit => e
     refuse('publish_refused', e.message.to_s)
   end
-  puts JSON.pretty_generate(post_answer(moved || path, warnings))
-rescue Refused => e
-  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
-  exit 0
+  compacted = 0
+  if freed
+    compacted, more = quietly(true, keep_stdout: true) { compact_queue(freed, rest) }
+    # `compacted` says how many moved; the screen's sentence about it is
+    # not a warning (without_own_report).
+    warnings += without_own_report(more, 'cli.queue_compacted')
+  end
+  puts JSON.pretty_generate(post_answer(moved || path, warnings).merge('compacted' => compacted))
 end
 
 def publish_interactively(slug, yes: false, announce: true, allow_partial: false)
@@ -2696,9 +2841,26 @@ def queue_entries
   end.sort_by { |entry| entry[:time] }
 end
 
+# Whether anything has ever run the queue on this installation: the
+# heartbeat publish-scheduled.sh leaves each time it is run (doctor reads
+# the same file). A blog nobody has given a cron line has none.
+def scheduler_ran?
+  !Publishing.scheduler_last_run.nil?
+end
+
+# What is said about a post whose time has passed. Where a scheduler runs,
+# the post is the scheduler's and the advice is to wait for it. Where
+# nothing ever has, "wait for the cron" is advice to wait for something
+# that will not come -- a blog set up to try things out has no cron, and
+# its overdue post sat in the queue telling its author exactly that
+# (Pavel, 8. 10. 2026). There the sentence says so and says what to do.
+def queue_overdue_refusal
+  t(scheduler_ran? ? 'cli.queue_swap_overdue' : 'cli.queue_swap_overdue_no_scheduler')
+end
+
 def queue_row(entry, index)
   time = entry[:time].getlocal.strftime(t('date_time_format'))
-  overdue = entry[:time] <= Time.now ? "  #{t('cli.queue_overdue')}" : ''
+  overdue = entry[:time] <= Time.now ? "  #{t(scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler')}" : ''
   format('%2d.  %s  %s%s', index + 1, time, entry[:slug], overdue)
 end
 
@@ -2872,7 +3034,7 @@ def cmd_queue_screen
       # because only the write has a line to say.
       first_future = entries.index { |entry| entry[:time] > Time.now }
       if first_future.nil? || selected < first_future
-        status = t('cli.queue_swap_overdue')
+        status = queue_overdue_refusal
       else
         target = queue_carry_screen(entries, selected, first_future, screen)
         if target && target != selected
@@ -3146,6 +3308,10 @@ rescue StandardError
   false
 end
 
+# Says false both when a move was not made and when the lock was somebody
+# else's; QUEUE_MOVE[:busy] is how a caller with no screen tells the two.
+QUEUE_MOVE = { busy: false }
+
 def apply_queue_moves(moves)
   held = RunLock.hold(ROOT, label: 'queue') do
     # Checked here rather than in the three callers that used to each keep
@@ -3413,6 +3579,7 @@ def apply_queue_moves(moves)
   # queue is re-read on the next frame anyway, so trying again costs a
   # keypress. (RunLock says the same thing on stderr, naming the holder;
   # this line is the one the queue screen can put on its status row.)
+  QUEUE_MOVE[:busy] = true
   puts t('cli.queue_busy')
   puts
   false
@@ -3437,7 +3604,7 @@ end
 def queue_carry(entries, index)
   first_future = entries.index { |entry| entry[:time] > Time.now }
   if first_future.nil? || index < first_future
-    puts t('cli.queue_swap_overdue')
+    puts queue_overdue_refusal
     puts
     return false
   end
@@ -3542,7 +3709,7 @@ def queue_swap(entries, index, other_index)
 
   entry, other = entries[index], entries[other_index]
   if entry[:time] <= Time.now || other[:time] <= Time.now
-    puts t('cli.queue_swap_overdue')
+    puts queue_overdue_refusal
     puts
     return false
   end
@@ -3582,6 +3749,15 @@ def queue_offer_compact(freed_time, rest)
   answer = Tui.key_choice(t('cli.queue_compact_prompt', count: rest.size))
   return false unless Tui.yes?(answer)
 
+  compact_queue(freed_time, rest).positive?
+end
+
+# The shift itself, for the screen above and for a program that answered
+# the question with a flag. How many posts moved, 0 when nothing did.
+def compact_queue(freed_time, rest)
+  rest = Array(rest)
+  return 0 if rest.empty? || freed_time <= Time.now
+
   times = [freed_time] + rest.map { |entry| entry[:time] }
   # The whole loop is checked before the first write, for the reason
   # queue_swap is: write_scheduled_date ABORTS the process, and an abort
@@ -3592,10 +3768,10 @@ def queue_offer_compact(freed_time, rest)
   applied = apply_queue_moves(rest.each_with_index.map { |entry, i| [entry, times[i]] }) do |entry, target|
     entry[:path] = write_scheduled_date(entry[:path], entry[:post], target, raw: entry[:raw])
   end
-  return false unless applied
+  return 0 unless applied
   puts Tui.paint(t('cli.queue_compacted'), :green)
   puts
-  true
+  rest.size
 end
 
 # The reverse of publish_draft: moves a published post back to draft. Also
@@ -3625,6 +3801,24 @@ def cmd_unpublish(slug)
     return
   end
 
+  path, = unpublish_post(path, post, slug)
+  puts t('cli.reverted_to_draft', path: path)
+
+  final_slug = File.basename(path, '.json')
+  unless rebuild_and_deploy(t('cli.updating_preview'))
+    warn t('cli.draft_saved_preview_pending', slug: final_slug)
+    warn ''
+    return
+  end
+
+  draft_decision_loop(final_slug, path: path)
+end
+
+# The move back to draft itself, shared with `unpublish --json`: the
+# announcements taken down, the state and the vacated address recorded.
+# Returns the path and the announcement addresses that could NOT be
+# deleted and so stay on the post.
+def unpublish_post(path, post, slug)
   toot_gone, skeet_gone = retract_announcements(post)
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
@@ -3636,28 +3830,22 @@ def cmd_unpublish(slug)
                        'unpublished_from' => PostAddress.vacated_marker(post, slug: slug))
   # Kept when the delete failed, so the address survives to be retried --
   # and so a re-publish can see there is already an announcement out there.
+  kept = []
   if toot_gone
     updated.delete('mastodon_url')
   else
     warn t('cli.announcement_kept', url: post['mastodon_url'])
+    kept << post['mastodon_url']
   end
   if skeet_gone
     updated.delete('bluesky_url')
     updated.delete('bluesky_uri')
   else
     warn t('cli.announcement_kept', url: post['bluesky_url'])
+    kept << post['bluesky_url']
   end
   AtomicWrite.write_json(path, updated)
-  puts t('cli.reverted_to_draft', path: path)
-
-  final_slug = File.basename(path, '.json')
-  unless rebuild_and_deploy(t('cli.updating_preview'))
-    warn t('cli.draft_saved_preview_pending', slug: final_slug)
-    warn ''
-    return
-  end
-
-  draft_decision_loop(final_slug, path: path)
+  [path, kept]
 end
 
 # --- properties and actions ------------------------------------------
@@ -4516,6 +4704,14 @@ def props_versions(path, slug)
     return
   end
 
+  restore_version(path, restored)
+  puts t('cli.versions_restored', path: path)
+  puts
+  rebuild_and_deploy(t('cli.updating_preview'))
+end
+
+# The restore itself, shared with `props --restore-version --json`.
+def restore_version(path, restored)
   # The current text becomes a version too, so this is not the one move in
   # the engine that cannot be walked back.
   PostVersions.keep(path, content_dir: CONTENT_DIR)
@@ -4530,6 +4726,23 @@ def props_versions(path, slug)
   %w[title tags content type hero].each do |key|
     restored.key?(key) ? current[key] = restored[key] : current.delete(key)
   end
+  # ...and the words of every language the version has. Its WORDS: the
+  # address a language serves the post at and the old addresses it is
+  # owed stay as they are now, for the reason the redirects above do. A
+  # language the post has lost since comes back whole, as the version
+  # held it; one the version never had is left alone -- a restore puts
+  # words back, it does not take a language away.
+  if restored['translations'].is_a?(Hash)
+    languages = current['translations'].is_a?(Hash) ? current['translations'].dup : {}
+    restored['translations'].each do |lang, was|
+      next unless was.is_a?(Hash)
+
+      now = languages[lang].is_a?(Hash) ? languages[lang].dup : was.dup
+      Translations::TEXT_KEYS.each { |key| was.key?(key) ? now[key] = was[key] : now.delete(key) }
+      languages[lang] = now
+    end
+    current['translations'] = languages unless languages.empty?
+  end
   # `src` is engine-side too, and older than this dialog knows: every
   # version written before media entries started carrying the address the
   # file came from -- which is every version in every archive that predates
@@ -4540,9 +4753,6 @@ def props_versions(path, slug)
   # exactly as edit_post takes it from the stored post.
   restore_media_src(current['content'], live_content)
   AtomicWrite.write_json(path, current)
-  puts t('cli.versions_restored', path: path)
-  puts
-  rebuild_and_deploy(t('cli.updating_preview'))
 end
 
 def props_addresses(path, slug)
@@ -4566,7 +4776,10 @@ def props_addresses(path, slug)
     # row for "the address I am at right now" is not marked as taken by
     # somebody else.
     current = PostAddress.vacated_marker(post, slug: slug)
-    rows = entries.each_with_index.map { |(_, value), i| address_row(value, current, i) }
+    rows = entries.each_with_index.map do |(key, value), i|
+      lang = address_language(key)
+      lang ? "#{address_row(value, current, i)}  [#{lang}]" : address_row(value, current, i)
+    end
     # Into the frame, not above it -- see version_pick.
     index = address_pick(rows, [Tui.paint(t('cli.addresses_heading', count: entries.size), :dim), ''])
     # The blank line after a picker is the caller's to write -- Tui.menu
@@ -4581,10 +4794,7 @@ def props_addresses(path, slug)
     next unless Tui.yes?(Tui.key_choice(''))
 
     abort_if_post_changed(path, raw, slug)
-    updated = post.dup
-    remaining = Array(updated[key]).map(&:to_s) - [former]
-    remaining.empty? ? updated.delete(key) : updated[key] = remaining
-    AtomicWrite.write_json(path, updated)
+    AtomicWrite.write_json(path, without_address(post, key, former))
     puts Tui.paint(t('cli.addresses_dropped', address: former), :green)
     maybe_rebuild
   end
@@ -4603,9 +4813,36 @@ end
 # dialog read only the first, so a renamed page was told it had no old
 # addresses at all -- while the build warned about the one it could not
 # place, on every single run, with nothing anywhere able to clear it.
+#
+# ...and a third: the old addresses of the post's text in ANOTHER language
+# (translations.<lang>.former_slugs), which the build serves and `check`
+# asks about like the other two. They were in neither this list nor any
+# command -- so `check` could say "take the entry out" about an address
+# this screen said the post did not have, and the only way to do it was
+# a text editor in the post's JSON.
 def address_entries(post)
   Array(post['former_slugs']).map { |value| ['former_slugs', value.to_s] } +
-    Array(post['redirect_from']).map { |value| ['redirect_from', value.to_s] }
+    Array(post['redirect_from']).map { |value| ['redirect_from', value.to_s] } +
+    Translations.former_slugs(post).map { |lang, value| ["translations.#{lang}.former_slugs", value.to_s] }
+end
+
+# The language an entry of address_entries belongs to, or nil for the
+# post's own two lists.
+def address_language(key)
+  key[/\Atranslations\.(.+)\.former_slugs\z/, 1]
+end
+
+# The post without one of its old addresses, wherever address_entries
+# found it. A list left empty is taken off, as it always was; the
+# translation it belonged to stays.
+def without_address(post, key, former)
+  updated = JSON.parse(JSON.generate(post))
+  lang = address_language(key)
+  holder = lang ? updated['translations'][lang] : updated
+  list = lang ? Translations::FORMER_KEY : key
+  remaining = Array(holder[list]).map(&:to_s) - [former]
+  remaining.empty? ? holder.delete(list) : holder[list] = remaining
+  updated
 end
 
 # Who is standing at a root address today: a page of that slug, whatever
@@ -4698,7 +4935,6 @@ end
 # rename, the old one after any kind of cancel.
 def rename_post(path, post, raw: nil)
   old_slug = post['slug']
-  year = File.basename(File.dirname(path))
 
   puts
   print t('cli.rename_prompt')
@@ -4708,65 +4944,19 @@ def rename_post(path, post, raw: nil)
   # itself -- "Přejmenovat na: Zrušeno." The same line Wizard.ask writes for
   # the same reason.
   puts unless Tui.interactive?
-  # Each of the five ways out below ends with one blank line, like every
-  # other command reachable from the wizard: this one is run from the
-  # properties dialog through screen.leave, and without it the "press a key"
-  # that follows sat flush against whatever was just refused.
+  # Each of the ways out below ends with one blank line, like every other
+  # command reachable from the wizard: this one is run from the properties
+  # dialog through screen.leave, and without it the "press a key" that
+  # follows sat flush against whatever was just refused.
   if input.empty?
     puts t('cli.cancelled')
     puts
     return old_slug
   end
 
-  new_slug = Slug.slugify(input)
-  if new_slug.empty?
-    puts t('cli.rename_unusable', input: input)
-    puts
-    return old_slug
-  end
-  # A slug is a filename (<slug>.json) and a URL segment; slugify keeps it
-  # to safe characters but not to a safe length, so a pasted paragraph
-  # reaches the write as a filename the filesystem rejects with a raw
-  # ENAMETOOLONG. cmd_add caps its slug at eight words for readability;
-  # this caps by bytes for correctness, well under any filesystem's limit.
-  if new_slug.bytesize > 200
-    puts t('cli.rename_too_long')
-    puts
-    return old_slug
-  end
-  if new_slug == old_slug
-    puts t('cli.rename_same')
-    puts
-    return old_slug
-  end
-
-  # Same guard as edit and publish, and it has to refuse EXACTLY what the
-  # build refuses -- so it asks PostAddress the same question the build
-  # asks, instead of working out its own answer. Comparing served
-  # addresses was its own answer, and it let through both pairs the build
-  # stops on: a draft (served under its token, but its file and media sit
-  # under year/slug like everyone else's) and a page (served at the root,
-  # so its year never seemed to matter). Either one turned a rename into a
-  # site that would not build.
-  new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
-  new_media_dir = File.join(MEDIA_DIR, year, new_slug)
-  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug,
-                                        path: new_path)
-  if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
-    # Not the shared post_already_exists text: that one says "continuing
-    # would overwrite it -- resolve manually", and a refused rename
-    # neither continues nor needs resolving. Picking another slug does.
-    #
-    # An occupant nobody can read is refused just the same -- a place whose
-    # owner will not open is not free space -- but it gets its own sentence,
-    # because "another post already uses that slug" is a claim about a file
-    # this process never managed to look at, and the reader would go
-    # looking for a post that may not be there.
-    if taken_address && AddressGuard.unreadable?(taken_address)
-      puts t('cli.rename_unreadable', slug: new_slug, path: taken_address)
-    else
-      puts t('cli.rename_taken', slug: new_slug)
-    end
+  new_slug, problem = rename_check(post, path, input)
+  if problem
+    puts problem.last
     puts
     return old_slug
   end
@@ -4796,6 +4986,71 @@ def rename_post(path, post, raw: nil)
   # draft -- no former_slugs, and the address it has been live at since
   # then dies with no redirect.
   abort_if_post_changed(path, raw, old_slug) if raw
+  rename_apply(path, post, new_slug)
+
+  puts Tui.paint(t('cli.renamed_label', slug: new_slug), :green)
+  if draft?(post)
+    rebuild_and_deploy(t('cli.updating_preview'))
+  else
+    maybe_rebuild
+  end
+  new_slug
+end
+
+# What the typed name becomes, or why it cannot: [new_slug, nil] or
+# [nil, [code, sentence]]. Shared with `props --rename --json`, so the
+# dialog and the program refuse exactly the same names.
+def rename_check(post, path, input)
+  old_slug = post['slug']
+  year = File.basename(File.dirname(path))
+
+  new_slug = Slug.slugify(input)
+  return [nil, ['rename_unusable', t('cli.rename_unusable', input: input)]] if new_slug.empty?
+  # A slug is a filename (<slug>.json) and a URL segment; slugify keeps it
+  # to safe characters but not to a safe length, so a pasted paragraph
+  # reaches the write as a filename the filesystem rejects with a raw
+  # ENAMETOOLONG. cmd_add caps its slug at eight words for readability;
+  # this caps by bytes for correctness, well under any filesystem's limit.
+  return [nil, ['rename_too_long', t('cli.rename_too_long')]] if new_slug.bytesize > 200
+  return [nil, ['rename_same', t('cli.rename_same')]] if new_slug == old_slug
+
+  # Same guard as edit and publish, and it has to refuse EXACTLY what the
+  # build refuses -- so it asks PostAddress the same question the build
+  # asks, instead of working out its own answer. Comparing served
+  # addresses was its own answer, and it let through both pairs the build
+  # stops on: a draft (served under its token, but its file and media sit
+  # under year/slug like everyone else's) and a page (served at the root,
+  # so its year never seemed to matter). Either one turned a rename into a
+  # site that would not build.
+  new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
+  new_media_dir = File.join(MEDIA_DIR, year, new_slug)
+  taken_address = AddressGuard.occupant(post, content_dir: CONTENT_DIR, slug: new_slug,
+                                        path: new_path)
+  if File.exist?(new_path) || Dir.exist?(new_media_dir) || taken_address
+    # Not the shared post_already_exists text: that one says "continuing
+    # would overwrite it -- resolve manually", and a refused rename
+    # neither continues nor needs resolving. Picking another slug does.
+    #
+    # An occupant nobody can read is refused just the same -- a place whose
+    # owner will not open is not free space -- but it gets its own sentence,
+    # because "another post already uses that slug" is a claim about a file
+    # this process never managed to look at, and the reader would go
+    # looking for a post that may not be there.
+    if taken_address && AddressGuard.unreadable?(taken_address)
+      return [nil, ['rename_unreadable', t('cli.rename_unreadable', slug: new_slug, path: taken_address)]]
+    end
+
+    return [nil, ['rename_taken', t('cli.rename_taken', slug: new_slug)]]
+  end
+  [new_slug, nil]
+end
+
+# The rename itself. Returns the post's new path.
+def rename_apply(path, post, new_slug)
+  old_slug = post['slug']
+  year = File.basename(File.dirname(path))
+  new_path = File.join(CONTENT_DIR, year, "#{new_slug}.json")
+  new_media_dir = File.join(MEDIA_DIR, year, new_slug)
 
   updated = post.merge('slug' => new_slug)
   unless draft?(post)
@@ -4823,14 +5078,7 @@ def rename_post(path, post, raw: nil)
                     to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, new_slug))
   AtomicWrite.write_json(new_path, updated)
   File.delete(path)
-
-  puts Tui.paint(t('cli.renamed_label', slug: new_slug), :green)
-  if draft?(post)
-    rebuild_and_deploy(t('cli.updating_preview'))
-  else
-    maybe_rebuild
-  end
-  new_slug
+  new_path
 end
 
 # Which languages the site publishes that this post has no words in.
@@ -4843,6 +5091,19 @@ def missing_translations(post)
   return [] if named.empty?
 
   (named - [own]) - Translations.languages(post)
+end
+
+# The site's own answer to the question below, given once: it publishes a
+# post in the languages the post has. `publishing.allow_partial: true` in
+# config/site.yml is `--allow-partial` said for every post -- for the site
+# where a translation is the exception. Such a site was asked at every
+# publish what it had long decided, and its phone could not answer at
+# all: a file sent with `publish: yes` stayed a draft every time.
+#
+# Only `true` says it. Left out, false, or a word in quotes, the question
+# stays where it was; doctor names a value that is neither true nor false.
+def partial_allowed?
+  SiteConfig.get('publishing', 'allow_partial', default: false) == true
 end
 
 # Every language the site publishes except the one it is written in --
@@ -4858,7 +5119,13 @@ end
 # A language's name in its own language, which is the only name somebody
 # looking for it recognises -- and the code itself when the engine has no
 # file for it, rather than a blank where a name should be.
+#
+# The site's own word for it first, as the build reads it (`language_name`
+# in config/site.<code>.yml): a language with a borrowed interface has no
+# other, and was "sk" in every picker.
 def language_name(code)
+  said = SiteConfig.language_data(code.to_s)['language_name']
+  return said.strip if said.is_a?(String) && !said.strip.empty?
   return code.to_s unless I18n.locale_file?(code.to_s)
 
   name = I18n.load_locale(code.to_s)['language_name'].to_s
@@ -4882,6 +5149,8 @@ end
 #
 # true means carry on publishing.
 def offer_missing_languages(slug, post)
+  return true if partial_allowed?
+
   missing = missing_translations(post)
   return true if missing.empty?
 
@@ -4908,7 +5177,7 @@ end
 # by a person who already answered this question, and a refusal nobody is
 # looking at strands the post in the queue instead of asking anybody.
 def refuse_partial!(post, slug, allow_partial, json: false)
-  return if allow_partial
+  return if allow_partial || partial_allowed?
 
   missing = missing_translations(post)
   return if missing.empty?
@@ -4977,15 +5246,94 @@ end
 # empty entry: a language a post has no words in must look exactly like a
 # language it was never offered in, or the build would give it a page with
 # the wrong text in it.
+# Whether this site can be asked for `lang` at all: through refuse, so
+# `--json` and the file route answer with an object and the terminal with
+# its sentence, as everywhere else.
+def translate_language!(lang)
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  offered = ([own] + Array(SiteConfig.get('site', 'locales', default: nil)).map { |c| c.to_s.strip }).uniq.reject(&:empty?)
+  refuse('no_locales', t('cli.translate_needs_locales')) if offered.length < 2
+  refuse('own_language', t('cli.translate_own_language', lang: lang)) if lang == own
+  unless offered.include?(lang)
+    refuse('unknown_language', t('cli.translate_unknown_language', lang: lang, known: (offered - [own]).join(', ')))
+  end
+  own
+end
+
+# The translation as the editor opens it: a header of its title and its
+# address, then its words -- empty when the language has none yet. The
+# address line is shown with what it is, so it can be read as well as
+# changed -- and left alone it stays exactly as it was, which is what an
+# address is for.
+def translation_skeleton(entry, media_dir)
+  "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
+    MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+end
+
+# `translate <slug> --lang xx --json`: what a program needs to write the
+# post's text in another language elsewhere -- the translation as it
+# stands, the original beside it with its pictures by bare name, and the
+# digest `base:` hands back. The text comes back through `add` of a file
+# saying `edits:`, `base:` and `lang:` (translation_from_file).
+def translate_as_json(slug, lang)
+  answer_json do
+    translate_language!(lang)
+    path, raw, post = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    entry = post.dig('translations', lang)
+    entry = {} unless entry.is_a?(Hash)
+    media_dir = File.join(MEDIA_DIR, year, slug)
+    # Said before the text is handed out, as `drafts --json` and `edit
+    # --json` say it of the post's own: a translation holding something
+    # its text cannot say is not one to edit from here, and the save
+    # would be refused (content_lost).
+    lost = unwritable_translation(entry, media_dir)
+    problem = if lost.nil?
+                'unreadable'
+              else
+                lost.any? ? 'content_lost' : nil
+              end
+    { 'ok' => true,
+      'post' => { 'slug' => slug, 'lang' => lang, 'title' => post_name_for(post),
+                  'written' => Translations.written?(entry),
+                  'editable' => problem.nil?, 'problem' => problem,
+                  'text' => translation_skeleton(entry, nil),
+                  'original' => translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
+                                                       'content' => LinkCard.split(post['content']).last }, nil),
+                  'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
+                  'preview' => PostAddress.path(post),
+                  'base' => Digest::SHA256.hexdigest(raw) } }
+  end
+end
+
+# A file saying `edits: <slug>`, `base: <digest>` and `lang: <code>`: the
+# translation as the app sends it back. The same save the editor's
+# round-trip makes (apply_translation), with every question a refusal.
+def translation_from_file(file, raw, meta, path, original_raw, post, json:, confined:)
+  lang = meta['lang'].to_s.strip
+  translate_language!(lang)
+  slug = post['slug'].to_s
+  _said, warnings = quietly(json, keep_stdout: true) do
+    apply_translation(slug, lang, path, original_raw, post, raw, confined: confined, interactive: false)
+  end
+  # Consumed the way every other file handed over is: out of incoming/,
+  # and from nowhere else. This deleted the file wherever it lay -- the
+  # one path of four that did, and on a Mac a text written beside the
+  # blog is quite possibly the only copy (fleet trial, 8. 10. 2026).
+  cleanup_incoming({}, [file])
+  deployed, more = quietly(json) { rebuild_and_deploy(t('cli.updating_preview')) }
+  if json
+    puts JSON.pretty_generate(acted_answer(path, warnings + more, rebuilt: deployed).merge('lang' => lang))
+  else
+    puts t('cli.translate_saved', lang: lang, slug: slug)
+  end
+end
+
 def cmd_translate(slug, lang)
   path = find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
-  own = SiteConfig.get('site', 'lang', default: 'en').to_s
-  offered = ([own] + Array(SiteConfig.get('site', 'locales', default: nil)).map { |c| c.to_s.strip }).uniq.reject(&:empty?)
-  abort t('cli.translate_needs_locales') if offered.length < 2
-  abort t('cli.translate_own_language', lang: lang) if lang == own
-  abort t('cli.translate_unknown_language', lang: lang, known: (offered - [own]).join(', ')) unless offered.include?(lang)
+  translate_language!(lang)
 
   original_raw = File.read(path, encoding: 'utf-8')
   post = JSON.parse(original_raw)
@@ -4999,20 +5347,21 @@ def cmd_translate(slug, lang)
   # changed underneath), and a buffer nobody is ever offered is a promise
   # the next successful save of any post quietly breaks.
   restored = offer_editor_buffer('translate', "#{slug}@#{lang}")
-  # The address line is shown with what it is, so it can be read as well as
-  # changed -- and left alone it stays exactly as it was, which is what an
-  # address is for.
-  skeleton = "---\ntitle: #{entry['title']}\nslug: #{entry['slug']}\n---\n\n" +
-             MarkdownWriter.blocks_to_markdown(Array(entry['content']), media_dir)
+  skeleton = translation_skeleton(entry, media_dir)
   # Nothing written in this language yet: the post's own words come in as
   # `//` lines, which the editor drops on the way back like every other
   # note. Translating with the original in the buffer beats translating
   # from a second window -- and because the lines are dropped, a
   # translation left half-done cannot save the original text as if it
   # were this language's.
-  opened_with = restored || (entry.empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
+  # The original comes along for as long as there is no text to work from:
+  # the first time, and every time after a save that got as far as a
+  # title. It used to come the first time only -- and the first time was
+  # the title -- so the body was then written with the original in
+  # another window, which is what these lines are there to spare.
+  opened_with = restored || (Array(entry['content']).empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
-                       { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" })
+                       { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" }, untouched: [skeleton])
   # 🪤 Against the buffer WITHOUT the notes as well: the editor strips
   # `//` lines on the way back, so a buffer that was carrying the original
   # NEVER returns the bytes it went in with -- and an untouched editor
@@ -5024,21 +5373,92 @@ def cmd_translate(slug, lang)
     return
   end
 
+  said = apply_translation(slug, lang, path, original_raw, post, raw)
+  discard_editor_buffer
+  puts
+  puts said
+  draft?(post) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+end
+
+# The save itself: the words of one language parsed, checked for an
+# address another post has, and written onto the post -- or taken off it
+# when both the title and the body are empty. Returns the sentence said.
+# `confined:` is the file route's: a picture may be named only by a bare
+# name, and none at all here, since a translation carries no media.
+def apply_translation(slug, lang, path, original_raw, post, raw, confined: false, interactive: true)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+  entry = post.dig('translations', lang)
+  entry = {} unless entry.is_a?(Hash)
   meta, body = MarkdownParser.parse_frontmatter(raw)
-  blocks, media_files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: INCOMING_DIR)
-  wait_for_missing_images(missing)
-  # A boundary rather than half of a feature: pictures belong to the post
-  # and are copied in by `edit`, which knows how to convert, remux and
-  # measure them. A translation that could bring its own would put files
-  # in one language's copy of a post whose media the other language shares.
-  abort t('cli.translate_media_unsupported') unless media_files.empty?
+  blocks, media_files, missing = begin
+    MarkdownParser.parse_body(body, media_dir, incoming_dir: confined ? nil : INCOMING_DIR, confined: confined)
+  rescue MarkdownParser::Rejected => e
+    # As for the post's own text (apply_post_edit): a refusal the caller
+    # can read, where this let the exception out as a failed engine.
+    refuse('bad_markdown', e.message)
+  end
+  if confined
+    refuse('media_unsupported', t('cli.translate_media_unsupported')) if missing.any?
+  else
+    wait_for_missing_images(missing)
+  end
+  refuse('media_unsupported', t('cli.translate_media_unsupported')) unless media_files.empty?
 
   title = meta['title'].to_s.strip
   translations = post['translations'].is_a?(Hash) ? post['translations'].dup : {}
+  # The old addresses of this language's text, held here so that both
+  # branches below can see them.
+  owed = Array(entry[Translations::FORMER_KEY]).map(&:to_s).reject { |former| former.strip.empty? }
+  inherited = []
   if title.empty? && blocks.empty?
     translations.delete(lang)
     said = t('cli.translate_removed', lang: lang, slug: slug)
+    # Taking the language off takes its page away, and with the page went
+    # the addresses that text was owed a redirect at: the entry was
+    # deleted whole, list and all. They are not this language's to lose --
+    # somebody still follows them. They go to the post's own list, where
+    # an old address leads to the post itself: the same words in another
+    # language rather than nothing.
+    inherited = owed - Array(post['former_slugs']).map(&:to_s)
+    # ...and the address the text stood at until this moment, an old
+    # address from now on like the rest: taking the language off left it
+    # answering nothing, with nothing for `check` to find (third fleet,
+    # 10. 10. 2026). Not where the text stood at the post's own slug -- the
+    # tree of that language shows the post there as it is.
+    if !draft?(post) && !PostAddress.page?(post)
+      stood = Translations.for_lang(post, lang)['address_slug'].to_s
+      unless stood.empty? || stood == post['slug'].to_s
+        inherited |= ["#{PostAddress.date_year(post)}/#{stood}"] - Array(post['former_slugs']).map(&:to_s)
+      end
+    end
+    said += " #{t('cli.translate_removed_addresses', count: inherited.size)}" unless inherited.empty?
   else
+    # What the new text left alone is saved as it was stored. A
+    # translation's blocks carry what markdown cannot say exactly as the
+    # post's own do -- a paragraph's kind, a video's poster and player --
+    # and this save rebuilt every one of them from the text: on a real
+    # archive 67 of 130 translations changed by being saved unchanged, and
+    # eight lost a whole block (fleet, 9. 10. 2026). keep_untouched_blocks
+    # is the rule the post's own text has had since the first fleet.
+    blocks = keep_untouched_blocks(blocks, entry['content'], media_files, media_dir)
+    # ...and what would still be gone is asked about, or refused. At a
+    # keyboard anything that goes is a question; from a file only what its
+    # author never saw going -- a link card, a player with no address to
+    # write, which the text this was edited from did not show.
+    lost = blocks_lost(entry['content'], blocks)
+    unless interactive
+      never_seen = unwritable_translation(entry, media_dir)
+      lost = larger_loss(never_seen, unchosen_loss(entry['content'], blocks, media_dir)) if never_seen
+    end
+    if lost.any?
+      summary = content_loss_summary(lost)
+      refuse('content_lost', t('cli.content_lost_from_file', summary: summary)) unless interactive
+      puts
+      puts t('cli.content_loss_warning', summary: summary)
+      print t('cli.confirm_continue_yes', word: t('cli.confirm_word'))
+      abort t('cli.cancelled_nothing_saved') unless $stdin.gets&.strip&.downcase == t('cli.confirm_word')
+    end
     one = {}
     one['title'] = title unless title.empty?
     one['content'] = blocks unless blocks.empty?
@@ -5066,13 +5486,56 @@ def cmd_translate(slug, lang)
       address = address.sub(/-+\z/, '')
     end
     one['slug'] = address
+    # A text that was out at one address and is given another owes the
+    # old one a redirect, as a post renamed by its own slug does
+    # (rename_apply). Nothing wrote that down: the list below was "for the
+    # merge, which is done by hand", so `slug:` changed in this header --
+    # a line the engine itself puts there -- left the page the language
+    # had stood at answering nothing, with no warning and nothing for
+    # `check` to find (trial of an upgrade, 9. 10. 2026). The address it
+    # WAS served at, asked the way the build asks. A page has no year in
+    # its address and this list has no way to say one: there the old
+    # address is still the author's to keep (redirect_from). A text that
+    # had no page yet -- a title and nothing under it -- had no address
+    # either: for_lang answers with the post itself for it, which carries
+    # none.
+    #
+    # 🪤 Nothing is ever taken OUT here, the address the text stands at
+    # now included. This used to drop it, "so a text renamed back does not
+    # redirect to itself" -- but the list is served in two places, the
+    # language's tree and the root of the site, and at the root the text's
+    # own address is an old one like any other: it is where the text stood
+    # as a post of its own before it was merged into this one. All 68
+    # merged posts of sean.cz carry exactly that entry, and the first save
+    # of such a text, changed or not, deleted its redirect -- no warning,
+    # nothing for `check` to find (third fleet, 10. 10. 2026). In its own
+    # tree the build has the page there and writes no redirect over it.
+    if !draft?(post) && !PostAddress.page?(post)
+      year = PostAddress.date_year(post)
+      was = Translations.for_lang(post, lang)['address_slug'].to_s
+      owed |= ["#{year}/#{was}"] unless was.empty? || was == address
+    end
+    # The entry is written anew on every save -- and the old addresses this
+    # language's text is owed redirects at are not something a save may
+    # drop. They are not text and no editor shows them, so they are carried
+    # across untouched (Translations.former_slugs).
+    one[Translations::FORMER_KEY] = owed unless owed.empty?
+    # ...and so is anything else the entry holds that this save does not
+    # write: a key somebody put there by hand, or one a later version
+    # will. The words are the editor's to replace; the rest is not.
+    entry.each { |key, value| one[key] = value unless one.key?(key) || Translations::TEXT_KEYS.include?(key) || key == Translations::FORMER_KEY }
+    # ...and the one text key no editor shows: a summary written for this
+    # language by hand. The save has nothing to replace it with, and it
+    # was the only key of a translation the documentation names that a
+    # save dropped.
+    one['excerpt'] = entry['excerpt'] if entry.key?('excerpt') && !one.key?('excerpt')
     # A PAGE lives in the root of its language, which is where the engine
     # keeps its own names: a page addressed `assets` in German would be
     # written over /de/assets/ and take the stylesheet down with it. The
     # build refuses such a page in the site's own language and says so;
     # this is the same refusal, one language further in.
     if PostAddress.page?(post) && PostAddress::RESERVED_ROOT_SEGMENTS.include?(address.downcase)
-      abort t('cli.translate_address_reserved', address: address)
+      refuse('address_reserved', t('cli.translate_address_reserved', address: address))
     end
     # Two posts at one address is the one thing an address may not do, and
     # in this language the other posts' addresses are their own translated
@@ -5091,25 +5554,32 @@ def cmd_translate(slug, lang)
         nil
       end
       next false unless other.is_a?(Hash) && other['slug'].to_s != post['slug'].to_s
+      # Only a post with WORDS in this language has a page in its tree. One
+      # that was never written in it is listed there and read at its own
+      # address, so the address it would have here is nobody's -- and this
+      # refused it all the same, saying a post "has that address in this
+      # language" about a post with no page in the language at all.
+      next false unless Translations.languages(other).include?(lang.to_s)
 
       localized = Translations.for_lang(other, lang)
       published_address(localized, localized['address_slug']) == wanted
     end
-    abort t('cli.translate_address_taken', address: address, slug: File.basename(clash.to_s, '.json')) if clash
+    refuse('address_taken', t('cli.translate_address_taken', address: address, slug: File.basename(clash.to_s, '.json'))) if clash
     translations[lang] = one
     said = t('cli.translate_saved', lang: lang, slug: slug)
   end
   updated = post.dup
   translations.empty? ? updated.delete('translations') : updated['translations'] = translations
+  updated['former_slugs'] = Array(post['former_slugs']) + inherited unless inherited.empty?
 
-  # The same guard every editor-backed save carries: the cron may have
-  # published this post while the editor sat open.
   abort_if_post_changed(path, original_raw, slug)
+  # The text as it was, kept before it is written over -- what every save
+  # of the post's own text does, and what `[v]` restores from. A
+  # translation had no way back at all: no version was kept, and a
+  # language taken off left no file on the disk that held its words.
+  PostVersions.keep(path, content_dir: CONTENT_DIR)
   AtomicWrite.write_json(path, updated)
-  discard_editor_buffer
-  puts
-  puts said
-  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+  said
 end
 
 def cmd_edit(slug)
@@ -5145,22 +5615,11 @@ rescue ArgumentError, TypeError
          t('cli.post_date_unreadable', slug: post['slug'].to_s, value: post['date'].inspect))
 end
 
-def edit_post(slug, path: nil)
-  path ||= find_post_path(slug)
-  abort t('cli.post_not_found', slug: slug) unless path
-
-  # Kept to compare against just before the save: an editor session is
-  # open-ended, and the scheduled-publish cron runs every 15 minutes. The
-  # post below was read BEFORE the editor opened, so writing it back after
-  # the cron published the post would revert it to a scheduled draft, drop
-  # the announcement URL it just stored, and let the next cron run publish
-  # -- and announce -- the same post a second time.
-  original_raw = File.read(path, encoding: 'utf-8')
-  post = JSON.parse(original_raw)
-  year = File.basename(File.dirname(path))
-  media_dir = File.join(MEDIA_DIR, year, slug)
-
-  date = post_time!(post)
+# The header and the body `edit` opens a post with. `drafts --json` hands
+# the same text to the phone, with media_dir nil so a picture is named by
+# its bare file name -- what the untrusted parser takes back, and all a
+# phone should learn about where the server keeps its media.
+def edit_markdown_for(post, media_dir)
   edited_card, = split_link_card(post['content'])
   frontmatter = build_frontmatter(
     title: post['title'].to_s,
@@ -5202,12 +5661,32 @@ def edit_post(slug, path: nil)
   # floor -- markdown has no form for it -- and the save would then ask
   # whether to lose the thing the author never touched.
   body = MarkdownWriter.blocks_to_markdown(split_link_card(post['content']).last, media_dir)
+  frontmatter + body
+end
+
+def edit_post(slug, path: nil)
+  path ||= find_post_path(slug)
+  abort t('cli.post_not_found', slug: slug) unless path
+
+  # Kept to compare against just before the save: an editor session is
+  # open-ended, and the scheduled-publish cron runs every 15 minutes. The
+  # post below was read BEFORE the editor opened, so writing it back after
+  # the cron published the post would revert it to a scheduled draft, drop
+  # the announcement URL it just stored, and let the next cron run publish
+  # -- and announce -- the same post a second time.
+  original_raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(original_raw)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+
+  # Unreadable dates refuse here, before the editor opens on them.
+  post_time!(post)
 
   # Recovery is offered per post, not per command: text left over from
   # `edit <this slug>` continues here, text from anything else is named
   # rather than restored (see offer_editor_buffer).
   restored = offer_editor_buffer('edit', slug)
-  opened_with = restored || frontmatter + body
+  opened_with = restored || edit_markdown_for(post, media_dir)
   raw = edit_in_editor(opened_with, FRONTMATTER_HINT, { 'kind' => 'edit', 'slug' => slug })
 
   # Same no-op guard as cmd_add: editor closed without saving (or saved
@@ -5224,17 +5703,179 @@ def edit_post(slug, path: nil)
     return
   end
 
+  new_path, updated = apply_post_edit(slug, path, post, original_raw, raw, interactive: true)
+  puts
+  puts t('cli.edited_label', path: new_path)
+  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+end
+
+# What saving `blocks` over the post would drop, by block type and by
+# formatting span. Shared by the save and by `drafts --json`, which marks a
+# draft the phone cannot edit without losing something.
+#
+# Checks for a drop in every block type, not just images: markdown can't
+# express a link card or a foreign embed (Instagram), so saving would
+# otherwise silently delete them.
+# ...and every formatting SPAN inside them. docs/architecture.md lists
+# `small`, `mention` (carrying an account URL) and `color` (carrying a hex)
+# as span types accepted from imports, and the build renders all three --
+# a mention becomes a real link. MarkdownWriter has no markdown form for
+# any of them, so wrap_markdown falls through to the bare text: the words
+# survive and the span, with whatever it carried, is gone. The block
+# stayed a text block, so counting block types alone said nothing had
+# happened and no confirmation was asked for.
+def edit_content_loss(post, blocks, new_card)
+  # ⚠️ The card the header just created does not stand in for one the body
+  # dropped. Counting by type alone, an edit that ADDS `link:` to a post
+  # whose second link block markdown cannot write keeps the total at one
+  # and says nothing -- the post loses the imported card silently, which
+  # is the exact failure this guard exists to prevent. So the comparison
+  # is made on the blocks as the editor saw them: without the card that
+  # was lifted into the header, and without the one put back from it.
+  blocks_lost(split_link_card(post['content']).last, new_card ? blocks.drop(1) : blocks)
+end
+
+# What `after` has less of than `before`, by block type and by span.
+def blocks_lost(before, after)
+  counts = lambda do |list|
+    Array(list).each_with_object(Hash.new(0)) do |b, h|
+      next unless b.is_a?(Hash)
+
+      h[['block', b['type']]] += 1
+      spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| i.is_a?(Hash) ? Array(i['formatting']) : [] }
+      spans.each { |f| h[['span', f['type']]] += 1 if f.is_a?(Hash) }
+    end
+  end
+  was = counts.call(before)
+  now = counts.call(after)
+  was.filter_map { |type, n| [type, n - now[type]] if n > now[type] }
+end
+
+# What one stored block holds that its own text cannot say: what is gone
+# once the block is written out and read back. Counted on the block
+# without what says nothing -- a span an import wrote down twice, a span
+# of no length -- or a paragraph with one bold range noted twice would be
+# "1x bold" about to be lost by an edit that loses nothing.
+def unsayable_in(block, media_dir)
+  empty = ->(span) { span.is_a?(Hash) && span['start'].is_a?(Integer) && span['end'].is_a?(Integer) && span['end'] <= span['start'] }
+  tidy = ->(spans) { spans.reject(&empty).uniq }
+  said = block.dup
+  said['formatting'] = tidy.call(said['formatting']) if said['formatting'].is_a?(Array)
+  if said['items'].is_a?(Array)
+    said['items'] = said['items'].map { |item| item.is_a?(Hash) && item['formatting'].is_a?(Array) ? item.merge('formatting' => tidy.call(item['formatting'])) : item }
+  end
+  back, = MarkdownParser.parse_body(MarkdownWriter.blocks_to_markdown([block], nil).to_s, media_dir, incoming_dir: nil, confined: true)
+  blocks_lost([said], back)
+rescue StandardError, SystemExit
+  blocks_lost([block], [])
+end
+
+# What a save takes away that its author did not choose to. A block the
+# save does not keep as it stood was removed or rewritten -- and with it
+# goes what its text never showed: a mention an import made of "@pavel",
+# small print, a card markdown has no words for. The words of such a
+# block are the author's to change; what they could not see they could
+# not have meant to lose. A block kept as stored loses nothing, and a
+# plain paragraph taken out is the edit.
+def unchosen_loss(before, stored, media_dir)
+  gone = Array(before).select { |block| block.is_a?(Hash) && Array(stored).none? { |kept| kept.equal?(block) } }
+  gone.each_with_object(Hash.new(0)) { |block, sum| unsayable_in(block, media_dir).each { |kind, n| sum[kind] += n } }.to_a
+end
+
+# Two counts of loss as one: each kind as many times as the larger says.
+def larger_loss(one, other)
+  (one + other).each_with_object(Hash.new(0)) { |(kind, n), sum| sum[kind] = [sum[kind], n].max }.to_a
+end
+
+# The same question for the words of one language: what its text cannot
+# say, and a save of that text back untouched would therefore drop. Asked
+# of the blocks as a save would STORE them -- with every block the text
+# left alone kept as it was -- so a paragraph's kind or a video's player
+# is no loss here; a link card or a player with no address to write is.
+# nil when the text cannot be read back at all.
+def unwritable_translation(entry, media_dir)
+  _, body = MarkdownParser.parse_frontmatter(translation_skeleton(entry, nil))
+  blocks, = MarkdownParser.parse_body(body, media_dir, incoming_dir: nil, confined: true)
+  blocks_lost(entry['content'], keep_untouched_blocks(blocks, entry['content'], {}, media_dir))
+rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
+  nil
+end
+
+# What the post holds that its own text cannot say: what would be gone
+# after saving that text back untouched. This is the loss nobody chose,
+# and the whole of what a save from a file is refused for -- the same
+# question `drafts --json` and `edit --json` answer before the text is
+# handed out (draft_problem). nil when the post's text cannot be read
+# back at all: then nothing was handed out either, and the caller keeps
+# the stricter count.
+def unwritable_content(post, media_dir)
+  # Pictures by bare name, as the text is handed out (draft_entry).
+  meta, body = MarkdownParser.parse_frontmatter(edit_markdown_for(post, nil))
+  blocks, = MarkdownParser.parse_body(body, media_dir, incoming_dir: nil, confined: true)
+  card = link_card_from_frontmatter(meta)
+  blocks.unshift(card) if card
+  # Asked of the blocks as a save would STORE them, with every block the
+  # text left alone kept as it stood -- as unwritable_translation asks.
+  # Asked of the text read back, this named what no save loses any more:
+  # a bold range an import wrote down twice, a link of no length, an
+  # attachment the text reads as a paragraph with a link. Five of the
+  # eleven posts a real archive refused were refused for that, and saved
+  # all the same would have been the same file (second fleet, 9. 10. 2026).
+  edit_content_loss(post, keep_untouched_blocks(blocks, post['content'], {}, media_dir), card)
+rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
+  nil
+end
+
+# The losses named as the author knows them, in the site's language: the
+# summary used to be built as "1x small span", the schema's words, on a
+# Czech screen. A type the locale has no name for -- something a future
+# import brings -- is still named, by its schema word.
+def content_loss_summary(lost)
+  lost.map do |(kind, type), n|
+    t('cli.content_loss_item', count: n,
+                              kind: I18n.lookup("cli.content_kind.#{kind}.#{type}") || type.to_s)
+  end.join(', ')
+end
+
+# Everything `edit` does once it holds the new text: read it back, refuse
+# what cannot be saved, write the post and its media, keep the version it
+# replaces. Answers with the path the post now lives at and the post.
+#
+# interactive: false is the way in for a file that names the post it edits
+# (`add` of a file carrying `edits:`, which is how the phone saves a
+# draft): every question becomes a refusal, because there is nobody to
+# answer it. confined: the untrusted parser -- pictures by bare name, from
+# the post's own media or from incoming/, and nothing else on the machine.
+def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined: false, extra_keys: [],
+                    consume: [], receipt: nil)
+  year = File.basename(File.dirname(path))
+  media_dir = File.join(MEDIA_DIR, year, slug)
+  date = post_time!(post)
+
   meta, new_body = MarkdownParser.parse_frontmatter(raw)
   abort_on_double_frontmatter(new_body)
-  abort_on_unknown_frontmatter(meta)
+  abort_on_unknown_frontmatter(meta, interactive: interactive, extra: extra_keys)
 
-  new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'])
+  new_date = meta['date'].to_s.empty? ? date : parse_frontmatter_date!(meta['date'], interactive: interactive)
   new_title = meta['title'].to_s.empty? ? nil : meta['title']
   new_tags = tags_from_frontmatter(meta['tags'])
   new_type, new_page = frontmatter_type_and_page(meta)
 
-  blocks, media_files, missing = MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR)
-  wait_for_missing_images(missing)
+  blocks, media_files, missing = begin
+    MarkdownParser.parse_body(new_body, media_dir, incoming_dir: INCOMING_DIR, confined: confined)
+  rescue MarkdownParser::Rejected => e
+    refuse('bad_markdown', e.message)
+  rescue MarkdownParser::ConfinedPath => e
+    refuse('bad_reference', t('cli.bad_reference', reference: e.reference))
+  end
+  # Nobody is at a keyboard to upload what is missing: the same refusal
+  # `add` of a file gives, and nothing is written.
+  if interactive
+    wait_for_missing_images(missing)
+  elsif missing.any?
+    refuse('missing_images', t('cli.add_file_missing_images',
+                               files: missing.map { |m| File.basename(m) }.join(', '), dir: INCOMING_DIR))
+  end
   new_card = link_card_from_frontmatter(meta)
   blocks.unshift(new_card) if new_card
   heic_consumed = convert_heic_attachments(blocks, media_files)
@@ -5250,46 +5891,31 @@ def edit_post(slug, path: nil)
   # a service answering.
   restore_embed_lookups(blocks, post['content'])
   resolve_embed_lookups(blocks)
+  blocks = keep_untouched_blocks(blocks, post['content'], media_files, media_dir)
 
-  # Checks for a drop in every block type, not just images: markdown can't
-  # express a link card or a foreign embed (Instagram), so saving would
-  # otherwise silently delete them.
-  # ...and every formatting SPAN inside them. docs/architecture.md lists
-  # `small`, `mention` (carrying an account URL) and `color` (carrying a hex)
-  # as span types accepted from imports, and the build renders all three --
-  # a mention becomes a real link. MarkdownWriter has no markdown form for
-  # any of them, so wrap_markdown falls through to the bare text: the words
-  # survive and the span, with whatever it carried, is gone. The block
-  # stayed a text block, so counting block types alone said nothing had
-  # happened and no confirmation was asked for.
-  counts = lambda do |list|
-    list.each_with_object(Hash.new(0)) do |b, h|
-      h[['block', b['type']]] += 1
-      spans = Array(b['formatting']) + Array(b['items']).flat_map { |i| Array(i['formatting']) }
-      spans.each { |f| h[['span', f['type']]] += 1 }
-    end
+  lost = edit_content_loss(post, blocks, new_card)
+  # From a file the question is a different one. At a keyboard anything
+  # that goes is asked about, and a yes is cheap. A file has nobody to
+  # ask -- and what it must not do is lose what its author never saw
+  # going: a card or a span markdown has no words for. A paragraph, a
+  # picture or a rule the author took out of the text they were shown is
+  # not that; it is the edit. Counting it as a loss meant a post could
+  # not be made SHORTER from the app at all (fleet, 8. 10. 2026).
+  unless interactive
+    # Two things, and the larger of them: what saving the text back
+    # untouched would lose (which is why such a post was not offered for
+    # editing), and what THIS save loses in the blocks it rewrote.
+    never_seen = unwritable_content(post, media_dir)
+    lost = larger_loss(never_seen, unchosen_loss(split_link_card(post['content']).last, blocks, media_dir)) if never_seen
   end
-  # ⚠️ The card the header just created does not stand in for one the body
-  # dropped. Counting by type alone, an edit that ADDS `link:` to a post
-  # whose second link block markdown cannot write keeps the total at one
-  # and says nothing -- the post loses the imported card silently, which
-  # is the exact failure this guard exists to prevent. So the comparison
-  # is made on the blocks as the editor saw them: without the card that
-  # was lifted into the header, and without the one put back from it.
-  before = counts.call(split_link_card(post['content']).last)
-  after = counts.call(new_card ? blocks.drop(1) : blocks)
-  lost = before.filter_map { |type, n| [type, n - after[type]] if n > after[type] }
   if lost.any?
+    summary = content_loss_summary(lost)
+    # Without a keyboard there is nobody to say "yes, lose it": refused,
+    # nothing written. The phone is offered no such draft in the first
+    # place (`drafts --json` marks it), so this is the second line.
+    refuse('content_lost', t('cli.content_lost_from_file', summary: summary)) unless interactive
     puts
-    # Named as the author knows them, in the site's language: the summary
-    # used to be built here as "1x small span", the schema's words, on a
-    # Czech screen. A type the locale has no name for -- something a future
-    # import brings -- is still named, by its schema word.
-    summary = lost.map do |(kind, type), n|
-      t('cli.content_loss_item', count: n,
-                                kind: I18n.lookup("cli.content_kind.#{kind}.#{type}") || type.to_s)
-    end
-    puts t('cli.content_loss_warning', summary: summary.join(', '))
+    puts t('cli.content_loss_warning', summary: summary)
     # The word is compared against the locale's own confirm_word -- the
     # Czech prompt says to type "ano", so comparing against a hardcoded
     # 'yes' aborted exactly the users who followed the instruction.
@@ -5399,7 +6025,7 @@ def edit_post(slug, path: nil)
   if moving
     taken = AddressGuard.occupant(updated, content_dir: CONTENT_DIR, slug: slug,
                                   except: path, path: new_path)
-    abort t('cli.post_already_exists', slug: slug, path: taken) if taken
+    refuse('post_exists', t('cli.post_already_exists', slug: slug, path: taken)) if taken
   end
 
   carried = Array(post['former_slugs']).map(&:to_s)
@@ -5423,7 +6049,15 @@ def edit_post(slug, path: nil)
   # public/write/r/<receipt>.json and the next prune deleted it, so the page
   # asked every three seconds for five minutes about a post that had gone
   # out perfectly well.
-  updated['receipt'] = post['receipt'] if post['receipt']
+  # A post edited from the phone carries the receipt of THAT send, so the
+  # page that sent it can ask after it; anything else keeps the one it has.
+  fresh = receipt.to_s.strip
+  refuse('bad_receipt', t('cli.receipt_shape')) unless fresh.empty? || PathSafety.hex_token?(fresh)
+  if !fresh.empty?
+    updated['receipt'] = fresh
+  elsif post['receipt']
+    updated['receipt'] = post['receipt']
+  end
   # And everything else the editor never showed is the post's to keep. The
   # save rebuilt the post from a list of what to carry, so whatever the
   # list had not heard of was dropped: every translation of a post went
@@ -5453,7 +6087,7 @@ def edit_post(slug, path: nil)
   # The text isn't lost either way: the editor buffer holds it and the
   # notice armed at edit time says where.
   if !File.exist?(path) || File.read(path, encoding: 'utf-8') != original_raw
-    abort t('cli.post_changed_while_editing', slug: slug)
+    refuse('changed', t('cli.post_changed_while_editing', slug: slug))
   end
 
   # The one place a post's TEXT is replaced by a person, so the one place
@@ -5513,15 +6147,30 @@ def edit_post(slug, path: nil)
       File.delete(File.join(new_media_dir, f)) unless keep.include?(f)
     end
   end
-  discard_editor_buffer
+  discard_editor_buffer if interactive
   File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
+  # A bare name the post already has means the file the post has: that is
+  # what lets a second save find its pictures. So a NEW file sent under
+  # such a name -- the natural way to try to replace a picture -- was not
+  # looked at, the answer was a success with no word about it, and the
+  # file lay in incoming/ to be met again by the next save that names it.
+  # Said, and where nobody is at a keyboard the file is tidied with the
+  # rest of what this text named.
+  brought = media_files.keys.map { |source| File.expand_path(source.to_s) }
+  shadowed = []
+  each_media_entry(updated['content']) do |entry|
+    name = entry['url'].to_s
+    waiting = File.join(INCOMING_DIR, name)
+    next if name.empty? || File.basename(name) != name || !File.file?(waiting) || brought.include?(File.expand_path(waiting))
+
+    shadowed << waiting
+  end
+  shadowed.uniq.each { |waiting| warn t('cli.edit_incoming_name_taken', file: File.basename(waiting)) }
   # Housekeeping only, and it runs last on purpose: an incoming/ the CLI
   # user can't unlink in must not be able to abort a save that already
   # succeeded.
-  cleanup_incoming(media_files, heic_consumed)
-  puts
-  puts t('cli.edited_label', path: new_path)
-  draft?(updated) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+  cleanup_incoming(media_files, heic_consumed + consume + (interactive ? [] : shadowed.uniq))
+  [new_path, updated]
 end
 
 # Confirm-by-typing-slug + move to trash, shared by the standalone
@@ -5553,25 +6202,29 @@ def retract_announcements(post)
   [toot_gone, skeet_gone]
 end
 
-def delete_post(slug, path: nil)
+# `confirmed:` is `delete --yes`: the slug typed before the command ran.
+# Returns the trash directory, or false when the person declined.
+def delete_post(slug, path: nil, confirmed: false)
   path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
-  text = post['content'].find { |b| b['type'] == 'text' }
-  puts "#{post['date']}  #{post['title'] || text&.fetch('text', '')&.slice(0, 60)}"
-  # Said BEFORE the confirmation, not after it: deleting the post takes
-  # the announcement down with it, and that part cannot be undone by
-  # `restore` -- the thread and whatever was said under it are gone for
-  # good. One confirmation is enough, as long as it is an informed one.
-  announced = [post['mastodon_url'], post['bluesky_url']].compact
-  puts t('cli.delete_takes_announcement', url: announced.first) unless announced.empty?
-  print t('cli.confirm_delete', slug: slug)
-  confirmation = $stdin.gets&.strip
-  unless confirmation == slug
-    puts t('cli.cancelled')
-    puts
-    return false
+  unless confirmed
+    text = post['content'].find { |b| b['type'] == 'text' }
+    puts "#{post['date']}  #{post['title'] || text&.fetch('text', '')&.slice(0, 60)}"
+    # Said BEFORE the confirmation, not after it: deleting the post takes
+    # the announcement down with it, and that part cannot be undone by
+    # `restore` -- the thread and whatever was said under it are gone for
+    # good. One confirmation is enough, as long as it is an informed one.
+    announced = [post['mastodon_url'], post['bluesky_url']].compact
+    puts t('cli.delete_takes_announcement', url: announced.first) unless announced.empty?
+    print t('cli.confirm_delete', slug: slug)
+    confirmation = $stdin.gets&.strip
+    unless confirmation == slug
+      puts t('cli.cancelled')
+      puts
+      return false
+    end
   end
 
   year = File.basename(File.dirname(path))
@@ -5641,7 +6294,7 @@ def delete_post(slug, path: nil)
   end
 
   puts t('cli.deleted_label', slug: slug, path: trash_dir)
-  true
+  trash_dir
 end
 
 def cmd_delete(slug)
@@ -5660,7 +6313,7 @@ end
 # somebody's undo.
 def trashed_paths(slug)
   (PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'post.json') +
-   [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) }.uniq.sort
+   [File.join(TRASH_DIR, slug, 'post.json')]).select { |f| File.file?(f) && PathGlob.named?(File.dirname(f), slug) }.uniq.sort
 end
 
 # Mirrors pick_among_years, over what is in the trash rather than what is
@@ -5703,7 +6356,7 @@ end
 # post.json to bring back, only files. `check --repair` promises the trash
 # is somewhere restore can reach, and this is the half that makes it true.
 def trashed_media_dirs(slug)
-  PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) }.sort
+  PathGlob.under(TRASH_DIR, '*', PathGlob.literal(slug), 'media').select { |d| File.directory?(d) && PathGlob.named?(File.dirname(d), slug) }.sort
 end
 
 # Files a filesystem leaves behind rather than files anybody wrote. Kept out
@@ -5783,6 +6436,24 @@ def cmd_restore(slug)
   # Two years of the same slug can sit in the trash at once now, so the
   # same rule as everywhere else applies: never guess, show both and ask.
   trash_json = found.size == 1 ? found.first : pick_among_trashed(slug, found)
+  new_path = restore_post(slug, trash_json)
+  post = JSON.parse(File.read(new_path, encoding: 'utf-8'))
+
+  if draft?(post)
+    unless rebuild_and_deploy(t('cli.updating_preview'))
+      warn t('cli.draft_saved_preview_pending', slug: slug)
+      warn ''
+      return
+    end
+    draft_decision_loop(slug, path: new_path)
+  else
+    maybe_rebuild
+  end
+end
+
+# The move out of the trash itself, shared with `restore --json`: post,
+# media and history back where they were. Returns the post's new path.
+def restore_post(slug, trash_json)
   trash_dir = File.dirname(trash_json)
 
   post = JSON.parse(File.read(trash_json, encoding: 'utf-8'))
@@ -5818,17 +6489,7 @@ def cmd_restore(slug)
   FileUtils.rm_rf(trash_dir)
 
   puts t('cli.restored_label', path: new_path)
-
-  if draft?(post)
-    unless rebuild_and_deploy(t('cli.updating_preview'))
-      warn t('cli.draft_saved_preview_pending', slug: slug)
-      warn ''
-      return
-    end
-    draft_decision_loop(slug, path: new_path)
-  else
-    maybe_rebuild
-  end
+  new_path
 end
 
 # One post file -> the summary row that `list` and the pick_*_interactively
@@ -5840,12 +6501,28 @@ end
 # reach for to find the bad post were exactly the ones that stopped
 # working. Skipping it keeps the rest of the archive usable; the build
 # still refuses to run until it's dealt with.
+def summary_year(file)
+  folder = File.basename(file) == 'post.json' ? File.dirname(File.dirname(file)) : File.dirname(file)
+  year = File.basename(folder)
+  year.match?(/\A\d{4}\z/) ? year : nil
+end
+
 def post_summary(file)
   post = JSON.parse(File.read(file, encoding: 'utf-8'))
   # Valid JSON of the wrong shape is as unusable as unparseable JSON, and
   # left to itself it crashes further along with no file named.
   raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)
 
+  post_summary_of(post, file)
+rescue JSON::ParserError, SystemCallError => e
+  warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
+  nil
+end
+
+# The row itself, from a post already read -- the search index keeps one
+# per post beside its words (lib/search_index.rb), so a search does not
+# read the archive twice.
+def post_summary_of(post, file)
   { slug: post['slug'], date: post['date'], title: post['title'],
     type: ContentType.dominant(post), tags: post['tags'] || [],
     state: post['state'] || PUBLISHED, scheduled: post['scheduled'],
@@ -5853,10 +6530,13 @@ def post_summary(file)
     # already has, instead of asking somebody to spell one again -- which
     # is how an archive grows two series that differ by a capital letter.
     series: post['series'],
-    pinned: truthy_frontmatter?(post['pinned']) }
-rescue JSON::ParserError, SystemCallError => e
-  warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100])
-  nil
+    pinned: truthy_frontmatter?(post['pinned']),
+    # The year of the file, for a caller that reads `list --json`: the
+    # same slug can live in two years, and a program picking one of them
+    # has nothing else to tell them apart by. A trashed post sits one
+    # level deeper (trash/<year>/<slug>/post.json); a flat trash/<slug>/
+    # from before the trash grew years has no year to give.
+    year: summary_year(file) }
 end
 
 # `list` is the plain-text face for pipes and scripts, and keeps the
@@ -5902,8 +6582,851 @@ def load_posts_summary
   PathGlob.under(CONTENT_DIR, '*', '*.json').filter_map { |f| post_summary(f) }
 end
 
+# `./blog.sh drafts [--json] [<slug>]` -- the drafts, each with what the
+# phone needs to edit it: the text as `edit` would open it (pictures by
+# bare name, see edit_markdown_for), the media it has, where its preview
+# lives -- the build copies a draft's media next to that hidden page, so
+# the phone shows them from there instead of fetching them over SSH --
+# and the digest that `base:` hands back, so a draft that changed in the
+# meantime is refused instead of overwritten (edit_from_file).
+#
+# The texts travel back to the phone inside an address (scripts/receive.sh
+# answers, the shortcut opens /write/#b=<base64>), so they are handed out
+# up to a budget, newest first; a draft past it comes without its text,
+# and the phone asks for that one by name. Every draft is LISTED either
+# way.
+DRAFTS_TEXT_BUDGET = 48_000
+
+# What a reader would call the post: its own title, a link block's, or its
+# opening words -- the rule the build titles pages by.
+def post_name_for(post)
+  return post['title'].to_s unless post['title'].to_s.strip.empty?
+
+  block = PostText.link_title_block(post)
+  return block['title'].to_s if block
+
+  name, = PostText.name_and_rest(post.merge('title' => nil))
+  name || post['slug'].to_s
+end
+
+# Why the phone cannot edit a draft, or nil when it can. Asked of the very
+# text it would be handed: read back through the untrusted parser, every
+# picture has to be in the draft's own media, and nothing may be lost
+# that markdown has no words for -- the phone cannot answer the question
+# `edit` asks about that, so it is never offered such a draft.
+def draft_problem(post, text, media_dir)
+  meta, body = MarkdownParser.parse_frontmatter(text)
+  blocks, _files, missing = MarkdownParser.parse_body(body, media_dir, incoming_dir: nil, confined: true)
+  return 'missing_media' if missing.any?
+
+  card = link_card_from_frontmatter(meta)
+  blocks.unshift(card) if card
+  # The same question the save asks (unwritable_content), so a post is
+  # marked uneditable exactly when its save would be refused.
+  edit_content_loss(post, keep_untouched_blocks(blocks, post['content'], {}, media_dir), card).any? ? 'content_lost' : nil
+rescue MarkdownParser::Rejected, MarkdownParser::ConfinedPath, SystemExit
+  'unreadable'
+end
+
+def draft_entry(path, with_text:)
+  raw = File.read(path, encoding: 'utf-8')
+  post = JSON.parse(raw)
+  slug = post['slug'].to_s
+  media_dir = File.join(MEDIA_DIR, File.basename(File.dirname(path)), slug)
+  text = edit_markdown_for(post, nil)
+  problem = draft_problem(post, text, media_dir)
+  media = Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []
+  {
+    'slug' => slug,
+    'title' => post_name_for(post),
+    'date' => post_time!(post).iso8601,
+    'scheduled' => post['scheduled'] == true,
+    'editable' => problem.nil?,
+    'problem' => problem,
+    'text' => with_text ? text : nil,
+    'media' => media,
+    'preview' => PostAddress.path(post),
+    'base' => Digest::SHA256.hexdigest(raw)
+  }
+end
+
+# `edit <slug> --json`: one post, any state, with what a program needs to
+# edit its text elsewhere -- the same entry `drafts --json` hands out for
+# a draft, for a published post too. The text comes back through `add` of
+# a file saying `edits: <slug>` and `base: <digest>` (edit_from_file).
+def cmd_edit_json(slug)
+  answer_json do
+    path, = post_for_json(slug)
+    { 'ok' => true, 'post' => draft_entry(path, with_text: true) }
+  end
+end
+
+def cmd_drafts(json:, slug: nil)
+  JSON_REFUSALS[:enabled] = json
+  paths = PathGlob.under(CONTENT_DIR, '*', '*.json').select do |f|
+    post = JSON.parse(File.read(f, encoding: 'utf-8'))
+    post.is_a?(Hash) && draft?(post)
+  rescue JSON::ParserError, SystemCallError
+    false
+  end
+  if slug
+    paths.select! { |f| File.basename(f, '.json') == slug }
+    # A reading, so the sentence is about a draft that is not there --
+    # not "nothing was written", which is what a failed SAVE says.
+    refuse('not_found', t('cli.draft_not_found', slug: slug)) if paths.empty?
+  end
+  # `omitted` on every entry, false where the text is there: a key that
+  # is only sometimes present is one a reader has to guess the absence of.
+  entries = paths.map { |f| draft_entry(f, with_text: true).merge('omitted' => false) }
+                 .sort_by { |e| e['date'] }.reverse
+  unless slug
+    spent = 0
+    entries.each do |e|
+      next unless e['text']
+
+      if spent + e['text'].bytesize > DRAFTS_TEXT_BUDGET
+        e['text'] = nil
+        e['omitted'] = true
+      else
+        spent += e['text'].bytesize
+      end
+    end
+  end
+  if json
+    puts JSON.pretty_generate('ok' => true, 'drafts' => entries)
+    return
+  end
+  if entries.empty?
+    puts t('cli.drafts_none')
+    return
+  end
+  entries.each do |e|
+    marks = []
+    marks << t('cli.mark_scheduled') if e['scheduled']
+    marks << t("cli.drafts_problem_#{e['problem']}") if e['problem']
+    line = "#{e['date'][0, 10]}  #{e['slug']}  #{e['title'].to_s.gsub(/\s+/, ' ')[0, 60]}"
+    puts marks.empty? ? line : "#{line}  #{Tui.paint(marks.join(' · '), :yellow)}"
+  end
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
+end
+
+# --- answers for a program (--json) ---------------------------------------
+#
+# `list --json`, `props <slug> --json` and `queue --json`: the three
+# screens somebody reads BEFORE acting, as data. A program that cannot
+# press a key in a dialog -- a phone app, a script -- reads these and then
+# calls the command whose answer it wants. The promise is the one `add
+# --json` makes: one object on standard output, every key always present,
+# a refusal as an object with "ok":false and a zero exit -- a caller that
+# has to test for a missing key is a caller writing its own parser.
+
+# `search` says the query back (nil when there was none): an engine from
+# before the flag ignores it and answers with the whole archive, and the
+# key is how a program tells "everything matched" from "nobody searched".
+# `match` is the line that says why a row is in the results, the one the
+# screen shows under the cursor; nil when the hit is in the title or a tag.
+def list_as_json(posts, search: nil)
+  rows = posts.map do |p|
+    { 'slug' => p[:slug], 'year' => p[:year], 'date' => p[:date], 'title' => p[:title],
+      'type' => p[:type], 'tags' => p[:tags], 'state' => p[:state],
+      'scheduled' => p[:scheduled] == true, 'series' => p[:series], 'pinned' => p[:pinned],
+      'match' => p[:match] }
+  end
+  puts JSON.pretty_generate('ok' => true, 'posts' => rows, 'count' => rows.size,
+                            'drafts' => posts.count { |p| p[:state] == DRAFT }, 'search' => search)
+end
+
+# The properties screen as data, with the keys it would offer named as
+# actions -- so a program learns what applies to THIS post (a scheduled
+# draft can be unscheduled, a published post on a site with a network can
+# be announced) without re-deriving the rules of the screen.
+def props_as_json(slug)
+  path = find_post_path(slug, ask: false)
+  refuse('not_found', t('cli.post_not_found', slug: slug).strip) unless path
+
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  year = File.basename(File.dirname(path))
+  draft = draft?(post)
+  network = SiteConfig.comment_network
+  announced = Publishing.announcement_url(post)
+  # The same ladder props_frame_lines climbs, as a word instead of a
+  # sentence: what the screen SAYS about the announcement is translated,
+  # what a program needs is which of the six cases it is.
+  announces = if announced then 'announced'
+              elsif network.nil? then 'nowhere'
+              elsif Publishing.unlisted?(post) then 'never_unlisted'
+              elsif !Publishing.announces? then 'no_secret'
+              elsif draft then 'on_publish'
+              else 'not_announced'
+              end
+  actions = if draft
+              %w[publish schedule properties rename delete] + (post['scheduled'] ? %w[unschedule] : [])
+            else
+              %w[unpublish pin properties rename addresses delete] + (network ? %w[announce] : [])
+            end
+  actions << 'versions' unless PostVersions.list(slug, year, content_dir: CONTENT_DIR).empty?
+  own = SiteConfig.get('site', 'lang', default: 'en').to_s
+  {
+    'ok' => true,
+    'slug' => post['slug'], 'year' => year, 'path' => path,
+    'title' => post_name_for(post),
+    'state' => post['state'] || PUBLISHED,
+    'scheduled' => post['scheduled'] == true,
+    # A plain draft has no time -- the screen shows none, for the reason
+    # row_date gives -- so the answer says so rather than handing out the
+    # bookkeeping timestamp as if it meant something.
+    'date' => draft && !post['scheduled'] ? nil : post_time!(post).iso8601,
+    'url' => if draft then props_preview_url(post)
+             elsif SITE_BASE_URL.to_s.empty? then ''
+             else published_url(post['slug'], post_time!(post).year, page: PostAddress.page?(post))
+             end,
+    'address' => PostAddress.path(post),
+    'type' => ContentType.dominant(post),
+    # The [e] rows a program sets: the type the post says for itself (nil
+    # when the content decides), and the two three-state flags in the
+    # words --set takes back.
+    'type_set' => post['type'].to_s.empty? ? nil : post['type'].to_s,
+    'hero' => if post.key?('hero') then truthy_frontmatter?(post['hero']) ? 'yes' : 'no' else 'default' end,
+    'toc' => if post['toc'].nil? then 'default' else truthy_frontmatter?(post['toc']) ? 'yes' : 'no' end,
+    'tags' => post['tags'] || [],
+    'series' => post['series'].to_s.strip.empty? ? nil : post['series'].to_s,
+    'series_part' => post['series_part'].to_s.empty? ? nil : post['series_part'].to_s,
+    'pinned' => truthy_frontmatter?(post['pinned']),
+    'unlisted' => Publishing.unlisted?(post),
+    # allow_partial: whether the site lets a post out without the words of
+    # every language (publishing.allow_partial) -- so a program knows not
+    # to ask what the engine is not going to ask either.
+    'languages' => { 'own' => own,
+                     'others' => other_languages.to_h { |lang| [lang, language_state(post, lang).to_s] },
+                     'allow_partial' => partial_allowed? },
+    'announced' => announced,
+    'announces' => announces,
+    # Which network [t] would announce on, so a program knows whether to
+    # call toot or bluesky -- and the slot the schedule dialog would offer
+    # a plain draft, so it can offer the same.
+    'network' => network&.to_s,
+    'slot' => draft && !post['scheduled'] ? next_publish_slot(slug)&.iso8601 : nil,
+    'addresses' => address_entries(post).map { |kind, value| { 'kind' => kind, 'value' => value } },
+    'actions' => actions
+  }
+end
+
+# One command's answer as an object. The block returns it; a Refused is
+# printed as the refusal object; and an abort reached INSIDE the engine --
+# prose meant for a terminal, from a guard that predates --json -- is
+# printed as one too, under the code the caller names, so the promise of
+# an object and a zero exit holds whichever guard spoke. (abort's message
+# has already gone to stderr by then, which the receiver throws away.)
+#
+# writes: the command changes a post, and then all of it -- the reading of
+# the post, the questions asked of it, the write and the rebuild that may
+# follow -- is one turn under the lock every writer of the archive takes
+# (as_the_one_writer). The label is what a held lock says it is held for.
+def answer_json(abort_code = 'refused', writes: nil)
+  JSON_REFUSALS[:enabled] = true
+  puts JSON.pretty_generate(writes ? as_the_one_writer(writes) { yield } : yield)
+rescue Refused => e
+  puts JSON.generate('ok' => false, 'error' => e.code, 'message' => e.message)
+  exit 0
+rescue SystemExit => e
+  raise if e.success?
+
+  puts JSON.generate('ok' => false, 'error' => abort_code, 'message' => e.message.to_s.strip)
+  exit 0
+end
+
+def cmd_props_json(slug)
+  answer_json { props_as_json(slug) }
+end
+
+# One writer of a post at a time, whichever command it came by. Each of
+# them read the post, asked its questions and wrote the whole file back,
+# and only `props --set` did so under a lock -- so a `--set` sent together
+# with an unpublish, a rename, a publish or a delete saw both answer ok
+# and its change gone with the other one's write, and with a delete the
+# post ended up in the trash AND in the archive, written back by the
+# `--set` that had read it first (second fleet, 9. 10. 2026). The lock is
+# the archive's own, so a build in progress is `busy` to all of them as it
+# has been to `--set` and `schedule`; a text sent as a file is not among
+# them -- it carries the digest of what it edited and is refused as
+# `changed` instead.
+def as_the_one_writer(label)
+  answer = RunLock.hold(ROOT, label: label, quiet: true) { yield }
+  refuse('busy', t('cli.busy_for_program')) if answer == RunLock::BUSY
+  answer
+end
+
+# The post a program resolves by slug, or the refusal: the two answers
+# every action below opens with.
+def post_for_json(slug)
+  path = find_post_path(slug, ask: false)
+  refuse('not_found', t('cli.post_not_found', slug: slug).strip) unless path
+
+  raw = File.read(path, encoding: 'utf-8')
+  [path, raw, JSON.parse(raw)]
+end
+
+# The address a program is handed for a post in whatever state it is now:
+# the draft preview for a draft, the public one for a post that is out --
+# and nothing where the site has no base URL, for the reason report_added
+# gives (a hostless fragment under a key called url is a lie).
+def url_for_json(post)
+  return '' if SITE_BASE_URL.to_s.empty?
+
+  draft?(post) ? draft_url(post) : published_url(post['slug'], post_time!(post).year, page: PostAddress.page?(post))
+end
+
+# What an action says about the post it acted on: the keys `add --json`
+# and `publish --json` answer with, plus whether the site was rebuilt.
+# `deploy` is 'skipped' when the caller did not ask for a rebuild (the
+# terminal would have asked them; a program says --rebuild or nothing).
+def deploy_word(rebuilt)
+  if rebuilt.nil? then 'skipped'
+  elsif rebuilt then 'done'
+  else 'pending'
+  end
+end
+
+def acted_answer(path, warnings, rebuilt: nil)
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  {
+    'ok' => true,
+    'slug' => post['slug'],
+    'path' => path,
+    'state' => post['state'] || PUBLISHED,
+    'scheduled' => post['scheduled'] == true,
+    # nil for a plain draft, the rule props_as_json follows.
+    'date' => draft?(post) && !post['scheduled'] ? nil : post_time!(post).iso8601,
+    'url' => url_for_json(post),
+    'deploy' => deploy_word(rebuilt),
+    'warnings' => warnings
+  }
+end
+
+# The terminal asks "rebuild now?" after an action that changes a live
+# page (maybe_rebuild); a program says --rebuild. nil means not asked.
+def rebuild_if_asked(rebuild, warnings)
+  return nil unless rebuild
+
+  deployed, more = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+  warnings.concat(more)
+  deployed
+end
+
+# `schedule <slug> --at <time> --json`, `--cancel`: the [s] and [n] keys of
+# a draft's properties, with the date typed in advance. --compact after
+# --cancel is the "shift the posts behind it forward?" question answered
+# yes, the way the queue screen asks it.
+def schedule_as_json(slug, at:, cancel:, compact:, allow_partial:)
+  answer_json(writes: 'schedule') do
+    path, raw, post = post_for_json(slug)
+    refuse('already_published', t('cli.schedule_only_drafts', slug: slug)) unless draft?(post)
+    if cancel
+      refuse('not_scheduled', t('cli.schedule_not_scheduled', slug: slug)) unless post['scheduled']
+      entries = queue_entries
+      index = entries.index { |e| File.expand_path(e[:path]) == File.expand_path(path) }
+      rest = index ? entries[(index + 1)..] : []
+      freed = post_time!(post)
+      done, warnings = quietly(true, keep_stdout: true) { unschedule_post(path, post, slug, raw: raw) }
+      refuse('busy', t('cli.busy_for_program')) unless done
+      warnings = without_own_report(warnings, 'cli.unscheduled_label')
+      moved = 0
+      if compact
+        moved, more = quietly(true, keep_stdout: true) { compact_queue(freed, rest) }
+        warnings.concat(without_own_report(more, 'cli.queue_compacted'))
+      end
+      acted_answer(find_post_path(slug, ask: false) || path, warnings).merge('position' => nil, 'compacted' => moved)
+    else
+      refuse('schedule_needs_at', t('cli.schedule_json_needs_at')) if at.nil?
+      # In the SITE's time, whatever zone the moment was said in: an app
+      # sends an instant in UTC, and written down as it came the post was
+      # dated ...Z -- and filed under UTC's year, which around a New
+      # Year's midnight is not the site's. And a day the calendar does not
+      # have is refused: Time.parse reads 30 February as 2 March and says
+      # nothing.
+      # The calendar was asked only of a moment written YYYY-M-D; written
+      # any other way Time.parse reads -- 2027/02/30, 30.2.2027, 20270230 --
+      # the thirtieth of February went through as the second of March, and
+      # a year of five digits founded posts/12027/. So a program says the
+      # moment one way, the way the answer says it back: YYYY-MM-DD, a
+      # space or a T, HH:MM, seconds and a zone if it likes -- or the time
+      # alone, for today, as the dialog takes it.
+      time = begin
+        said = at.to_s.strip
+        # The time is not optional: a day alone went through as its
+        # midnight, which the documentation said it would not.
+        whole = said.match(/\A(\d{4})-(\d{1,2})-(\d{1,2})[ T]\d{1,2}:\d{2}(?::\d{2}(?:\.\d+)?)?\s*(?:Z|[+-]\d{2}:?\d{2})?\z/i)
+        if whole
+          Date.valid_date?(*whole.captures.map(&:to_i)) ? Time.parse(said).getlocal : nil
+        elsif said.match?(/\A\d{1,2}:\d{2}\z/)
+          Time.parse(said)
+        end
+      rescue ArgumentError, TypeError
+        nil
+      end
+      refuse('bad_date', t('cli.schedule_date_invalid')) if time.nil?
+      refuse('not_future', t('cli.schedule_date_not_future')) if time <= Time.now
+      refuse_partial!(post, slug, allow_partial, json: true) unless post['scheduled']
+      others = scheduled_entries(except_slug: slug)
+      new_path, warnings = quietly(true, keep_stdout: true) { write_scheduled_date(path, post, time, raw: raw) }
+      refuse('busy', t('cli.busy_for_program')) if new_path.nil?
+      acted_answer(new_path, warnings).merge('position' => others.count { |entry| entry.first <= time } + 1,
+                                             'compacted' => 0)
+    end
+  end
+end
+
+# `unpublish <slug> --yes --json`: the typed slug replaced by the flag.
+def unpublish_as_json(slug)
+  answer_json(writes: 'unpublish') do
+    path, _raw, post = post_for_json(slug)
+    refuse('already_draft', t('cli.already_draft', slug: slug, url: draft_url(post))) if draft?(post)
+    (_, kept), warnings = quietly(true, keep_stdout: true) { unpublish_post(path, post, slug) }
+    # The preview of the draft it has become, the way the terminal rebuilds
+    # it before opening the draft dialog -- not asked, because the live
+    # page has to come down either way.
+    deployed, more = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+    acted_answer(path, warnings + more, rebuilt: deployed).merge('announcement_kept' => kept)
+  end
+end
+
+# `delete <slug> --yes --json`: into the trash, the slug typed in advance.
+# What a run SAID is caught whole, and its last line is usually that it
+# worked -- "Deleted (in the trash ...): /abs/path". That is the screen's
+# way of answering; a program has the object for it, and the sentence then
+# stood among the warnings, where an app shows it to a person as one.
+# Told from a warning by how the locale's own sentence begins.
+def without_own_report(lines, *keys)
+  heads = keys.map { |key| I18n.lookup(key).to_s.split('%{').first.to_s.strip }.reject(&:empty?)
+  lines.reject { |line| heads.any? { |head| line.start_with?(head) } }
+end
+
+def delete_as_json(slug, rebuild:)
+  answer_json(writes: 'delete') do
+    path, _raw, = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    trash_dir, warnings = quietly(true, keep_stdout: true) { delete_post(slug, path: path, confirmed: true) }
+    warnings = without_own_report(warnings, 'cli.deleted_label')
+    trashed = JSON.parse(File.read(File.join(trash_dir, 'post.json'), encoding: 'utf-8'))
+    deployed = rebuild_if_asked(rebuild, warnings)
+    { 'ok' => true, 'slug' => slug, 'year' => year, 'trash' => trash_dir,
+      'announcement_kept' => [trashed['mastodon_url'], trashed['bluesky_url']].compact,
+      'deploy' => deploy_word(deployed),
+      'warnings' => warnings }
+  end
+end
+
+# `restore --json`: what the trash holds, the rows the picker would offer.
+def trash_as_json
+  answer_json do
+    rows = trash_summary.sort_by { |p| p[:date].to_s }.reverse.map do |p|
+      { 'slug' => p[:slug], 'year' => p[:year], 'date' => p[:date], 'title' => p[:title],
+        'type' => p[:type], 'tags' => p[:tags] || [], 'state' => p[:state],
+        # The media `check --repair` set aside for a post that was never
+        # deleted: restorable, but not a post.
+        'media_only' => p[:type].nil? }
+    end
+    { 'ok' => true, 'trash' => rows }
+  end
+end
+
+# `restore <slug> --json`: back from the trash, as a program would.
+def restore_as_json(slug, rebuild:)
+  answer_json(writes: 'restore') do
+    found = trashed_paths(slug)
+    if found.empty?
+      refuse('media_only', t('cli.restore_media_json', slug: slug)) unless trashed_media_dirs(slug).empty?
+      refuse('not_found', t('cli.nothing_in_trash', slug: slug).strip)
+    end
+    refuse('ambiguous_slug', t('cli.ambiguous_slug', slug: slug, count: found.size)) if found.size > 1
+    new_path, warnings = quietly(true, keep_stdout: true) { restore_post(slug, found.first) }
+    warnings = without_own_report(warnings, 'cli.restored_label')
+    deployed = rebuild_if_asked(rebuild, warnings)
+    acted_answer(new_path, warnings, rebuilt: deployed)
+  end
+end
+
+# `rebuild --json`: the same build and deploy, the lines it would print
+# kept out of the answer. A held lock is a refusal a program can retry.
+def rebuild_as_json(full:, force:)
+  answer_json do
+    ok, warnings = quietly(true) { rebuild_and_deploy(nil, full: full, force: force) }
+    unless ok
+      refuse('busy', t('cli.busy_for_program')) if Publishing.stopped_on_busy_lock?
+      refuse('rebuild_failed', warnings.last(6).join(' '))
+    end
+    { 'ok' => true, 'deploy' => 'done', 'warnings' => warnings }
+  end
+end
+
+# `empty trash|versions --json`: the count and the size the terminal asks
+# somebody to type back; with --yes, the deletion too.
+def empty_as_json(what, yes:)
+  answer_json do
+    case what
+    when 'trash'
+      dirs = trashed_dirs
+      count = dirs.length
+      size = dirs.sum { |d| dir_size(d) }
+      sweep_trash(dirs) if yes && count.positive?
+    when 'versions'
+      doomed = doomed_versions
+      count = doomed.length
+      size = doomed.sum { |f| File.size(f) }
+      doomed.each { |f| File.unlink(f) } if yes && count.positive?
+    else
+      refuse('empty_what', t('cli.empty_what'))
+    end
+    # `size` is always words: FileSize.human has none for nothing at all.
+    { 'ok' => true, 'what' => what, 'count' => count, 'bytes' => size, 'size' => FileSize.human(size) || '0 B',
+      'emptied' => yes && count.positive? }
+  end
+end
+
+# `toot <slug> --json` / `bluesky <slug> --json`: the announcement sent by
+# hand, with every reason it would not be as a code. --force answers the
+# "this post is old -- announce it anyway?" question the terminal asks.
+def announce_as_json(slug, wanted, force:)
+  answer_json(writes: 'announce') do
+    network = SiteConfig.comment_network
+    if wanted == :mastodon
+      refuse('wrong_network', t('cli.use_bluesky_command')) if network == :bluesky
+      refuse('no_network', t('cli.no_network_toot')) if network.nil?
+    else
+      refuse('wrong_network', t('cli.use_toot_command')) unless network == :bluesky
+    end
+    path, _raw, post = post_for_json(slug)
+    refuse('still_draft', t('cli.still_draft_toot', slug: slug)) if draft?(post)
+    refuse('already_announced', t('cli.announcement_exists', url: Publishing.announcement_url(post))) if Publishing.announced?(post)
+    refuse('unlisted', t('cli.unlisted_no_toot')) if Publishing.unlisted?(post)
+    date = post_time!(post)
+    year = PostAddress.date_year(post)
+    unless force || Publishing.within_recency_window?(date)
+      refuse('outside_window', t('cli.toot_outside_window_for_program', date: date.strftime(t('date_format'))))
+    end
+    if network == :bluesky
+      # The same recovery cmd_bluesky runs first: an announcement whose
+      # reply never came back is found on the account, not sent twice.
+      candidates = [Publishing.post_url(post['slug'], year, page: PostAddress.page?(post))]
+      candidates << Publishing.post_url(post['slug'], year, page: false) if PostAddress.page?(post)
+      if (found = candidates.uniq.filter_map { |url| BlueskyPoster.find_announcement(url) }.first)
+        AtomicWrite.write_json(path, post.merge('bluesky_url' => found[:url], 'bluesky_uri' => found[:uri]))
+        next { 'ok' => true, 'slug' => slug, 'url' => found[:url], 'recovered' => true, 'warnings' => [] }
+      end
+    end
+    fields, warnings = quietly(true, keep_stdout: true) { announce_post(post, year: year, date: date, force: force) }
+    refuse('failed', warnings.last || t('cli.toot_failed')) if fields == false
+    refuse('not_sent', warnings.join(' ')) if fields.nil?
+    AtomicWrite.write_json(path, post.merge(fields))
+    { 'ok' => true, 'slug' => slug, 'url' => fields['mastodon_url'] || fields['bluesky_url'],
+      'recovered' => false, 'warnings' => warnings }
+  end
+end
+
+# `props <slug> --set key=value --json`: the [e] screen's rows and the [c]
+# key, written in one go. The words are the ones the screen shows --
+# yes/no, and default for the two flags that have the site's own answer
+# -- and a dash clears what the screen's first row would clear.
+PROPERTY_KEYS = %w[series series_part tags type unlisted hero toc pinned].freeze
+
+def apply_property_sets(post, sets)
+  updated = post.dup
+  sets.each do |pair|
+    key, _, value = pair.partition('=')
+    value = value.strip
+    bad = -> { refuse('bad_property', t('cli.props_bad_property', key: key, value: value, keys: PROPERTY_KEYS.join(', '))) }
+    case key
+    when 'series'
+      if value == '-' || value.empty?
+        # The part number goes with it, the way the screen's first row
+        # takes it: a number without a series is a field nothing reads.
+        updated.delete('series')
+        updated.delete('series_part')
+      else
+        updated['series'] = value
+      end
+    when 'series_part'
+      if value == '-' then updated.delete('series_part')
+      elsif value.match?(/\A[1-9]\d{0,3}\z/) then updated['series_part'] = value.to_i
+      else bad.call
+      end
+    when 'tags'
+      if value == '-'
+        updated['tags'] = []
+      else
+        tags = tags_from_frontmatter(value)
+        tags.empty? ? bad.call : updated['tags'] = tags
+      end
+    when 'type'
+      if value == '-' then updated.delete('type')
+      elsif ContentType::PRIORITY.include?(value) then updated['type'] = value
+      else bad.call
+      end
+    when 'unlisted', 'pinned'
+      case value
+      when 'yes' then updated[key] = true
+      when 'no' then updated.delete(key)
+      else bad.call
+      end
+    when 'hero', 'toc'
+      case value
+      when 'yes' then updated[key] = true
+      when 'no' then updated[key] = false
+      when 'default' then updated.delete(key)
+      else bad.call
+      end
+    else
+      bad.call
+    end
+  end
+  if updated['series_part'] && updated['series'].to_s.strip.empty?
+    refuse('bad_property', t('cli.series_part_needs_series'))
+  end
+  updated
+end
+
+# The properties screen after a write: the same object `props --json`
+# reads, plus what the write did to the site.
+def props_after(slug, warnings, deployed)
+  props_as_json(slug).merge('deploy' => deploy_word(deployed), 'warnings' => warnings)
+end
+
+# One writer of a post's fields at a time, and the post read INSIDE the
+# turn. Two `props --set` sent together each read the post, each wrote it
+# whole, and the second took the first one's change away with it while
+# both answered ok (fleet, 8. 10. 2026). Under the lock every other writer
+# of the archive takes -- the scheduler, a build, the queue -- the one that
+# comes second is told the blog is busy, in the words `schedule` uses for
+# the same thing, and writes nothing. The rebuild that may follow is not
+# part of the turn: it takes the lock for itself.
+def with_post_for_write(slug)
+  held, = quietly(true, keep_stdout: true) do
+    RunLock.hold(ROOT, label: 'props') do
+      path, _raw, post = post_for_json(slug)
+      yield path, post
+      :written
+    end
+  end
+  refuse('busy', t('cli.busy_for_program')) if held == RunLock::BUSY
+end
+
+def props_set_as_json(slug, sets:, rebuild:)
+  answer_json do
+    warnings = []
+    with_post_for_write(slug) do |path, post|
+      updated = apply_property_sets(post, sets)
+      if truthy_frontmatter?(updated['pinned']) && !truthy_frontmatter?(post['pinned'])
+        # The note toggle_pin prints: only one pin ever shows.
+        other = load_posts_summary.find { |p| p[:pinned] && p[:slug] != slug }
+        warnings << t('cli.pin_other', slug: other[:slug]) if other
+      end
+      AtomicWrite.write_json(path, updated)
+    end
+    props_after(slug, warnings, rebuild_if_asked(rebuild, warnings))
+  end
+end
+
+# `props <slug> --drop-address <address> --json`: the [a] screen's one action.
+#
+# kind: which of the post's lists, where an address stands in more than
+# one of them -- its own and a translation's, or two translations'. The
+# screen picks a ROW; a program named an address, got the first row that
+# held it, and that was the one `check` had just advised keeping (the
+# list the root leads to). Named once, an address in two lists is
+# refused with the kinds it could mean.
+def props_drop_address_as_json(slug, address, rebuild:, kind: nil)
+  answer_json do
+    with_post_for_write(slug) do |path, post|
+      held = address_entries(post).select { |_, value| value == address }
+      refuse('address_unknown', t('cli.props_address_unknown', address: address)) if held.empty?
+      entries = kind.nil? ? held : held.select { |key, _| key == kind }
+      # A kind the address does not stand under is its own mistake, and
+      # was "the post has no such address" about one it had (third fleet,
+      # 10. 10. 2026).
+      refuse('kind_unknown', t('cli.props_kind_unknown', address: address, kind: kind, kinds: held.map(&:first).uniq.join(', '))) if entries.empty?
+      # Twice in ONE list is one address written twice, not two meanings:
+      # without_address takes every copy out, as the screen does.
+      kinds = entries.map(&:first).uniq
+      refuse('address_ambiguous', t('cli.props_address_ambiguous', address: address, kinds: kinds.join(', '))) if kinds.size > 1
+      key, former = entries.first
+      AtomicWrite.write_json(path, without_address(post, key, former))
+    end
+    warnings = []
+    props_after(slug, warnings, rebuild_if_asked(rebuild, warnings))
+  end
+end
+
+# `props <slug> --rename <new> --yes --json`: the [r] key with its answer
+# and its confirmation given. A draft's preview is rebuilt as the screen
+# rebuilds it; a published post's rename waits for --rebuild like the
+# screen waits for the answer to its question.
+def rename_as_json(slug, input, rebuild:)
+  answer_json(writes: 'rename') do
+    path, _raw, post = post_for_json(slug)
+    new_slug, problem = rename_check(post, path, input)
+    refuse(problem.first, problem.last) if problem
+    _new_path, warnings = quietly(true, keep_stdout: true) { rename_apply(path, post, new_slug) }
+    deployed = if draft?(post)
+                 done, more = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+                 warnings.concat(more)
+                 done
+               else
+                 rebuild_if_asked(rebuild, warnings)
+               end
+    props_after(new_slug, warnings, deployed)
+  end
+end
+
+# `props <slug> --versions --json`: the [v] list.
+def version_time(name)
+  m = name.match(/\A(\d{4})(\d{2})(\d{2})-(\d{2})(\d{2})(\d{2})/)
+  m && Time.new(m[1].to_i, m[2].to_i, m[3].to_i, m[4].to_i, m[5].to_i, m[6].to_i)
+end
+
+def versions_as_json(slug)
+  answer_json do
+    path, = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    rows = PostVersions.list(slug, year, content_dir: CONTENT_DIR).map do |file|
+      name = File.basename(file, '.json')
+      { 'name' => name, 'date' => version_time(name)&.iso8601, 'label' => PostVersions.human_stamp(name) }
+    end
+    { 'ok' => true, 'slug' => slug, 'year' => year, 'versions' => rows }
+  end
+end
+
+# `props <slug> --restore-version <name> --yes --json`: one of them chosen.
+# The preview is rebuilt as the screen rebuilds it, without asking.
+def restore_version_as_json(slug, name)
+  answer_json(writes: 'restore-version') do
+    path, = post_for_json(slug)
+    year = File.basename(File.dirname(path))
+    file = PostVersions.list(slug, year, content_dir: CONTENT_DIR).find { |f| File.basename(f, '.json') == name }
+    refuse('version_unknown', t('cli.props_version_unknown', name: name)) unless file
+    restored = begin
+      JSON.parse(File.read(file, encoding: 'utf-8'))
+    rescue JSON::ParserError, SystemCallError => e
+      refuse('version_unreadable', "#{File.basename(file)}: #{e.class} -- #{e.message.lines.first.to_s.strip[0, 80]}")
+    end
+    restore_version(path, restored)
+    deployed, warnings = quietly(true) { rebuild_and_deploy(t('cli.updating_preview')) }
+    props_after(slug, warnings, deployed)
+  end
+end
+
+# `queue --up <slug> --json`, `--down`, `--move <slug> --to <n>`: the [u],
+# [d] and [m] keys, the post named rather than under a cursor. The answer
+# is the queue as it stands afterwards. Nothing is rebuilt: the screen
+# rebuilds once on the way out, and a program calls `rebuild --json` when
+# it is done moving things.
+def queue_move_as_json(which, slug, to)
+  # Under the archive's lock from the first read: the queue was read above
+  # it, and a cancel landing in the gap made the move answer `refused`
+  # with the editor's sentence about a post changed on disk (third fleet,
+  # 10. 10. 2026).
+  answer_json(writes: 'queue') do
+    entries = queue_entries
+    matches = entries.each_index.select do |i|
+      [entries[i][:slug], "#{File.basename(File.dirname(entries[i][:path]))}/#{entries[i][:slug]}"].include?(slug)
+    end
+    refuse('not_scheduled', t('cli.schedule_not_scheduled', slug: slug)) if matches.empty?
+    refuse('ambiguous_slug', t('cli.ambiguous_slug', slug: slug, count: matches.size)) if matches.size > 1
+    index = matches.first
+    first_future = entries.index { |entry| entry[:time] > Time.now }
+    overdue = ->(i) { first_future.nil? || i < first_future }
+    QUEUE_MOVE[:busy] = false
+    moved, warnings = quietly(true, keep_stdout: true) do
+      case which
+      when :up then queue_swap(entries, index, index - 1)
+      when :down then queue_swap(entries, index, index + 1)
+      when :move
+        target = Integer(to.to_s, exception: false)
+        refuse('bad_position', t('cli.queue_bad_position', count: entries.size)) unless target&.between?(1, entries.size)
+        target -= 1
+        refuse('overdue', queue_overdue_refusal) if overdue.call(index) || overdue.call(target)
+        target == index ? true : queue_carry_apply(entries, index, target)
+      end
+    end
+    # A lock somebody else holds is not "first, last, or its time has
+    # passed": a program told not_moved stops offering the move, and one
+    # told busy tries again -- which is the right thing to do when a
+    # build happened to be running.
+    refuse('busy', t('cli.busy_for_program')) if !moved && QUEUE_MOVE[:busy]
+    refuse('not_moved', warnings.join(' ')) unless moved
+    # The queue in the answer IS the report of the move; the sentence the
+    # screen says about it is not a warning.
+    { 'ok' => true, 'queue' => queue_rows, 'scheduler' => queue_scheduler,
+      'warnings' => without_own_report(warnings, 'cli.queue_swapped', 'cli.queue_carried') }
+  end
+end
+
+def queue_rows
+  queue_entries.each_with_index.map do |entry, index|
+    { 'position' => index + 1, 'date' => entry[:time].iso8601, 'slug' => entry[:slug],
+      'year' => File.basename(File.dirname(entry[:path])), 'title' => post_name_for(entry[:post]),
+      'overdue' => entry[:time] <= Time.now }
+  end
+end
+
+# Who publishes the queue, for a program that shows it: when something
+# last ran it, or null where nothing ever has. A row can say `overdue`,
+# and only this says whether waiting will help -- with null the reader
+# offers to publish the post now instead of showing a clock.
+def queue_scheduler
+  last = Publishing.scheduler_last_run
+  { 'last_run' => last && last.iso8601 }
+end
+
+def queue_as_json
+  puts JSON.pretty_generate('ok' => true, 'queue' => queue_rows, 'scheduler' => queue_scheduler)
+end
+
+# How much of a post's text `match` carries: the terminal cuts the same
+# line to its own width, a program has none, and a phone shows about this.
+LIST_MATCH_WIDTH = 120
+
+# `list --search=<query>`: the search `browse` runs behind [/], for a
+# caller with no screen to type it into. The same query language as the
+# screen and the site's search box (SearchQuery), over the same text
+# (PostText.searchable) -- so the three answer one question one way. An
+# empty query, or one of nothing but exclusions, matches nothing, as it
+# does there.
+def list_search(query)
+  tokens = SearchQuery.parse(query)
+  search_entries.filter_map do |file, entry|
+    next unless SearchQuery.match?(entry['folded'].to_s, tokens)
+
+    summary = entry['summary'].transform_keys(&:to_sym)
+    key = "#{File.basename(File.dirname(file))}/#{summary[:slug]}"
+    summary.merge(path: file, key: key,
+                  match: browse_context({ text: entry['text'].to_s }, tokens, LIST_MATCH_WIDTH, {}, key))
+  end
+end
+
+# The archive's search index (lib/search_index.rb): every post file with
+# the row `list` prints for it and the words a query is matched against,
+# read from the posts only where a post changed since it was last asked.
+# The languages are all the site publishes: a label a language gives a
+# tag is a word a reader of that language types.
+def search_entries(warn_unreadable: true)
+  labels = SearchIndex.tag_labels(ROOT, Array(SiteConfig.get('site', 'locales', default: [])).map(&:to_s))
+  files = PathGlob.under(CONTENT_DIR, '*', '*.json')
+  SearchIndex.load(root: ROOT, files: files, stamp: SearchIndex.stamp(ROOT, labels)) do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8'))
+    raise JSON::ParserError, "not a post object (#{post.class})" unless post.is_a?(Hash)
+
+    { 'summary' => post_summary_of(post, file).transform_keys(&:to_s) }.merge(SearchIndex.words(post, labels))
+  rescue JSON::ParserError, SystemCallError => e
+    warn t('cli.unreadable_post', path: file, error: e.message.lines.first.to_s.strip[0, 100]) if warn_unreadable
+    nil
+  end
+end
+
 def cmd_list(filters)
-  posts = load_posts_summary.select do |p|
+  searching = !filters[:search].nil?
+  posts = (searching ? list_search(filters[:search]) : load_posts_summary).select do |p|
     next false if filters[:tag] && !p[:tags].map(&:downcase).include?(filters[:tag].downcase)
     next false if filters[:type] && p[:type] != filters[:type]
     next false if filters[:drafts] && p[:state] != DRAFT
@@ -5916,6 +7439,8 @@ def cmd_list(filters)
   # named neither the file nor the problem.
   posts.sort_by! { |p| p[:date].to_s }
   posts.reverse!
+  return list_as_json(posts, search: filters[:search]) if filters[:json]
+
   posts.each { |p| puts summary_row(p, localized: false) }
   drafts = posts.count { |p| p[:state] == DRAFT }
   count = t('cli.post_count', count: posts.size, drafts_suffix: drafts.positive? ? t('cli.drafts_suffix', count: drafts) : '')
@@ -5975,16 +7500,13 @@ end
 # screen show WHY a post matched.
 def browse_index(posts)
   Tui.spinner(t('cli.browse_indexing', count: posts.size)) do
+    # Kept between runs (lib/search_index.rb): only a post that changed
+    # is read again. post_summary already warned about a file that
+    # cannot be read; here such a post simply matches nothing.
+    entries = search_entries(warn_unreadable: false)
     posts.each_with_object({}) do |summary, index|
-      begin
-        post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
-        text = PostText.plain(post).gsub(/\s+/, ' ').strip
-        index[summary[:key]] = { text: text, folded: PostText.searchable(post, text) }
-      rescue JSON::ParserError, SystemCallError
-        # post_summary already warned about this file; a post that cannot
-        # be read simply matches nothing.
-        index[summary[:key]] = { text: '', folded: '' }
-      end
+      entry = entries[summary[:path]]
+      index[summary[:key]] = entry ? { text: entry['text'].to_s, folded: entry['folded'].to_s } : { text: '', folded: '' }
     end
   end
 end
@@ -6422,6 +7944,7 @@ def trash_summary
     # and a bare year ("2026") is an ArgumentError -- which took down the
     # whole trash picker, and with it the only undo the engine has.
     { slug: slug, title: t('cli.restore_media_count', count: count),
+      year: File.basename(File.dirname(File.dirname(dir))),
       date: "#{File.basename(File.dirname(File.dirname(dir)))}-01-01T00:00:00+00:00" }
   end
   posts + media_only.uniq { |entry| entry[:slug] }
@@ -6507,6 +8030,138 @@ def restore_embed_lookups(blocks, original_blocks)
 
     src = stored[block['url'].to_s]
     block['embed_src'] = src if src
+  end
+end
+
+# A block the new text did not change is saved as it was stored -- the
+# very block, with everything on it.
+#
+# The three restores above each bring back one thing markdown cannot say
+# (a poster, a player's address, where a file came from). There are more
+# such things than anybody has listed, and an import is where they come
+# from: a paragraph Tumblr marked as indented, as a list item or as a line
+# of a chat; a video's provider and the address it was first seen at; the
+# player a service handed over as HTML. None of them has a word in
+# markdown, so the text an editor shows does not carry them, and a save
+# rebuilt every block from that text: fixing one typo in a post rewrote
+# every other block of it without them. Measured through the app's road
+# on a real archive, 101 posts changed by being saved unchanged (fleet,
+# 8. 10. 2026).
+#
+# So the question is asked the other way round: not "what did this block
+# lose", one field at a time, but "did the author change it". A stored
+# block is written out as the text an editor shows and read back, on its
+# own: that is what it looks like when nobody has touched it -- which is
+# not always what it was stored as, since a paragraph stored with a space
+# at its end comes back without one. Where a block of the new text is
+# written exactly like that, the stored block is what is saved. What the
+# text changed is the author's, as parsed.
+#
+# Three kinds are left alone. A link card travels in the header, not in
+# the text, and has its own road back. A stored block that does not read
+# back as ONE block has no single block of the new text to be recognised
+# in. And a block naming a file that ARRIVED with this save: what was
+# measured from the bytes a moment ago is what is true now, and the stored
+# block describes the file that was.
+def keep_untouched_blocks(blocks, original_blocks, media_files, media_dir)
+  here = File.expand_path(media_dir.to_s)
+  arriving = media_files.reject { |source, _| File.dirname(File.expand_path(source.to_s)) == here }.values.map(&:to_s)
+  written_as = lambda do |block|
+    MarkdownWriter.blocks_to_markdown([block], nil)
+  rescue StandardError
+    nil
+  end
+  # Each stored block under what it is written as once read back; first
+  # come, first kept, so two written alike keep the order they stood in.
+  # What each reads back AS is kept too, for the second pass below.
+  originals = Array(original_blocks).select { |block| block.is_a?(Hash) && block['type'] != 'link' }
+  read_back = {}.compare_by_identity
+  stored = Hash.new { |known, text| known[text] = [] }
+  originals.each do |block|
+    back = begin
+      MarkdownParser.parse_body(written_as.call(block).to_s, media_dir, incoming_dir: nil, confined: true).first
+    rescue StandardError, SystemExit
+      nil
+    end
+    next unless back && back.size == 1
+
+    read_back[block] = back.first
+    text = written_as.call(back.first)
+    stored[text] << block if text
+  end
+
+  kept = blocks.map do |block|
+    next block if !block.is_a?(Hash) || block['type'] == 'link'
+
+    names = []
+    each_media_entry([block]) { |entry| names << entry['url'].to_s }
+    next block if (names & arriving).any?
+
+    text = written_as.call(block)
+    (text && stored[text].shift) || block
+  end
+  carry_unsaid(kept, originals, read_back)
+end
+
+# What is never carried from a stored block to the one that rewrote it:
+# its kind, and everything the text itself decides or another step fills
+# in (restore_media_src, fill_image_dimensions).
+UNCARRIED = %w[type text formatting items media poster embed_html].freeze
+
+# A block the text REWROTE -- a word corrected in a paragraph -- is saved
+# as parsed, and parsed it has only what markdown can say. What the stored
+# block held beyond that went with it, unasked: the kind of a paragraph an
+# import marked indented or as a line of chat (a list item became a
+# paragraph in the middle of its list), a video's origin (`provider`,
+# `url`). 317 blocks in 37 posts of sean.cz, and 13 videos (third fleet,
+# 10. 10. 2026).
+#
+# So a rewritten block is paired with the stored block it rewrote and
+# takes from it every key the TEXT could not have changed: one the stored
+# block reads back as something else, where the new block says exactly
+# what that read-back says -- nothing, or the default. A key the author
+# could have written, a quote's marker or a caption, the new block
+# decides. Paired only where the pairing is beyond doubt: between two
+# blocks kept as stored, the rewritten blocks of a type are paired in order
+# with the stored blocks of that type the window holds -- when there are as
+# many of each. A paragraph inserted beside a corrected one makes two for
+# one, and both stay unpaired, which is what happened before.
+def carry_unsaid(kept, originals, read_back)
+  # Where each block of the result stands among the originals: an index
+  # for a block kept as stored, nil for one the text wrote anew.
+  places = kept.map { |block| originals.index { |original| original.equal?(block) } }
+  taken = places.compact
+  bounds = [-1] + kept.each_index.select { |i| places[i] } + [kept.size]
+  bounds.each_cons(2) do |lo, hi|
+    from_index = lo.negative? ? 0 : places[lo] + 1
+    to_index = hi == kept.size ? originals.size : places[hi]
+    # Kept blocks that changed places leave no window between them.
+    next if to_index <= from_index
+
+    rewritten = ((lo + 1)...hi).select { |j| kept[j].is_a?(Hash) && kept[j]['type'] != 'link' }
+    candidates = (from_index...to_index).reject { |k| taken.include?(k) }
+    rewritten.group_by { |j| kept[j]['type'] }.each do |type, js|
+      ks = candidates.select { |k| originals[k]['type'] == type }
+      next unless ks.size == js.size
+
+      js.zip(ks).each { |j, k| carry_from(originals[k], kept[j], read_back[originals[k]]) }
+    end
+  end
+  kept
+end
+
+# One rewritten block takes from the stored block it rewrote every key the
+# text could not have changed (carry_unsaid says which).
+def carry_from(from, block, back)
+  return unless back
+  # The same file, or nothing is carried: a video replaced by another the
+  # post already had keeps the new one's own origin, which is none.
+  return if from.key?('media') && Array(from['media']).dig(0, 'url') != Array(block['media']).dig(0, 'url')
+
+  from.each do |key, value|
+    next if UNCARRIED.include?(key) || value == back[key] || block[key] != back[key]
+
+    block[key] = value
   end
 end
 
@@ -6680,6 +8335,11 @@ def cmd_empty_trash
   size = dirs.sum { |d| dir_size(d) }
   return unless confirm_count('cli.empty_trash_confirm', count: dirs.length, size: size)
 
+  sweep_trash(dirs)
+  puts t('cli.empty_trash_done', count: dirs.length, size: FileSize.human(size))
+end
+
+def sweep_trash(dirs)
   dirs.each { |d| FileUtils.rm_rf(d) }
   # The year directories the posts sat in, when nothing else is left in
   # them: an empty trash should look empty.
@@ -6688,16 +8348,19 @@ def cmd_empty_trash
   rescue SystemCallError
     nil
   end
-  puts t('cli.empty_trash_done', count: dirs.length, size: FileSize.human(size))
 end
 
 # The last version of each post stays. They exist to answer "give me back
 # what I just overwrote", and that answer is the newest one -- emptying
 # them completely would take away the thing they are for.
-def cmd_empty_versions
+def doomed_versions
   root = PostVersions.versions_root(CONTENT_DIR)
   dirs = Dir.exist?(root) ? PathGlob.under(root, '*', '*').select { |d| File.directory?(d) } : []
-  doomed = dirs.flat_map { |d| PathGlob.under(d, '*.json').sort[0...-1] }
+  dirs.flat_map { |d| PathGlob.under(d, '*.json').sort[0...-1] }
+end
+
+def cmd_empty_versions
+  doomed = doomed_versions
   if doomed.empty?
     puts t('cli.empty_versions_none')
     return
@@ -6973,6 +8636,42 @@ end
 
 # --- CLI dispatch ----------------------------------------------------------
 
+# `--name value` or `--name=value`, taken out of ARGV; nil when absent. A
+# name with nothing after it is refused rather than read as nothing.
+# ⚠️ Through utf8, for the reason the list filters go through it: ARGV
+# arrives in the encoding the ENVIRONMENT declares, and with LANG unset --
+# docker exec, cron, the forced command a phone's key runs -- that is
+# ASCII-8BIT. A series called Procházky then reached JSON.generate as
+# binary and a rename to "Venku a dál" died in unicode_normalize.
+def option_value!(name)
+  value = ARGV.find { |arg| arg.start_with?("#{name}=") }&.delete_prefix("#{name}=")
+  ARGV.reject! { |arg| arg.start_with?("#{name}=") }
+  if value.nil? && (index = ARGV.index(name))
+    value = ARGV[index + 1]
+    abort t('cli.option_needs_value', option: name) if value.nil? || value.start_with?('--')
+    ARGV.slice!(index, 2)
+  end
+  value && utf8(value)
+end
+
+# `--set key=value`, as many times as it is said.
+def option_values!(name)
+  values = []
+  while (value = option_value!(name))
+    values << value
+  end
+  values
+end
+
+# Every word of the command line, labelled as what it is (utf8 above says
+# why the label is wrong with no LANG). Done once, here, because it was
+# being done value by value -- the values of options got it, and a slug
+# given as a bare word did not. Since the door for programs lets a slug in
+# any alphabet through, that was a post named `žába` deleted and the
+# answer a crash about encodings, and a draft named `čaj` that could be
+# neither scheduled nor published from an app.
+ARGV.map! { |word| utf8(word) }
+
 command = ARGV.shift
 
 # `help` and `version` are the two commands a fresh (or broken) install
@@ -7012,6 +8711,13 @@ begin
     run_wizard
   else
     case command
+    when 'drafts'
+      # Read-only and quick: what the phone asks for when it opens a draft
+      # (scripts/receive.sh, drafts.txt), and a plain list without --json.
+      json = !ARGV.delete('--json').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.drafts_unknown_option', option: unknown) if unknown
+      cmd_drafts(json: json, slug: ARGV.shift)
     when 'add'
       # Read here rather than inside cmd_add, the way `rebuild` reads --full:
       # the dispatcher is where this file turns a command line into
@@ -7048,12 +8754,14 @@ begin
       # `--lang de`, or the second word: a translation is always OF a post
       # INTO a language, so both are required and neither has a default.
       args = ARGV.dup
+      json = !args.delete('--json').nil?
       lang = args.find { |arg| arg.start_with?('--lang=') }&.delete_prefix('--lang=')
       args.reject! { |arg| arg.start_with?('--lang=') }
       if lang.nil? && (at = args.index('--lang'))
         lang = args[at + 1]
         args.slice!(at, 2)
       end
+      abort t('cli.translate_json_needs_slug') if json && (args.empty? || args.first.to_s.start_with?('--'))
       slug = args.shift || pick_slug_interactively
       lang ||= args.shift unless args.first.to_s.start_with?('--')
       # 🪤 Whatever is still here was not asked for: a typo in `--lang`, a
@@ -7063,32 +8771,146 @@ begin
       # the reader to site.locales to add it.
       abort t('cli.translate_unknown_args', args: args.join(' ')) unless args.empty?
       lang = nil if lang.to_s.start_with?('--')
-      abort t('cli.translate_needs_language') if lang.to_s.strip.empty?
-      cmd_translate(slug, lang.to_s.strip)
+      if lang.to_s.strip.empty?
+        # Named from what THIS site publishes: the sentence used to say
+        # `--lang de` to everybody, and on a site in Czech and English
+        # following it was answered "this site does not publish de".
+        own = SiteConfig.get('site', 'lang', default: 'en').to_s
+        others = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
+        others = others.reject { |code| code.empty? || code == own }.uniq
+        abort t('cli.translate_needs_locales') if others.empty?
+        abort t('cli.translate_needs_language', lang: others.first, langs: others.join(', '))
+      end
+      json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
     when 'edit'
-      slug = ARGV.shift || pick_slug_interactively
-      cmd_edit(slug)
+      json = !ARGV.delete('--json').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.edit_unknown_option', option: unknown) if unknown
+      if json
+        # The text as the editor would open it, handed out for a program
+        # to edit elsewhere and send back as a file saying `edits:`.
+        abort t('cli.edit_json_needs_slug') if ARGV.empty?
+
+        cmd_edit_json(ARGV.shift)
+      else
+        slug = ARGV.shift || pick_slug_interactively
+        cmd_edit(slug)
+      end
     when 'props'
-      slug = ARGV.shift || pick_slug_interactively
-      cmd_props(slug)
+      json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      rebuild = !ARGV.delete('--rebuild').nil?
+      versions = !ARGV.delete('--versions').nil?
+      sets = option_values!('--set')
+      drop = option_value!('--drop-address')
+      said_kind = ARGV.count { |arg| arg == '--kind' || arg.start_with?('--kind=') }
+      kind = option_value!('--kind')
+      rename = option_value!('--rename')
+      restore = option_value!('--restore-version')
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.props_unknown_option', option: unknown) if unknown
+      # --kind belongs to --drop-address, and is said once. Under --json
+      # these are refusals with a code: "Unknown option" in prose was
+      # engine_failed to the program that said --kind (third fleet,
+      # 10. 10. 2026).
+      misused = if said_kind > 1 then ['kind_once', t('cli.props_kind_once')]
+                elsif kind && drop.nil? then ['kind_needs_drop', t('cli.props_kind_needs_drop')]
+                end
+      if misused
+        answer_json { refuse(*misused) } if json
+        abort misused.last
+      end
+      # One key of the screen per call, the way one keypress does one thing.
+      actions = [sets.any?, !drop.nil?, !rename.nil?, versions, !restore.nil?].count(true)
+      abort t('cli.props_one_action') if actions > 1
+      if json
+        # An object for an answer means nobody is watching, and the picker
+        # this skips is the only thing that would ask.
+        abort t('cli.props_json_needs_slug') if ARGV.empty?
+
+        slug = ARGV.shift
+        if sets.any?
+          props_set_as_json(slug, sets: sets, rebuild: rebuild)
+        elsif drop
+          props_drop_address_as_json(slug, drop, rebuild: rebuild, kind: kind)
+        elsif rename
+          # The screen confirms a rename with a key; a program says --yes.
+          abort t('cli.props_rename_needs_yes') unless yes
+
+          rename_as_json(slug, rename, rebuild: rebuild)
+        elsif versions
+          versions_as_json(slug)
+        elsif restore
+          abort t('cli.props_restore_needs_yes') unless yes
+
+          restore_version_as_json(slug, restore)
+        else
+          cmd_props_json(slug)
+        end
+      else
+        # The screen's keys answer these at the terminal.
+        abort t('cli.props_flags_need_json') if actions.positive? || yes || rebuild
+
+        slug = ARGV.shift || pick_slug_interactively
+        cmd_props(slug)
+      end
     when 'delete'
-      slug = ARGV.shift || pick_slug_interactively
-      cmd_delete(slug)
+      json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      rebuild = !ARGV.delete('--rebuild').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.delete_unknown_option', option: unknown) if unknown
+      if json
+        abort t('cli.delete_json_needs_yes') if !yes || ARGV.empty?
+
+        delete_as_json(ARGV.shift, rebuild: rebuild)
+      else
+        abort t('cli.delete_yes_needs_json') if yes || rebuild
+
+        slug = ARGV.shift || pick_slug_interactively
+        cmd_delete(slug)
+      end
     when 'restore'
-      slug = ARGV.shift || pick_trash_interactively
-      cmd_restore(slug)
+      json = !ARGV.delete('--json').nil?
+      rebuild = !ARGV.delete('--rebuild').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.restore_unknown_option', option: unknown) if unknown
+      if json
+        # Without a slug the terminal offers what is in the trash; a
+        # program is handed the same list.
+        ARGV.empty? ? trash_as_json : restore_as_json(ARGV.shift, rebuild: rebuild)
+      else
+        abort t('cli.restore_rebuild_needs_json') if rebuild
+
+        slug = ARGV.shift || pick_trash_interactively
+        cmd_restore(slug)
+      end
     when 'empty'
-      cmd_empty(ARGV.shift)
+      json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.empty_unknown_option', option: unknown) if unknown
+      if json
+        empty_as_json(ARGV.shift.to_s, yes: yes)
+      else
+        abort t('cli.empty_yes_needs_json') if yes
+
+        cmd_empty(ARGV.shift)
+      end
     when 'publish'
       yes = !ARGV.delete('--yes').nil?
       announce = ARGV.delete('--no-announce').nil?
       json = !ARGV.delete('--json').nil?
       allow_partial = !ARGV.delete('--allow-partial').nil?
+      compact = !ARGV.delete('--compact').nil?
       unknown = ARGV.find { |arg| arg.start_with?('--') }
       abort t('cli.publish_unknown_option', option: unknown) if unknown
       # An object for an answer means nobody is watching, and the dialog
       # this skips is the only thing that would ask.
       abort t('cli.publish_json_needs_yes') if json && !yes
+      # The queue screen asks this question after [p]; the flag answers it
+      # for a program, and only there.
+      abort t('cli.publish_compact_needs_json') if compact && !json
       # --no-announce on its own still shows the dialog; it only says what
       # [p] must not do when it gets there. Refusing the combination would
       # be refusing "let me look first, and keep it off Mastodon".
@@ -7101,22 +8923,83 @@ begin
       abort t('cli.publish_yes_needs_slug') if yes && slug.nil?
 
       slug ||= pick_draft_interactively
-      cmd_publish(slug, yes: yes, announce: announce, json: json, allow_partial: allow_partial)
+      cmd_publish(slug, yes: yes, announce: announce, json: json, allow_partial: allow_partial, compact: compact)
     when 'schedule'
       allow_partial = !ARGV.delete('--allow-partial').nil?
-      slug = ARGV.shift || pick_draft_interactively
-      cmd_schedule(slug, allow_partial: allow_partial)
+      json = !ARGV.delete('--json').nil?
+      cancel = !ARGV.delete('--cancel').nil?
+      compact = !ARGV.delete('--compact').nil?
+      # `--at <time>` or `--at=<time>`: the date the dialog would ask for.
+      at = option_value!('--at')
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.schedule_unknown_option', option: unknown) if unknown
+      # The date, the cancellation and the shift are answers to questions
+      # the dialog asks; without --json the dialog is there to ask them.
+      abort t('cli.schedule_flags_need_json') if (at || cancel || compact) && !json
+      if json
+        abort t('cli.schedule_json_needs_slug') if ARGV.empty?
+
+        schedule_as_json(ARGV.shift, at: at, cancel: cancel, compact: compact, allow_partial: allow_partial)
+      else
+        slug = ARGV.shift || pick_draft_interactively
+        cmd_schedule(slug, allow_partial: allow_partial)
+      end
     when 'queue'
-      cmd_queue
+      json = !ARGV.delete('--json').nil?
+      up = option_value!('--up')
+      down = option_value!('--down')
+      move = option_value!('--move')
+      to = option_value!('--to')
+      abort t('cli.queue_unknown_option', option: ARGV.first) unless ARGV.empty?
+      moves = [up, down, move].compact
+      abort t('cli.queue_one_move') if moves.size > 1
+      abort t('cli.queue_flags_need_json') if (moves.any? || to) && !json
+      if up
+        queue_move_as_json(:up, up, nil)
+      elsif down
+        queue_move_as_json(:down, down, nil)
+      elsif move
+        abort t('cli.queue_to_missing') if to.nil?
+
+        queue_move_as_json(:move, move, to)
+      elsif json
+        queue_as_json
+      else
+        cmd_queue
+      end
     when 'unpublish'
-      slug = ARGV.shift || pick_published_interactively
-      cmd_unpublish(slug)
-    when 'toot'
-      slug = ARGV.shift || pick_published_interactively
-      cmd_toot(slug)
-    when 'bluesky'
-      slug = ARGV.shift || pick_published_interactively
-      cmd_bluesky(slug)
+      json = !ARGV.delete('--json').nil?
+      yes = !ARGV.delete('--yes').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.unpublish_unknown_option', option: unknown) if unknown
+      if json
+        # The typed slug is the whole confirmation; a program types it as
+        # a flag and names the post, or the dialog is there to ask.
+        abort t('cli.unpublish_json_needs_yes') if !yes || ARGV.empty?
+
+        unpublish_as_json(ARGV.shift)
+      else
+        abort t('cli.unpublish_yes_needs_json') if yes
+
+        slug = ARGV.shift || pick_published_interactively
+        cmd_unpublish(slug)
+      end
+    when 'toot', 'bluesky'
+      json = !ARGV.delete('--json').nil?
+      force = !ARGV.delete('--force').nil?
+      unknown = ARGV.find { |arg| arg.start_with?('--') }
+      abort t('cli.toot_unknown_option', option: unknown, command: command) if unknown
+      if json
+        abort t('cli.toot_json_needs_slug', command: command) if ARGV.empty?
+
+        announce_as_json(ARGV.shift, command == 'toot' ? :mastodon : :bluesky, force: force)
+      else
+        # "This post is old -- announce it anyway?" is asked at the terminal.
+        abort t('cli.toot_force_needs_json', command: command) if force
+
+        slug = ARGV.shift || pick_published_interactively
+        command == 'toot' ? cmd_toot(slug) : cmd_bluesky(slug)
+      end
     when 'rebuild'
       # Read here rather than inside cmd_rebuild, the way `list` and `browse`
       # read their filters: the dispatcher is where this file turns a command
@@ -7132,9 +9015,13 @@ begin
         print_usage
         exit 0
       end
-      unknown = ARGV.reject { |arg| %w[--full --force].include?(arg) }
+      unknown = ARGV.reject { |arg| %w[--full --force --json].include?(arg) }
       abort t('cli.rebuild_unknown_option', option: unknown.join(' ')) unless unknown.empty?
-      cmd_rebuild(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
+      if ARGV.include?('--json')
+        rebuild_as_json(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
+      else
+        cmd_rebuild(full: ARGV.include?('--full'), force: ARGV.include?('--force'))
+      end
     when 'preview'
       # A local static server over the build output -- the quickest way to
       # look at the site before deploying anywhere.
@@ -7148,13 +9035,45 @@ begin
       abort t('cli.preview_bad_port', value: asked) unless asked.match?(/\A\d{1,5}\z/) && asked.to_i.between?(1, 65_535)
 
       port = asked.to_i
+      # Taken BEFORE the line that says where it is served: a port that
+      # something already holds is the commonest way this fails (a preview
+      # left running in another window), and it used to be answered with
+      # "Serving ... at http://localhost:8000/" and a stack trace.
+      server = begin
+        PreviewServer.listen(port)
+      rescue Errno::EADDRINUSE
+        abort t('cli.preview_port_taken', port: port, other: port < 65_535 ? port + 1 : 8000)
+      rescue Errno::EACCES, Errno::EPERM
+        abort t('cli.preview_port_denied', port: port)
+      end
       puts t('cli.preview_serving', url: "http://localhost:#{port}/")
       # The serve loop below blocks forever -- with stdout piped (not a TTY)
       # the URL line would sit in the buffer the whole time, so push it out.
       $stdout.flush
-      PreviewServer.serve(File.join(ROOT, 'public.nosync'), port)
+      PreviewServer.serve(File.join(ROOT, 'public.nosync'), port, server: server)
     when 'list', 'browse'
       filters = {}
+      # A filter's value is taken after `=` or as the next word: `--tag
+      # cats` used to be read as a switch with nothing after it and a word
+      # nobody asked about, and answered with the WHOLE archive -- ok: true
+      # to a program that had asked for one tag. And a word this command
+      # has no use for is said, not swallowed.
+      words = ARGV.dup
+      ARGV.clear
+      until words.empty?
+        word = words.shift
+        if %w[--type --tag --search].include?(word)
+          abort t('cli.list_needs_value', option: word) if words.empty? || words.first.start_with?('--')
+          word = "#{word}=#{words.shift}"
+        end
+        # ...and `--tag=` is a filter with nothing after it too, written
+        # the other way: it answered with the whole archive, as `--tag`
+        # alone once did. (`--search=` is not among them: an empty query
+        # matches nothing and is said back, which is an answer.)
+        abort t('cli.list_needs_value', option: word.chomp('=')) if %w[--type= --tag=].include?(word)
+        abort t('cli.list_unknown_option', option: utf8(word)) unless word.match?(/\A--(type|tag|search)=/m) || %w[--drafts --json].include?(word)
+        ARGV << word
+      end
       ARGV.each do |arg|
         # ⚠️ force_encoding, because ARGV arrives in the encoding the
         # ENVIRONMENT declares -- and with LANG unset that is ASCII-8BIT.
@@ -7167,12 +9086,16 @@ begin
         # bytes are UTF-8 either way -- only the label on them was wrong.
         filters[:type] = utf8(Regexp.last_match(1)) if arg =~ /\A--type=(.+)\z/
         filters[:tag] = utf8(Regexp.last_match(1)) if arg =~ /\A--tag=(.+)\z/
+        filters[:search] = utf8(Regexp.last_match(1)) if arg =~ /\A--search=(.*)\z/m
         filters[:drafts] = true if arg == '--drafts'
+        filters[:json] = true if arg == '--json'
       end
       # Same filters, two ways to read the answer: `list` prints it,
       # `browse` puts you inside it. Down a pipe they are the same command,
       # because a screen you can't press keys in is just a list.
-      command == 'browse' ? cmd_browse(filters) : cmd_list(filters)
+      # ...and with --json they are the same command everywhere, because
+      # an object is not something a screen can be opened over.
+      command == 'browse' && !filters[:json] ? cmd_browse(filters) : cmd_list(filters)
     when 'help'
       print_usage
     when 'version', '--version', '-v'

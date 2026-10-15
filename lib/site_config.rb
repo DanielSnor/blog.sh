@@ -241,11 +241,14 @@ module SiteConfig
   #                everywhere (never a traceback), and always said out loud.
   #   set       -- the site's own answer.
   module Chrome
-    # The five cards the sidebar can draw. One list, because it used to be
+    # The cards the sidebar can draw. One list, because it used to be
     # copied into four places and the copy in doctor was missing one of
     # them -- which is exactly why an unknown name passed the check meant
     # to catch it.
-    CARDS = %w[toots pixelfed commits bluesky rss].freeze
+    CARDS = %w[toots pixelfed commits bluesky rss on_this_day].freeze
+    # Cards with nothing to set up but their name (see LanguageFile, which
+    # needs the same answer and cannot require this file).
+    BARE = LanguageFile::BARE_CARDS
     # Every key the engine reads back with `list` belongs here, or the four
     # states above do not apply to it and the key falls back to being read
     # as empty in silence. `share` was missing until the shape check learned
@@ -298,8 +301,30 @@ module SiteConfig
     end
 
     # Only names the sidebar can draw, each holding settings.
+    #
+    # A card that needs no settings may be written as its bare name --
+    # `on_this_day:` with nothing under it, or `on_this_day: true` -- and
+    # reads as a card with none; `false` switches it off. Every other card
+    # identifies what it shows by a setting, so a bare name there is still
+    # a card that can never fill itself, and still said so.
+    def settings(name, conf)
+      return conf if conf.is_a?(Hash)
+      return {} if BARE.include?(name) && (conf.nil? || conf == true)
+
+      nil
+    end
+
+    def switched_off?(name, conf)
+      BARE.include?(name) && conf == false
+    end
+
     def widgets(data)
-      map(data, 'widgets').select { |name, conf| CARDS.include?(name) && conf.is_a?(Hash) }
+      map(data, 'widgets').each_with_object({}) do |(name, conf), cards|
+        next unless CARDS.include?(name)
+
+        found = settings(name, conf)
+        cards[name] = found if found
+      end
     end
 
     # What the build will actually render from a nav entry: a label and
@@ -322,7 +347,7 @@ module SiteConfig
       map(data, 'widgets').each do |name, conf|
         next found << [:unknown_widget, name] unless CARDS.include?(name)
 
-        found << [:widget_shape, name] unless conf.is_a?(Hash)
+        found << [:widget_shape, name] unless settings(name, conf) || switched_off?(name, conf)
       end
       list(data, 'nav').each_with_index { |entry, i| found << [:nav_item, i + 1] unless nav_item?(entry) }
       TEXTS.each do |path|

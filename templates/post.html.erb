@@ -8,7 +8,7 @@
                 <div class="post-hero__content">
                   <%# An untitled post's date is its heading, so with a hero it moves up here from the byline rather than being printed in both places -- see date_badge. It cannot stay in the byline and be a heading: that paragraph is a <p>, and an h1 inside one is closed by the browser before it starts. %>
                   <%= post_names_itself?(post) ? post_heading_html(post, 'h1', nil) : hero_time_html(post, heading: true) %>
-                  <p class="post-hero__meta"><span class="post-hero__author"><%= h(SITE_AUTHOR) %></span><%= post_names_itself?(post) ? hero_time_html(post) : '' %><%= reading_time_html(reading_labels(post)) %></p>
+                  <p class="post-hero__meta"><span class="post-hero__author"><%= h(SITE_AUTHOR_NAME) %></span><%= post_names_itself?(post) ? hero_time_html(post) : '' %><%= reading_time_html(reading_labels(post)) %></p>
                 </div>
               </div><% elsif !page?(post) %><%= date_badge(post, heading: !post_names_itself?(post), link: archive_link_for(post)) %><% end %><%# A page has no date worth showing: "Contact, 1 July 2022" says nothing except that somebody had to type a date into a field. %>
               <div class="post-body">

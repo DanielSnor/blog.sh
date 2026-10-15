@@ -76,7 +76,7 @@ module ColorsCss
 
   module_function
 
-  def generate(colors: nil, fonts: nil, fonts_dir: nil)
+  def generate(colors: nil, fonts: nil, fonts_dir: nil, plain_banner: false)
     colors = {} unless colors.is_a?(Hash)
     fonts = {} unless fonts.is_a?(Hash)
     <<~CSS
@@ -91,7 +91,7 @@ module ColorsCss
 
       :root,
       :root[data-theme="light"] {
-      #{color_declarations(colors, 'light', '  ')}
+      #{color_declarations(colors, 'light', '  ', plain_banner: plain_banner)}
       }
 
       /* WARNING: the dark values appear twice below and must stay identical.
@@ -102,12 +102,12 @@ module ColorsCss
          apart completely in older browsers.) */
       @media (prefers-color-scheme: dark) {
         :root:not([data-theme="light"]) {
-      #{color_declarations(colors, 'dark', '    ')}
+      #{color_declarations(colors, 'dark', '    ', plain_banner: plain_banner)}
         }
       }
 
       :root[data-theme="dark"] {
-      #{color_declarations(colors, 'dark', '  ')}
+      #{color_declarations(colors, 'dark', '  ', plain_banner: plain_banner)}
       }
     CSS
   end
@@ -127,7 +127,7 @@ module ColorsCss
     safe_css_value(raw, "colors.#{mode}.#{key}") || DEFAULT_COLORS[mode][key]
   end
 
-  def color_properties(colors, mode)
+  def color_properties(colors, mode, plain_banner: false)
     text = color_for(colors, mode, 'text')
     meta_text = color_for(colors, mode, 'meta_text')
     nav_bg = color_for(colors, mode, 'nav_bg')
@@ -170,8 +170,15 @@ module ColorsCss
       # build/build_blog.rb. Same default either falls back to as before this
       # pair existed: nav-bg in light mode (a readable tone against most
       # banner images without being pure white), white in dark mode.
-      'banner-title-color' => color_for_optional(colors, mode, 'banner_title') || (mode == 'dark' ? '#ffffff' : nav_bg),
-      'banner-claim-color' => color_for_optional(colors, mode, 'banner_claim') || (mode == 'dark' ? '#ffffff' : nav_bg)
+      #
+      # A header without its picture (banner.show_image: false) has nothing
+      # to be read against but the page, so there the two fall back to what
+      # the page's own text is written in. A colour the site set is a colour
+      # the site set, with or without a picture under it.
+      'banner-title-color' => color_for_optional(colors, mode, 'banner_title') ||
+                              (plain_banner ? text : (mode == 'dark' ? '#ffffff' : nav_bg)),
+      'banner-claim-color' => color_for_optional(colors, mode, 'banner_claim') ||
+                              (plain_banner ? meta_text : (mode == 'dark' ? '#ffffff' : nav_bg))
     }
   end
 
@@ -183,8 +190,8 @@ module ColorsCss
     safe_css_value(raw, "colors.#{mode}.#{key}")
   end
 
-  def color_declarations(colors, mode, indent)
-    color_properties(colors, mode).map { |name, value| "#{indent}--#{name}: #{value};" }.join("\n")
+  def color_declarations(colors, mode, indent, plain_banner: false)
+    color_properties(colors, mode, plain_banner: plain_banner).map { |name, value| "#{indent}--#{name}: #{value};" }.join("\n")
   end
 
   def font_setting(fonts, key)

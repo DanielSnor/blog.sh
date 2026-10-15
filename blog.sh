@@ -12,11 +12,15 @@
 #   ./blog.sh toot [<slug>]
 #   ./blog.sh rebuild [--full]
 #   ./blog.sh browse [--type=image] [--tag=foo]
-#   ./blog.sh list [--type=image] [--tag=foo]
+#   ./blog.sh list [--type=image] [--tag=foo] [--search="words"] [--drafts] [--json]
+#   ./blog.sh drafts [--json]
 #   ./blog.sh doctor [--online] [--strip-location]
+#   ./blog.sh pair [--list] [--revoke [<device>]] [--json]
 #   ./blog.sh check [--online] [--json] [--repair]
 #   ./blog.sh export [<dir>] [--no-drafts] [--dry-run] [--force]
 #   ./blog.sh stats [--json]
+#   ./blog.sh on-this-day [--date MM-DD] [--json]
+#   ./blog.sh version [--json]
 #   ./blog.sh help
 #   ./blog.sh                      (no command launches the wizard)
 set -euo pipefail
@@ -62,7 +66,8 @@ case "${1:-}" in
   # parse these two died before they could answer -- exactly the install
   # whose owner is asking.
   version | --version | -v)
-    exec ruby scripts/info.rb version
+    shift
+    exec ruby scripts/info.rb version "$@"
     ;;
   # Doctor takes that furthest: it exists to explain an install with no
   # env.sh, no config, or a config that won't parse, so the "Missing
@@ -95,12 +100,43 @@ case "${1:-}" in
     shift
     exec ruby scripts/export.rb "$@"
     ;;
+  # A code for an app to read (lib/pairing.rb). It asks nothing of the
+  # network or of a deploy target and has to work on an installation that
+  # has not got that far, so env.sh is not required -- but it is read when
+  # there is one, the way doctor reads it. BLOG_SH_AUTHORIZED_KEYS lives
+  # there: read by doctor and not by pair, a device let in through the file
+  # it names was "no device" to `pair --list` and "no such device" to
+  # `pair --revoke`, beside its own line in the file sshd reads.
+  #
+  # Two things are carried past env.sh as they arrived: whether the
+  # request came through the door, and which device's line it came
+  # through (scripts/remote.rb sets both, to a value or to nothing). They
+  # say who is asking, and a line left in env.sh must not answer that.
+  pair)
+    shift
+    through_door="${BLOG_SH_REMOTE:-}"
+    asking_device="${BLOG_SH_DEVICE:-}"
+    if [ -f env.sh ]; then
+      set -a
+      # shellcheck source=/dev/null
+      . ./env.sh
+      set +a
+    fi
+    export BLOG_SH_REMOTE="$through_door" BLOG_SH_DEVICE="$asking_device"
+    exec ruby scripts/pair.rb "$@"
+    ;;
   # Counts the archive on disk, so it needs no env.sh either -- and it is
   # the command most likely to be piped somewhere (--json), which is
   # another reason not to make it depend on a configuration being right.
   stats)
     shift
     exec ruby scripts/stats.rb "$@"
+    ;;
+  # Reads the archive on disk like stats, for the same reasons: no env.sh,
+  # no network, and --json for whatever reads it next.
+  on-this-day)
+    shift
+    exec ruby scripts/on_this_day.rb "$@"
     ;;
 esac
 

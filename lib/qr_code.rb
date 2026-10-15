@@ -6,17 +6,39 @@
 # everything else here -- which means encoding QR by hand.
 #
 # Deliberately the smallest correct subset of the spec this use needs:
-# byte mode, error-correction level L, versions 1-5 only (all
-# single-ECC-block, which keeps the interleaving step away entirely) --
-# that's up to 106 bytes, comfortably above any draft URL; longer input
-# returns nil and the caller just skips the QR. The mask is fixed to
+# byte mode, error-correction level L, versions 1-12 -- up to 367 bytes;
+# longer input returns nil and the caller just skips the QR. It was
+# versions 1-5 while a draft's address was all it drew (106 bytes, and
+# every one of those a single block of correction); `./blog.sh pair`
+# hands a phone an address, a key and a fingerprint in one code, which is
+# about two hundred, so the larger versions and what they bring -- data
+# split into blocks and read across them, more than one alignment mark,
+# the version written into the symbol from 7 up, a two-byte length from
+# 10 -- are here now. A text that fitted version 5 is drawn exactly as it
+# was. The mask is fixed to
 # pattern 0 instead of scoring all eight: the format bits declare the
 # mask, so every decoder handles it; penalty scoring only optimizes
 # scannability margins, and a terminal render has bigger distortions than
 # a suboptimal mask anyway.
 module QrCode
-  # [data codewords, error-correction codewords] per version, level L.
-  CODEWORDS = { 1 => [19, 7], 2 => [34, 10], 3 => [55, 15], 4 => [80, 20], 5 => [108, 26] }.freeze
+  # Per version, level L: the correction codewords EACH block gets, then
+  # the blocks as [how many, data codewords each] -- from version 6 the
+  # data is split, and in versions 10 and 12 into blocks of two lengths.
+  BLOCKS = {
+    1 => [7, [1, 19]], 2 => [10, [1, 34]], 3 => [15, [1, 55]], 4 => [20, [1, 80]],
+    5 => [26, [1, 108]], 6 => [18, [2, 68]], 7 => [20, [2, 78]], 8 => [24, [2, 97]],
+    9 => [30, [2, 116]], 10 => [18, [2, 68], [2, 69]], 11 => [20, [4, 81]],
+    12 => [24, [2, 92], [2, 93]]
+  }.freeze
+  # [data codewords, error-correction codewords per block] per version.
+  CODEWORDS = BLOCKS.transform_values { |ecc, *groups| [groups.sum { |count, each| count * each }, ecc] }.freeze
+  # Where alignment marks are centred, per version: every pairing of these
+  # except the three that would land on a finder.
+  ALIGNMENT = {
+    1 => [], 2 => [6, 18], 3 => [6, 22], 4 => [6, 26], 5 => [6, 30], 6 => [6, 34],
+    7 => [6, 22, 38], 8 => [6, 24, 42], 9 => [6, 26, 46], 10 => [6, 28, 50],
+    11 => [6, 30, 54], 12 => [6, 32, 58]
+  }.freeze
   # Precomputed BCH(15,5) format strings for level L, masks 0-7 -- only
   # mask 0 is used, the rest kept for reference.
   FORMAT_L = %w[
@@ -75,9 +97,11 @@ module QrCode
 
   # --- encoding ------------------------------------------------------------
 
-  def codewords(bytes, data_capacity)
+  # `length_bits`: how wide the byte count is written -- eight bits up to
+  # version 9, sixteen from version 10.
+  def codewords(bytes, data_capacity, length_bits = 8)
     bits = +'0100'
-    bits << bytes.size.to_s(2).rjust(8, '0')
+    bits << bytes.size.to_s(2).rjust(length_bits, '0')
     bytes.each { |b| bits << b.to_s(2).rjust(8, '0') }
 
     capacity_bits = data_capacity * 8
@@ -94,16 +118,44 @@ module QrCode
     words
   end
 
+  # How many bytes of text a version holds: its data codewords less the
+  # mode and the length in front of them.
+  def capacity(version)
+    CODEWORDS[version][0] - (version < 10 ? 2 : 3)
+  end
+
+  # The data cut into the version's blocks, each given its own correction,
+  # and the lot read ACROSS the blocks -- first codeword of each, second of
+  # each -- so a smudge costs every block a little instead of one block
+  # everything. With one block this is the data followed by its
+  # correction, which is all versions 1 to 5 ever needed.
+  def interleaved(data, version)
+    ecc_len, *groups = BLOCKS[version]
+    blocks = []
+    at = 0
+    groups.each do |count, each|
+      count.times do
+        blocks << data[at, each]
+        at += each
+      end
+    end
+    corrections = blocks.map { |block| ecc_for(block, ecc_len) }
+    longest = blocks.map(&:size).max
+    out = []
+    longest.times { |i| blocks.each { |block| out << block[i] if i < block.size } }
+    ecc_len.times { |i| corrections.each { |block| out << block[i] } }
+    out
+  end
+
   # Returns the module matrix (arrays of booleans, true = dark) or nil
-  # when the text doesn't fit version 5.
+  # when the text doesn't fit the largest version drawn here.
   def encode(text)
     bytes = text.to_s.b.bytes
-    version = CODEWORDS.keys.find { |v| bytes.size <= CODEWORDS[v][0] - 2 }
+    version = CODEWORDS.keys.find { |v| bytes.size <= capacity(v) }
     return nil unless version
 
-    data_cap, ecc_len = CODEWORDS[version]
-    data = codewords(bytes, data_cap)
-    stream = data + ecc_for(data, ecc_len)
+    data = codewords(bytes, CODEWORDS[version][0], version < 10 ? 8 : 16)
+    stream = interleaved(data, version)
 
     size = 17 + 4 * version
     matrix = Array.new(size) { Array.new(size) }
@@ -140,14 +192,38 @@ module QrCode
       set.call(i, 6, i.even?)
     end
 
-    # One alignment pattern for versions 2-5, centered at (c, c).
-    if version >= 2
-      center = 4 * version + 10
-      (-2..2).each do |r|
-        (-2..2).each do |c|
-          dark = r.abs == 2 || c.abs == 2 || (r.zero? && c.zero?)
-          set.call(center + r, center + c, dark)
+    # Alignment patterns: one for versions 2-6, centred at (c, c); six from
+    # version 7, where the list of centres has three entries and every
+    # pairing counts but the three a finder already stands on. One on the
+    # timing line agrees with it -- its centre is on an even module.
+    centres = ALIGNMENT[version]
+    last = centres.size - 1
+    centres.each_with_index do |crow, i|
+      centres.each_with_index do |ccol, j|
+        next if (i.zero? && j.zero?) || (i.zero? && j == last) || (i == last && j.zero?)
+
+        (-2..2).each do |r|
+          (-2..2).each do |c|
+            dark = r.abs == 2 || c.abs == 2 || (r.zero? && c.zero?)
+            set.call(crow + r, ccol + c, dark)
+          end
         end
+      end
+    end
+
+    # From version 7 the symbol says which version it is, in two blocks of
+    # six by three beside the top-right and bottom-left finders: the number
+    # with twelve bits of correction of its own, BCH(18,6).
+    if version >= 7
+      rest = version
+      12.times { rest = (rest << 1) ^ ((rest >> 11) * 0x1F25) }
+      bits = (version << 12) | rest
+      18.times do |i|
+        dark = ((bits >> i) & 1) == 1
+        a = size - 11 + (i % 3)
+        b = i / 3
+        set.call(b, a, dark)
+        set.call(a, b, dark)
       end
     end
 

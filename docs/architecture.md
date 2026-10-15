@@ -82,7 +82,7 @@ dedup by `source`).
 | `bluesky_uri` | string | the announcement's `at://` URI -- what the thread API takes; stored alongside the URL because converting between them needs a handle→DID resolution round-trip |
 | `former_slugs` | array of strings | every address the post used to have, as `"year/slug"` frozen at rename time; the build emits a redirect stub for each (see `props` → rename). Engine-side history like the announcement URLs: edits and re-imports carry it over untouched |
 | `unpublished_from` | string | drafts only -- the `"year/slug"` address the post vacated when it was unpublished. Publishing consumes it: back under a different slug it becomes a `former_slugs` redirect, back under the same one it just disappears |
-| `series` | string | the series this post belongs to; with two or more published parts the build gives it a listing at `/series/<slug>/` and puts "part 2 of 5" navigation on the post |
+| `series` | string | the series this post belongs to; with two or more published parts the build gives it a listing at `/series/<slug>/`, a line in the index at `/series/`, and puts "part 2 of 5" navigation on the post |
 | `series_part` | integer | position within the series -- without it, parts are ordered by date, which is the usual case; the number is for the rare insert |
 | `pinned` | string/boolean | one post held at the top of the front page. Truth test is strict (`true`/`yes`/`1`), so a hand-edited `false` cannot pin by accident; more than one pinned post warns and the newest wins. Listings past page one, the archives and the feeds ignore it |
 | `toc` | string/boolean | table of contents on the post page. Absent = automatic (from 4 headings up); an explicit false suppresses it, an explicit true forces it below that threshold |
@@ -90,7 +90,7 @@ dedup by `source`).
 | `scheduled` | boolean | set on a draft whose `date` is its future publish time; the `publish-scheduled` cron publishes it then and drops the key |
 | `unlisted` | string/boolean | a published post out of the listings, the archives, the feeds, the sitemap and the search index, `noindex` on its page -- but on its ordinary dated address, with its redirects intact. Not a password (see [decisions.md](decisions.md)); the truth test is loose, so a typo hides rather than exposes |
 | `page` | boolean | a page rather than a post: a permanent address (`/<slug>/`), out of the listings, the archives and the feed, but in the sitemap and the search index. Written as `type: page` in front matter; `page: true` is the older spelling and is still read |
-| `translations` | object | the post's text in the OTHER languages the site publishes, keyed by language code: `{"de": {"title": …, "content": [ … ]}}`. An entry may carry `title`, `content` (blocks, the same shapes as below), `excerpt`, and `slug` -- the address that language serves the post at, which is NOT the post's own `slug` (that names the file and the media directory; internally the translated one travels as `address_slug`). Nothing else: the date, the tags, the series, the state and the source belong to the post and hold in every language (`Translations::TEXT_KEYS` is the whole list). A language counts as written once it has a body. Absent = a post in the site's own language, which is every post of an archive that publishes one. See [localization.md](localization.md#what-a-post-carries) |
+| `translations` | object | the post's text in the OTHER languages the site publishes, keyed by language code: `{"de": {"title": …, "content": [ … ]}}`. An entry may carry `title`, `content` (blocks, the same shapes as below), `excerpt`, `slug` -- the address that language serves the post at, which is NOT the post's own `slug` (that names the file and the media directory; internally the translated one travels as `address_slug`) -- and `former_slugs`, the `"year/slug"` addresses THIS LANGUAGE'S text is owed a redirect at: the ones it had as a post of its own before it was merged in as a translation. The build serves each at the site's root and in that language's tree, leading to that language's page (`Translations.former_slugs`). Nothing else: the date, the tags, the series, the state and the source belong to the post and hold in every language (`Translations::TEXT_KEYS` is the whole list). A language counts as written once it has a body. Absent = a post in the site's own language, which is every post of an archive that publishes one. See [localization.md](localization.md#what-a-post-carries) |
 | `redirect_from` | array of strings | site-root paths the post answered at on its PREVIOUS platform (`"/old-post/"`, `"/2009/05/old-post.html"`), written by importers when the new site keeps the old domain. The build emits a redirect stub for each, after everything real -- a live page, listing or site file always wins over a stub, out loud. Deliberately separate from `former_slugs`: that is rename history inside this site, this is where the post lived before it arrived. Paths ending `.html`/`.htm` become literal files (Blogger-era URLs had no trailing slash); first segments the site itself owns (`posts`, `page`, `tag`, `type`, `assets`, `search`, `markdown`) are refused. Published posts only; edits and re-imports carry it over untouched |
 
 **Blocks** (`content` array entries), by `type`:
@@ -140,7 +140,11 @@ see it:
 - **`lib/markdown_parser.rb`** (text → blocks) parses the author's
   markdown once, at save time. The `/markdown/` cheat-sheet page is
   generated through this same parser, so the documented syntax can't
-  drift from the implemented one.
+  drift from the implemented one. The two pictures its examples show are
+  drawings in `assets/cheat-sheet/`: to the parser that folder is the
+  sheet's media, so an example names them bare as a post names its
+  pictures, and like everything under `assets/` they are published as
+  they stand (`/assets/cheat-sheet/landscape.svg`, `portrait.svg`).
 - **`lib/markdown_writer.rb`** (blocks → markdown) is the mirror: it
   renders a stored post back into editable markdown for `blog.sh edit`.
   The output is always re-parseable, though ties between overlapping
@@ -270,7 +274,10 @@ poster frame is imported as an image -- a `video` block with no media would
 render as "video unavailable".
 
 `scripts/import.rb` is a second wizard rather than a menu entry in
-`blog.sh`, and always previews in dry-run before writing. `lib/site_header.rb`
+`blog.sh`, and always previews in dry-run before writing. `lib/launcher.rb`
+is the one piece that is for a single platform: on a Mac `setup.sh` can put
+an icon in Applications that opens Terminal in the site's folder and runs
+`./blog.sh`, built with tools macOS ships. `lib/site_header.rb`
 is shared by both wizards so the site-identity block can't drift between
 them.
 
@@ -359,7 +366,7 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Nineteen questions, in one pass: a `config/site.yml` that is missing, empty,
+Twenty questions, in one pass: a `config/site.yml` that is missing, empty,
 unparseable or unopenable -- the one question about something outside the
 archive, asked because this is what people run before a build and the build
 refuses all four; files the checker cannot read at all, posts
@@ -403,8 +410,10 @@ characters themselves belong; and, on a site that publishes more than one
 language, two posts asking for one address inside one of them -- which the
 build resolves by serving one of the pair and dropping the other, and a
 language `site.locales` names that the engine has no locale file for, which
-stops the build of every language of the site, its own included; and a
-`config/site.<lang>.yml` that nothing reads -- written for a language the
+stops the build of every language of the site, its own included; and
+`site.fallback` or `site.ui_language` kept in `config/site.yml`, where a
+language's own settings stood before 1.9 and the build now refuses them;
+and a `config/site.<lang>.yml` that nothing reads -- written for a language the
 site does not publish, carrying a key the engine does not know, or
 translating something site.yml does not have -- all of which look exactly
 like work that is done; and one whose menu or footer links go to other
@@ -497,6 +506,35 @@ sizes, and the build's own 200-words-per-minute constant for reading
 time -- two places telling a reader how long something takes must not
 disagree.
 
+## On this day (`lib/on_this_day.rb`)
+
+One module decides which posts from earlier years stand on a date and
+which of them the card shows; the command (`scripts/on_this_day.rb`),
+the build and the cron all call it, so what the author sees in the
+terminal is what a reader gets. It is data in, data out: entries (day,
+year, time, titled, word count, plus whatever the caller carries) and a
+date go in, windows of rows come out. It never reads the config and
+never decides a language.
+
+The split between build and cron is the part worth knowing. What a post
+is called and where it lives depends on the language -- a translation's
+own title and address, a fallback's, the site's -- and only the build
+knows that. The day, on the other hand, changes at midnight, when only
+the cron runs. So every build run writes a catalogue for its language
+beside the build cache (`.on-this-day.<lang>.json`: every listed post
+with its selection facts, its title and its address in that language,
+and the tree it belongs to), plus today's file; the cron re-chooses
+from the catalogues and rewrites a file only when its content changed.
+A build with the card off removes its catalogue, and the run that owns
+the site root removes catalogues of languages the site stopped
+publishing -- otherwise the cron would keep writing a tree nobody
+builds.
+
+The page's file carries every window with its start and end in UTC, and
+`sidebar.js` shows the one the clock is in. That is also the staleness
+check: yesterday's file has no window for now, so a stopped cron hides
+the card instead of showing the wrong day.
+
 ## Build pipeline (`build/build_blog.rb`)
 
 The script is the pass itself; the domains it calls live beside it, one
@@ -504,8 +542,15 @@ file each -- `build/blocks.rb` (a content block becomes HTML),
 `build/output.rb` (writing, pruning, and getting a file into
 `public.nosync`), `build/feeds.rb` (RSS, Atom, JSON Feed, sitemap),
 `build/discovery.rb` (the search index and what feeds it),
-`build/cards.rb` (link and social cards) and `lib/series.rb` (what a
-series is and what order its parts go in, which the CLI needs too).
+`build/cards.rb` (link and social cards), `build/languages.rb` (which
+language a run renders, where its reader is sent, and the checks a
+language configuration has to pass), `build/tags.rb` (the tag pages and
+the index of them), `build/archive.rb` (the archive map and a page per
+year) and `lib/series.rb` (what a series is and what order its parts go
+in, which the CLI needs too). The phases in `tags.rb` and `archive.rb`
+are functions with their inputs spelled out -- the posts, the tag map --
+called from the point in the pass where they always ran, so the pages
+are written in the order they always were.
 
 ⚠️ Moving a method out of `build_blog.rb` is not a free refactor: the
 templates in `templates/` are rendered against the script's own binding,
@@ -812,7 +857,7 @@ wrote. Then, in load order:
   wholesale.
 - **Widgets** (`sidebar.js`) read same-origin JSON (`toots.json`,
   `bluesky.json`, `pixelfed.json`, `commits.json`, `rss.json`,
-  `stats.json`) that
+  `stats.json`, and each language tree's `on-this-day.json`) that
   **cron** (`scripts/refresh_sidebar.rb`) fetched server-side -- the
   visitor's browser never contacts GitHub, the Fediverse or Bluesky for
   them. A failed cron fetch keeps the previous JSON rather than
@@ -828,7 +873,9 @@ wrote. Then, in load order:
 - **The tag index** (`tag-index.js`) reorders `/tag/` between alphabetical
   and by-count, and remembers which the reader chose. The page is built
   alphabetically, so a reader without the script gets the order the
-  markup already has rather than a control that does nothing.
+  markup already has rather than a control that does nothing. The row of
+  letters above the list links to the bands between the tags; count order
+  takes the bands out, so the script hides the row with them.
 - **Sharing** (`share.js`) drives the three share controls a link cannot
   be. `mastodon` has no single address to point at -- the destination is
   the reader's own instance -- so it asks once and remembers the answer in
@@ -847,6 +894,14 @@ wrote. Then, in load order:
   never runs shows no button instead of a dead one. It refuses to appear
   at all where the clipboard is unavailable: an insecure origin, or a
   browser without `navigator.clipboard.writeText`.
+- **The 404 page** (`not-found.js`) is the one script a single page asks
+  for by itself rather than through the layout: `/404.html` is one file
+  for every missing address, and only the browser showing it knows which.
+  It reads the address in the bar, puts its words into the page's search
+  field -- the last part that holds a letter, separators turned to
+  spaces -- and shows the archive pill of a year the address names. It
+  searches nothing and redirects nowhere; without it the page is an empty
+  field and the pills that are always there.
 - **i18n:** locale strings the client needs are embedded once per page
   as `window.BLOG_I18N` -- the only inline script, allowlisted in the
   CSP by its SHA-256 content hash rather than `unsafe-inline`.

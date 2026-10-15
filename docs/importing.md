@@ -419,6 +419,10 @@ directory whose only markdown is its `_index.md` and which carries prose
 or files of its own is a page written that way (`about/_index.md` with
 its pictures beside it), and it is imported under the directory's name.
 
+`<!--more-->` on a line of its own -- where Jekyll and Hugo end an
+excerpt -- is read as the end of the teaser, the line this engine writes
+`//--more--//` for. Inside a code fence it is the code.
+
 **A tree written by `./blog.sh export` comes back whole.** Its front
 matter carries a `blogsh:` block -- the post's identity and everything
 else no other engine has a word for -- and this importer reads it back,

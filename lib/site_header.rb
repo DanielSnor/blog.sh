@@ -50,8 +50,9 @@ module SiteHeader
   # is where someone about to report a problem is already looking.
   # `extra:` is one more line under the identity, barred like the rest --
   # the CLI commands put their mode there.
-  def render(tool: './blog.sh', extra: nil)
-    bar = Tui.paint('▍', :cyan)
+  # The three facts the header is made of, for `version --json` and for
+  # render below: the site's short name, its claim as one line, its URL.
+  def identity
     short_name = setting('site', 'short_name')
     base_url = ENV['SITE_BASE_URL'] || setting('site', 'base_url')
 
@@ -72,13 +73,20 @@ module SiteHeader
                            .map { |part| part.gsub(/<[^>]+>/, '').strip }
                            .reject(&:empty?)
                            .join(' · ')
-    claim = [short_name, claim_text].compact.reject(&:empty?).join(' — ')
-
     # The full URL, protocol included, not a bare domain: terminals
     # linkify what they see, and a bare domain got mangled into a
     # punycode guess (https://xn--...) -- with the protocol present the
     # link is exactly the site's address.
-    url = base_url.to_s.chomp('/')
+    { 'name' => short_name.to_s, 'claim' => claim_text, 'url' => base_url.to_s.chomp('/') }
+  rescue StandardError, SystemExit
+    { 'name' => '', 'claim' => '', 'url' => '' }
+  end
+
+  def render(tool: './blog.sh', extra: nil)
+    bar = Tui.paint('▍', :cyan)
+    who = identity
+    claim = [who['name'], who['claim']].reject(&:empty?).join(' — ')
+    url = who['url']
 
     lines = ["#{Tui.paint(tool, :bold)} #{Tui.paint(BlogSh::VERSION, :dim)}"]
     lines << claim unless claim.empty?
