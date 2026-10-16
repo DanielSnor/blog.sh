@@ -4293,3 +4293,24 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-li
   body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > p:first-of-type { flex: 0 0 100%; }
   body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge { margin-bottom: 6px; }
 }
+
+/* A search result shows the post's first picture, where it has one (the
+   engine hands it over hidden): a square at the end of the row, the wall
+   in small, with air under it so two rows of pictures never touch. The
+   date's column is minimal's, 104px. On a phone it stands beside the
+   words. */
+.search-result:has(> .search-result__picture) { grid-template-columns: 104px minmax(0, 1fr) 96px; }
+.search-result > .search-result__picture {
+  display: block;
+  grid-column: 3;
+  grid-row: 1 / span 3;
+  width: 96px;
+  height: 96px;
+  margin: 0 0 14px;
+  object-fit: cover;
+  border-radius: var(--tile);
+}
+@media (max-width: 560px) {
+  .search-result:has(> .search-result__picture) { grid-template-columns: minmax(0, 1fr) 72px; column-gap: 14px; }
+  .search-result > .search-result__picture { grid-column: 2; grid-row: 1 / span 3; width: 72px; height: 72px; }
+}

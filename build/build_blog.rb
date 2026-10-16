@@ -3955,7 +3955,16 @@ def search_index_entry(post)
     # -- it is the address of the tag page -- and where the two are one
     # word, as on a site's own language, nothing changes.
     folded: PostText.searchable(post.merge('tags' => searchable_tags(post)), text)
-  }
+  }.merge(search_picture(post))
+end
+
+# The post's first picture, for a skin that shows one beside a result: a
+# wall of pictures (Pictorial) whose search was a list of words. Only where
+# there is one, so the index of a site that writes text grows by nothing;
+# the address the page's own <img> uses.
+def search_picture(post)
+  picture = first_usable_image(post)
+  picture ? { img: "#{post_href(post)}#{media_name_encoded(picture.last['url'])}" } : {}
 end
 
 def searchable_tags(post)

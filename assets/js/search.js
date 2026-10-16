@@ -214,6 +214,9 @@
       var title = p.title || fromText || p.date;
       return (
         '<div class="card post-list-item search-result">' +
+          // The post's first picture, where the index has one: hidden by
+          // the engine's own rules, shown by a skin that wants it.
+          (p.img ? '<img class="search-result__picture" src="' + escapeHtml(p.img) + '" alt="" loading="lazy" decoding="async">' : '') +
           '<p class="meta">' + escapeHtml(p.date) + '</p>' +
           '<h2><a href="' + escapeHtml(p.url) + '">' + markTerms(title, terms) + '</a></h2>' +
           '<p>' + markTerms(p.excerpt, terms) + '</p>' +

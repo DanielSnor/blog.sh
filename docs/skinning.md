@@ -310,7 +310,11 @@ it (`reply: true`), so the indent appears with the next refresh.
 so a skin can keep the number and drop the word. In a result's title and
 excerpt the words that were asked for are `<mark>`; `site.css` gives it
 the pills' ground instead of the browser's yellow
-(`.search-result mark`).
+(`.search-result mark`). A result whose post has a picture carries its
+first one, first in the card: `<img class="search-result__picture"
+alt="" loading="lazy">`. `site.css` hides it -- a site of words keeps its
+list of words -- and a skin that wants it says `display: block` and where
+it goes (Minimal Pictorial puts a square at the end of the row).
 
 **The days a page covers.** Under a listing, the label between the two
 links is `page 12` -- the word in `.pagination-word`, the number in

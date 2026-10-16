@@ -159,6 +159,9 @@ img, video { max-width: 100%; height: auto; }
    lib/embed.rb), so the height comes from the tag and only the frame is
    styled here. */
 .embed-audio { display: block; width: 100%; border: 0; margin: 1rem 0; }
+/* A search result's picture (the post's first, where it has one) is a
+   skin's to show: a site of words keeps its list of words. */
+.search-result__picture { display: none; }
 
 /* ---- after the skin ---- */
 

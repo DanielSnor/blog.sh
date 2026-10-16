@@ -32,6 +32,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **A card carries the hour its post went out, hidden.** For a skin that wants it; never an hour an importer made up.
 - **A gallery's card says how many pictures it has.** `data-photos="N"`, on a post with two or more.
 - **A menu item can name a series.** `series:` leads to its listing and marks every part of it as the chapter you are in.
+- **A search result can show the post's first picture.** The index carries it (`img`, only where there is one); the engine hides it and Minimal Pictorial shows a square at the end of the row.
 
 ### Changed
 
