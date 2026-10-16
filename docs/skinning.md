@@ -16,7 +16,11 @@ engine ships its own in `skins/` and a site picks one with `site.skin:` in
 `config/site.yml` -- `classic`, the look blog.sh has always had, unless it
 says otherwise, or `minimal`: paper, ink and one colour, the base of the
 Minimal family -- or one of its variants: `minimal-literal` (a book's
-setting: one column, a serif, a reader's measure), `minimal-pictorial`
+setting: one column, a serif, a reader's measure), `minimal-journal` (a
+diary, read by its days: a line of time down the left, the date its
+heading), `minimal-manual` (a manual: a series is a chapter, the menu --
+chapters, and `group: true` over them -- down the side from 1100px, the
+sections of a page numbered), `minimal-pictorial`
 (a wall of pictures where the listing stood, three across, the front
 page's lead a row of its own; `layout.lead_card` and a page of nine or
 twelve posts suit it) or `minimal-terminal`

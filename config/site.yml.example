@@ -131,6 +131,8 @@ site:
   # (skins/ beside this engine): classic, the look blog.sh has always had,
   # unless a site says otherwise; or minimal -- paper, ink and one colour;
   # or minimal-literal -- minimal set as a book: one column and a serif;
+  # or minimal-journal -- a diary: a line of time down the left;
+  # or minimal-manual -- a manual: chapters (series) in a menu down the side;
   # or minimal-pictorial -- a wall of pictures three across where the
   # listing stood (layout.lead_card and a page of 9 or 12 posts suit it);
   # or minimal-terminal -- a page the way a terminal would print it (it sets

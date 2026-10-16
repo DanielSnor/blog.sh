@@ -1,0 +1,4098 @@
+/* minimal journal -- a skin for blog.sh, of the minimal family.
+
+   The page is a diary. Minimal stands underneath, whole: the head, the
+   menu, the lead, the sidebar, a post's page, the engine's pages. This file
+   changes the listing: it is led by time, not by titles. A line runs down
+   the left of it, each entry hangs on that line by its date, and an entry
+   is read whole, as the engine put it in its card -- not three lines of how
+   it begins.
+
+   The palette is the site's, the faces the engine's, as in minimal.
+
+   Worn with `site.skin: minimal-journal`. Made by skins/src/build.rb:
+   skins/minimal.css whole, then the layer in skins/src/journal.css --
+   change the layer, never the file made from it. */
+
+/* ---- part one: what minimal keeps of classic ----
+
+   The rules of skins/classic.css that minimal does not say itself, in
+   classic's order: every declaration minimal sets again for the same
+   selector under the same @media is gone from here, since it could never
+   win, and a rule left with nothing is gone with it. So the two parts
+   together draw exactly what classic with minimal.css loaded after it drew
+   -- the way minimal was worn until 1.11. The comments are classic's. */
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+/* Four controls the ring goes INSIDE instead of around, each for its own
+   reason -- and in every one of them the reason is that the ground just
+   outside the control is not something this stylesheet can vouch for.
+
+   The appearance toggle sits on a photograph and the lightbox controls on
+   a near-black overlay, so nothing can be assumed about what is behind
+   them. Plenty is known about what is inside them, though: an accent fill
+   under a white glyph, a pale disc under a white one. Both already carry
+   white as their own foreground, so the ring moves in and borrows it --
+   as readable as the label it belongs to, whatever the picture underneath
+   is doing. */
+#theme-toggle:focus-visible,
+.lightbox-close:focus-visible,
+.lightbox-nav:focus-visible {
+  outline-color: #ffffff;
+  outline-offset: -3px;
+}
+
+/* Nav items are 70px boxes in a 60px bar -- the 5px they stand proud top
+   and bottom is what lets a hovered link paint over the bar's own frame
+   (see nav li above). A ring around that box therefore starts outside the
+   bar, in the banner above it and the border below. Inside, it lands on
+   the item and reads as the same rectangle the active item wears filled. */
+nav a:focus-visible { outline-offset: -3px; }
+
+/* Two more accent-on-accent cases, where the base rule would draw the ring
+   in the exact colour of the ground it lands on and quietly do nothing:
+   the item whose listing you are already in, filled with the accent, and
+   the date badge, which is accent all the way to its edge with the link
+   filling it. Both take white -- the colour each already prints its own
+   text in. The badge holds its ring a further pixel in, so the corners
+   stay clear of the 4px radius rather than crossing it. */
+nav a[aria-current="page"]:focus-visible { outline-color: #ffffff; }
+
+/* The bar holds two things that both want the width: the type filters and
+   the search box. With every content type present the menu is nine items,
+   and measured against the 908px this has inside a 940px page, the three
+   shipped locales came out at 906 (en), 927 (cs) and 899 (de) -- so the
+   longest one already ran under the search field and the other two had
+   single-digit slack. The three rules that keep it honest, in order:
+   the menu may wrap to a second row (a bar that grows is better than a
+   label hidden under an input), the search box never shrinks or gets
+   overlapped, and `min-width: 0` lets the menu actually give way instead
+   of forcing the overflow it used to. Between 700px and the full width
+   the same applied to every locale, English included. */
+nav {
+  background: var(--nav-bg);
+  padding: 0 1rem;
+  min-height: 60px;
+  box-sizing: content-box;
+  display: flex;
+  justify-content: space-between;
+  /* flex-start, NOT center: the active item's fill is exactly the bar's
+     60px content box (the transparent 5px borders and background-clip
+     keep it off the frame), so it only sits flush if the menu starts at
+     the top. Centering it left a strip of bar showing under the fill.
+     The search box centres itself with its own align-self. */
+  align-items: flex-start;
+  gap: 1rem;
+  border-top: 5px solid var(--nav-border);
+  border-bottom: 5px solid var(--nav-border);
+}
+
+/* The bar follows the reader down the page. On an archive listing -- and
+   more so on a post, where the way out is the menu and the menu was at the
+   top of an article they have just read to the bottom of -- that is the
+   difference between changing your mind about what to read and scrolling
+   all the way back to be allowed to.
+
+   Scoped to the page's own bar rather than to `nav`: a post also carries a
+   pagination nav inside <main>, and there is nothing sticky about "older
+   posts".
+
+   Above the page, below the two things meant to cover it: the back-to-top
+   button at 10 and the lightbox at 100. The bar paints its own opaque
+   background, or the text would show through as it passed underneath. */
+.wrap > nav {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+}
+
+nav ul { list-style: none; display: flex; flex-wrap: wrap; min-width: 0; margin: 0; padding: 0; }
+
+/* 1.25rem rather than the original 1.875rem: eight gaps at nine items,
+   so the difference is 80px -- the whole overflow and then some, in
+   every locale, without a single label getting shorter. */
+/* The explicit height matters as much as the line-height: the link inside
+   is 60px tall plus two 5px borders and a -5px top margin, so its border
+   box contributes 65px to the row unless the row is told otherwise. The
+   bar used to be `height: 60px`, which simply clipped that; once it became
+   `min-height` (so the menu can wrap), the extra 5px grew the bar instead
+   and left a strip of bar background under the active item's fill. Fixing
+   the row's height keeps the overflow purely visual -- which is the whole
+   point of it: it is what lets a hovered link paint over the bar's frame. */
+nav li {
+  font-weight: 400;
+  color: var(--nav-text);
+}
+
+nav li:first-child { margin-left: 0; }
+
+nav a {
+  height: 60px;
+  display: block;
+  color: var(--nav-text);
+  text-decoration: none;
+  letter-spacing: 0.05em;
+  margin-top: -5px;
+  border-top: 5px solid transparent;
+  border-bottom: 5px solid transparent;
+  transition: 0.3s ease-in-out;
+  box-sizing: content-box;
+}
+
+nav a:hover { color: var(--accent); border-top-color: var(--accent); border-bottom-color: var(--accent); }
+
+/* The listing you're currently on, filled like a .date-badge (accent
+   ground, white text) so the menu reads as a filter with one option
+   taken. background-clip keeps the fill off the nav bar's own 5px
+   frame, which the transparent borders above would otherwise let it
+   paint over. The negative margins let the fill spill into the gap on
+   each side without widening the item -- without them every item after
+   the active one shifts sideways, so the whole bar jumps as you move
+   between listings.
+
+   The inset is HALF the gap between items, so the fill reaches exactly
+   as far towards its neighbours as they are from it. It used to be the
+   nav's own 16px against a 30px gap, which was nearly half; when the
+   gap dropped to 20px to fit nine types, that same 16px left 4px of air
+   before the next label and the fill read as a too-wide block.
+
+   The first item is the exception: it has no neighbour on its left, and
+   the bar's own 16px padding is what it has to reach across to sit
+   flush with the edge instead of leaving a sliver of background beside
+   it. */
+nav a[aria-current="page"] {
+  background: var(--accent);
+  background-clip: padding-box;
+  color: #ffffff;
+  padding: 0 0.625rem;
+  margin-left: -0.625rem;
+  margin-right: -0.625rem;
+}
+
+nav li:first-child a[aria-current="page"] {
+  padding-left: 1rem;
+  margin-left: -1rem;
+}
+/* Without this the generic :hover above would paint the text --accent
+   on an --accent ground and the label would vanish. Inverts the way
+   .date-badge:hover does rather than inventing a third behaviour. */
+nav a[aria-current="page"]:hover {
+  background: var(--hover-invert);
+  color: var(--badge-hover-text);
+  border-color: transparent;
+}
+
+/* 44px, which is the smallest a finger reliably hits, and 4px more than
+   this was. It costs nothing to look at: the button has no background and
+   no border, so all that grows is the area that answers to a tap around a
+   24px glyph that has not moved. */
+.nav-toggle {
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  align-self: center;
+  background: none;
+  border: none;
+  color: var(--nav-text);
+  cursor: pointer;
+  padding: 0;
+}
+.nav-toggle:hover { color: var(--accent); }
+
+/* flex: 0 0 auto -- the search box is the one thing in the bar that must
+   not be squeezed: a field narrower than its placeholder is useless, and
+   an overlapped one is worse. 160px rather than 225px buys the menu
+   another 65px, and still fits "Search…" with room to type in. */
+.search-form { position: relative; align-self: center; display: flex; flex: 0 0 auto; }
+.search-form input[type="search"] {
+  box-sizing: border-box;
+}
+.search-form input[type="search"]::-webkit-search-cancel-button { display: none; }
+.search-form button {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  transition: 0.3s ease-in-out;
+}
+
+.banner-wrap { position: relative; }
+.banner-link { display: block; }
+
+/* Darkens the corner an overlay line sits in, so the title/claim stay
+   readable regardless of what the image itself looks like -- same technique
+   as fedik.online's hero, since the image doesn't change with the light/dark
+   toggle but the text needs to stay on top of it either way.
+
+   Each corner is tied to its own overlay: a site with banner.show_title /
+   show_claim off gets that corner left alone, and with both off the image is
+   shown exactly as authored. Gating this in CSS via :has() rather than a
+   class the template emits is deliberate -- an overlay toggle then changes
+   one stylesheet instead of re-rendering every page in the archive. Where
+   :has() is unsupported the scrim simply isn't painted, which costs a little
+   contrast rather than breaking the header.
+
+   A header without its picture (banner.show_image: false, below) has
+   nothing to darken. It is excluded inside :where() and not by a bare
+   :not(), which would have made these three selectors one class heavier
+   -- and every skin that switches a scrim off with the selector as it
+   stood would have got it back, on sites that never touched the setting. */
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-title)::before,
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-claim)::after {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-title)::before {
+  background: linear-gradient(135deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
+}
+
+.banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-claim)::after {
+  background: linear-gradient(315deg, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 45%);
+}
+
+/* Both overlay lines in one box, laid out as a column. They used to be
+   pinned to opposite corners of the picture, which meant the only thing
+   keeping them apart was there being enough picture between them -- and on
+   a phone there is not. A banner scaled to a 375px screen is around 100px
+   tall, and a 30px title with a claim wrapped onto two lines fills that on
+   its own: on blogsh.app the two printed across each other for 79px, both
+   unreadable, with the claim reaching under the appearance toggle as well.
+   Two items in a column cannot overlap however short the column gets.
+
+   The corners are the same as before. The title is simply the column's
+   first item; the claim is pushed to the far end by its own auto margin
+   rather than by justify-content: space-between, which would have sent a
+   site showing ONLY a claim to the top of the banner instead of the
+   bottom. The insets that used to be each line's own top/left/bottom/right
+   are the box's padding now, so there is one place to change them.
+
+   pointer-events sits on the box rather than on the two lines, so the
+   whole banner is still one click target for the link underneath -- the
+   padding between the lines would otherwise swallow a tap. */
+.banner-overlay {
+  inset: 0;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  pointer-events: none;
+}
+
+.banner-title,
+.banner-claim {
+  margin: 0;
+}
+
+/* Colors and fonts both come from colors.css (config/site.yml's
+   colors.<mode>.banner_title/banner_claim and fonts.banner_title/
+   banner_claim, all independently optional) -- no light/dark override pair
+   needed here, colors.css already carries both modes. The font stacks
+   repeat the engine's default as the var() fallback, so a page served with
+   a stylesheet older than this rule still gets a monospace header rather
+   than the browser's default serif. */
+
+.banner-claim {
+  font-weight: 400;
+}
+
+/* The narrow-screen sizes are scaled from the configured ones rather than
+   written out, so a site that sets its own size keeps the step down on a
+   phone instead of overflowing the banner with it. The factors are the
+   ratios the fixed values always had (30/45, 14/20), and calc() means the
+   configured value can be in any unit -- px, rem, even a clamp().
+
+   The column now guarantees the two lines cannot meet, but a short banner
+   can still be asked to hold more text than it has room for, so the phone
+   also gets its insets back: 10px and 14px instead of 20 and 24 is another
+   20px of height to put the lines in, on a banner that has about a
+   hundred.
+
+   The claim gives up its width cap here, and that is what stops it needing
+   two lines in the first place -- 65% of a 375px screen is 244px, which is
+   where a claim of any length wraps. It has nothing to avoid at the bottom
+   of the column. The title keeps its cap for the opposite reason: the
+   appearance toggle sits in the corner it starts from, and 65% is what has
+   always kept it from running underneath. */
+@media (max-width: 700px) {
+  /* On a phone the block already runs to both edges of the screen, so a
+     frame has nothing to enclose -- and two more lines take two more
+     pixels from a column that has none to spare. A tablet keeps them:
+     there the page still sits on a background. */
+  .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); }
+  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); }
+
+  /* The claim's scrim follows it. A corner gradient darkens the corner a
+     corner-anchored text sits in, and the claim is no longer one: it runs
+     the width of the banner here, and its first words start where a
+     diagonal fading out at 45% has nothing left to give. On a bright
+     picture -- a sky, a screen, a whitewashed wall -- that end of the line
+     was being read off the photograph itself. So on a phone the scrim
+     becomes the shape the text became: a band across the bottom. The
+     title keeps the corner it was drawn for. */
+  .banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-claim)::after {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.5) 0%, rgba(0, 0, 0, 0) 55%);
+  }
+}
+
+/* A header without its picture: banner.show_image: false. The name and
+   the claim stand on the page itself, one under the other at the left
+   edge, in the page's own text colours (colors.css gives the two their
+   defaults for this case; a colour the site set is kept).
+
+   The markup is the banner's with the <img> taken out and nothing else
+   moved -- the link is still there, empty, and here it is laid over the
+   whole header so the header is one way home as the picture was.
+
+   Every rule hangs on :where(), which weighs nothing: each is exactly as
+   heavy as the rule it replaces above and wins only by coming later. A
+   skin that already draws its own header out of these elements -- hides
+   the picture, sets `.banner-overlay`, `.banner-title` -- is loaded after
+   this file and wins every one of them back with the selectors it has
+   always used. Such a site turns the picture off and looks the same; its
+   readers just stop downloading a picture nobody showed them.
+
+   This block has to stay BELOW the phone's rules for the banner: the
+   sizes and the padding here are for every width. */
+:where(.banner-wrap--plain) { min-height: 3.25rem; }
+:where(.banner-wrap--plain) .banner-link { position: absolute; inset: 0; z-index: 1; }
+/* Scaled from the configured sizes, as the phone's are: 45px and 20px are
+   sizes for a line laid across a picture, and 32px and 16px are what the
+   same two lines want on a page. A site that set its own keeps the ratio. */
+:where(.banner-wrap--plain) .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.711); }
+:where(.banner-wrap--plain) .banner-claim {
+  align-self: flex-start;
+  margin-top: 0.3rem;
+  font-size: calc(var(--banner-claim-size, 20px) * 0.8);
+  text-align: left;
+}
+
+/* The two controls that belong to the reader rather than to the site:
+   which language they read it in, and whether it is light or dark. They
+   sit together in the banner's corner because they are the same kind of
+   thing -- a choice about this visit, not a place to go. The language
+   switcher spent its first days as a band under the menu, which broke the
+   menu in two (Daniel, 21. 9. 2026: it must not be in the menu).
+
+   The row exists only on a site with more than one language -- with one
+   there is nothing to stand beside, and the button keeps the corner to
+   itself as it always has (see #theme-toggle below). */
+.banner-tools {
+  /* 🪤 No z-index here on purpose. With one, this box becomes a stacking
+     context and the layer its children ask for stops meaning anything
+     outside it -- which would quietly break the advice docs/skinning.md
+     gives every skin that unsticks the bar: `#theme-toggle { z-index: 6 }`.
+     The children carry their own layer instead, in the context the banner
+     is already in. */
+  display: flex;
+}
+
+/* The same chip as the button beside it: a reader who has understood one
+   of them has understood the other. The codes are what fits a chip that
+   has to hold four of them one day; the name each code stands for is in
+   the title and the label, exactly as the button carries its sentence
+   there rather than on its face. */
+.lang-switch {
+  position: relative;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  white-space: nowrap;
+  /* One target, like the button beside it: the whole chip takes the click
+     and moves you on, rather than asking a reader to hit two letters. */
+  cursor: pointer;
+  text-decoration: none;
+  min-height: 0;
+  /* The same line box as the button beside it -- with line-height: 1 the
+     chip came out 25px against its 33px and sat visibly high in the row. */
+  line-height: normal;
+  transition: 0.3s ease-in-out;
+}
+
+.lang-switch__item {
+  display: inline;
+  margin: 0;
+  height: auto;
+  background: none;
+  border: 0;
+  line-height: inherit;
+  font-size: inherit;
+  letter-spacing: normal;
+  text-decoration: none;
+}
+
+.lang-switch__item.is-current { font-weight: 700; }
+
+a.lang-switch:hover .lang-switch__item.is-current {
+  opacity: 1;
+}
+
+/* No spaces around it: the button next door reads ☀︎/☾︎, and this is the
+   same word in the same voice. */
+.lang-switch__item + .lang-switch__item::before {
+  color: var(--lang-switch-dim, rgba(255, 255, 255, 0.5));
+  font-weight: 400;
+}
+
+#theme-toggle {
+  z-index: 3;
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+  text-align: center;
+}
+/* In the corner row beside the language switcher the ROW places it, so
+   it gives up its own place there: relative rather than static, so a skin
+   that lifts it above an unstuck bar (`#theme-toggle { z-index: 6 }`, which
+   docs/skinning.md tells it to do) still has an element a layer applies
+   to. The offsets are reset here, at a weight a skin's bare
+   `#theme-toggle { top: 32px }` cannot outrank -- written for the corner,
+   those numbers would otherwise shift the button off its place in the row
+   -- and the translateY(-50%) that centres it on a bar pulled it half its
+   height out of the row, off the top of the page (arch-linux.cz's skin on
+   a two-language build). A skin moves the row instead, `.banner-tools`. */
+.banner-tools #theme-toggle {
+  position: relative;
+  top: auto;
+  right: auto;
+  bottom: auto;
+  left: auto;
+  transform: none;
+}
+
+/* The button is 32px tall and a finger wants 44. Growing it would be the
+   obvious answer and the wrong one: this thing sits on the banner of every
+   site built with the engine, and 12px of extra height is a visible change
+   to a corner nobody asked to have redecorated. So the target grows and
+   the button does not -- 6px of reach above and below, which is part of
+   the button for a tap and invisible to the eye. Width needs nothing: the
+   three-glyph floor already keeps it past 44. */
+#theme-toggle::after {
+  content: "";
+  position: absolute;
+  inset: -6px 0;
+}
+
+.banner { width: 100%; height: auto; }
+
+.layout {
+  display: grid;
+}
+
+@media (max-width: 700px) {
+  .wrap { margin-top: 0; margin-bottom: 0; }
+
+  /* minmax(0, 1fr), not 1fr: plain 1fr is shorthand for minmax(auto, 1fr),
+     and that "auto" stops the column from shrinking below its widest
+     unbreakable content. A code block doesn't wrap, so it stretched the
+     whole column -- and with it the whole page -- wide, instead of
+     scrolling within itself. The desktop rule above has always had a zero
+     here, which is why this only showed up on narrow (mobile) viewports. */
+  .layout { grid-template-columns: minmax(0, 1fr); }
+
+  /* The bar hugs what it holds instead of standing 60px tall regardless.
+     That floor was worth having when the bar held one 40px hamburger and
+     nothing else; with the search field beside it there is nothing left to
+     prop up, and the floor had become the reason the top row moved: closed,
+     the spare 16px was shared out above and below the row, and the moment
+     the menu opened there was no spare (the 1rem gap between flex lines had
+     taken it), so the button and the field slid 8px up as the menu came
+     down. Hugging, the row sits at the same offset in both states -- and
+     the bar comes out 70px, exactly what it is on a desktop. */
+  nav {
+    flex-wrap: wrap;
+    height: auto;
+    min-height: 0;
+    padding: 0.5rem 1rem;
+  }
+
+  /* The search field stays in the bar on a phone. It used to be folded away
+     with the menu, which put the archive's only way in behind a button that
+     says nothing about search -- on a site with four thousand posts that is
+     the wrong thing to hide, and it was hidden in the emptiest bar on the
+     site: one 44px button and the rest of the width doing nothing.
+
+     `order` puts it beside that button rather than after the menu. Without
+     it the field is the third item in the row, so opening the menu -- which
+     is 100% wide and wraps to its own line -- would push the field down to a
+     third line, moving the thing the reader was about to tap. The cost of
+     ordering is the usual one, that Tab follows the markup and not the eye:
+     with the menu open, Tab goes from the button to the menu items below
+     before reaching the field above them. Closed, the items are display:none
+     and there is nothing to disagree about -- and open is a state the reader
+     has just asked for, with the items being what they asked for. */
+  nav ul { display: none; }
+  nav.nav-open ul { display: flex; flex-direction: column; margin-top: 0.5rem; }
+
+  /* Takes what the button leaves. min-width: 0 because a flex item will not
+     shrink below its content by default, and the field carries a
+     placeholder. */
+  .search-form { min-width: 0; }
+
+  
+  /* height too. The desktop bar fixes the row at 60px so a hovered link
+     can paint over the bar's frame; stacked on a narrow screen that
+     leaves every 40px link floating in a 60px row, with the divider
+     under it in mid-gap rather than under the text. The rest of this
+     block already undoes the desktop row metrics -- this was the one
+     property left behind. */
+  nav li { float: none; margin-left: 0; height: auto; }
+
+  nav a {
+    height: auto;
+    margin-top: 0;
+    padding: 0.6rem 0;
+    border-top: none;
+    border-bottom: 1px solid var(--border);
+  }
+  nav li:last-child a { border-bottom: none; }
+  nav a:hover { border-color: transparent; }
+  /* Stacked rows, so the fill spans the whole row: 1rem of padding to
+     replace the nav's own, and matching negative margins so the label
+     still lines up with the items above and below it. The separator
+     under it would cut the fill in half, hence transparent. */
+  nav a[aria-current="page"] {
+    padding: 0.6rem 1rem;
+    margin-left: -1rem;
+    margin-right: -1rem;
+    border-bottom-color: transparent;
+  }
+
+}
+
+/* No horizontal padding: the 260px grid track IS the sidebar's content
+   width. The air on both sides is layout-level -- grid gap on the left,
+   the layout's own edge padding on the right. */
+
+h1 { color: var(--accent); font-size: 1.6rem; margin-top: 0; }
+h2 { color: var(--accent); font-size: 1.75rem; font-weight: 600; line-height: 1.25; margin-top: 0; }
+h3 { color: var(--accent); font-size: 1rem; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 0; }
+
+.post-list-item h2 { font-weight: 600; font-size: 1.6rem; }
+.post-list-item h2 a { transition: 0.3s ease-in-out; }
+
+.content h1, .content h2 {
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.75rem;
+}
+/* h3 outside .content is a card heading (uppercase, small); inside an
+   article it should be a normal subheading -- hence overriding it here. */
+.content h3, .content h4, .content h5, .content h6 {
+  color: var(--accent);
+  text-transform: none;
+  letter-spacing: normal;
+  font-weight: 600;
+  line-height: 1.3;
+  margin: 1.5rem 0 0.5rem;
+}
+.content h4, .content h5, .content h6 { font-size: 0.95rem; }
+
+.content table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 0.9rem;
+}
+.content th, .content td {
+  border: 1px solid var(--border);
+  padding: 0.4rem 0.6rem;
+  text-align: left;
+  vertical-align: top;
+}
+.content th { font-weight: 600; }
+
+/* The icon lives once in a variable, not twice across the prefixed and
+   unprefixed declarations -- it's almost a kilobyte of data URI. */
+:root {
+  --apple-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 384 512'%3E%3Cpath d='M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z'/%3E%3C/svg%3E");
+}
+
+.content a[href^="https://apps.apple.com"]::before,
+.content a[href^="https://testflight.apple.com"]::before {
+  content: "";
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin-right: 0.3em;
+  vertical-align: -0.1em;
+  background-color: currentColor;
+  -webkit-mask-image: var(--apple-icon);
+  mask-image: var(--apple-icon);
+  -webkit-mask-size: contain;
+  mask-size: contain;
+  -webkit-mask-repeat: no-repeat;
+  mask-repeat: no-repeat;
+}
+
+.meta { color: var(--meta-text); font-size: 0.85rem; }
+
+/* Preview of an unpublished post -- deliberately impossible to miss, so a
+   draft can't be mistaken for something that's actually live on the blog. */
+/* Chat blocks: speaker bold on its own line, the line indented under it --
+   the classic chat-post shape. */
+dl.chat { margin: 1rem 0; }
+dl.chat dt { font-weight: 700; margin-top: 0.5em; }
+dl.chat dt:first-child { margin-top: 0; }
+dl.chat dd { margin: 0 0 0 1.25rem; }
+
+/* A quote's attribution: its own right-aligned line, visually detached
+   from the quoted text. */
+blockquote cite { display: block; margin-top: 0.5em; text-align: right; font-style: normal; color: var(--meta-text); }
+
+/* Task-list items: the checkbox replaces the bullet. Disabled on purpose --
+   a reader can't toggle someone's published to-do. */
+li.task-item { list-style: none; margin-left: -1.1em; }
+li.task-item input { margin-right: 0.45em; }
+
+.draft-banner {
+  background: var(--accent);
+  color: #ffffff;
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+.draft-banner strong { color: #ffffff; display: block; }
+/* The link needs to stay visible against the accent color, and a long
+   address must not overflow the page on a narrow screen. */
+.draft-banner a {
+  display: block;
+  color: #ffffff;
+  text-decoration: underline;
+  word-break: break-all;
+}
+
+/* The native audio player is an inline element with a fixed size of its
+   own -- centred so it lines up with the figcaption underneath. */
+.content audio { display: block; margin: 0 auto; }
+
+figcaption {
+  text-align: center;
+  margin-top: 0.4rem;
+}
+
+a { transition: 0.3s ease-in-out; }
+
+blockquote {
+  margin-left: 0;
+  padding-left: 1rem;
+  color: var(--text);
+}
+
+/* .chrome-text is the about card and the footer note -- config text that
+   speaks the same Markdown a post does (build_blog.rb's config_html), so it
+   can arrive as a rule, a quote or a code block. It gets the same look as
+   the post body rather than a second set of values to keep in step.
+   Lists are the exception: the browser's 40px marker indent is a sixth of
+   a 260px sidebar, so both zones use the same narrower one. */
+.chrome-text ul, .chrome-text ol { padding-left: 1.2rem; margin: 0.5rem 0; }
+.content hr, .chrome-text hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+.content pre, .chrome-text pre {
+  padding: 0.85rem 1rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+}
+/* The copy button hangs on a WRAPPER the script builds around the block,
+   not on the block itself. A <pre> that scrolls is its own scroll
+   container, so an absolutely positioned child of it is placed against
+   the CONTENT: on a long command the button rode across the code as the
+   reader scrolled, and at the far end left the block altogether. The
+   wrapper does not scroll, so the corner stays a corner. */
+.code-wrap { position: relative; }
+.copy-code {
+  position: absolute;
+  top: 0.35rem;
+  right: 0.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  padding: 0;
+  border: 1px solid var(--border);
+  color: var(--meta-text);
+  cursor: pointer;
+  /* Always there rather than on hover: a phone has no hover, and a button
+     that appears only to a mouse is a button half the readers never get. */
+  opacity: 0.75;
+  transition: opacity 0.2s ease-in-out, color 0.2s ease-in-out;
+}
+.copy-code:hover, .copy-code:focus-visible { opacity: 1; color: var(--text); }
+/* The icon becoming a check is the whole of the VISIBLE feedback; the
+   button's own name carries it for a reader who cannot see the corner. */
+.copy-code--done { color: var(--accent); opacity: 1; }
+/* Room ABOVE the first line rather than beside it. Padding on the side
+   cannot work: a code block does not wrap, so its long first line runs
+   under anything parked at the right edge -- measured on this project's
+   own /markdown/ page, 14 of 27 blocks had characters covered on a
+   phone. A strip at the top is the only place a button can sit where no
+   character can ever be behind it. */
+.code-wrap > pre.code-block { padding-top: 2.5rem; }
+@media (prefers-reduced-motion: reduce) {
+  .copy-code { transition: none; }
+}
+/* Inline `code` spans get a small pill look; .content pre code below
+   resets that for the fenced-block case so the two don't double up. */
+.content code, .chrome-text code {
+  padding: 0.1em 0.35em;
+  font-size: 0.9em;
+}
+.content pre code, .chrome-text pre code {
+  padding: 0;
+  border-radius: 0;
+  font-size: 0.85rem;
+  color: var(--text);
+  white-space: pre;
+}
+
+.video-unavailable, .audio-unavailable { color: var(--meta-text); font-style: italic; }
+/* The note search.js draws when the archive index will not load. Its twin
+   -- the line shown while the index is still coming -- has always been
+   styled; this one was left plain, so the one message that says a SEARCH
+   IS INCOMPLETE looked like ordinary text. */
+.search-archive-failed { color: var(--meta-text); font-style: italic; }
+
+/* The link block is body text and stays body text. A link post's title is
+   no longer in here -- it is the post's heading now, in an h1 or an h2 like
+   every other title (see post_heading_html in build_blog.rb) -- so what is
+   left in the block is the description, or an ordinary inline link where a
+   titled post quotes something mid-article. */
+.link-block { margin: 1rem 0; }
+
+.post-header { display: flex; align-items: flex-start; }
+.post-body { flex: 1 1 auto; min-width: 0; }
+
+/* margin and font-weight are declared here only because this tile is an h1
+   on a post with no title of its own -- the date is what such a post is
+   called, so the thing already saying it is the heading rather than a
+   second one being added above it. Everything else in this rule already
+   beat the h1 element styles on specificity; these two were not declared at
+   all, so the heading would have arrived bold and with a browser default
+   margin under it, moving the content down on every untitled post. Which,
+   on an archive of imported tweets and photographs, is most of them. */
+.date-badge {
+  flex: 0 0 auto;
+  width: 72px;
+  text-align: center;
+  background: var(--accent);
+  color: #ffffff;
+  border-radius: 4px;
+  padding: 0.6rem 0.25rem;
+  font-size: 0.75rem;
+  font-weight: inherit;
+  line-height: 1.3;
+  margin: 0;
+  transition: 0.3s ease-in-out;
+}
+.date-badge:hover { background: var(--hover-invert); }
+.date-badge svg { width: 40px; height: 40px; margin: 0 auto 0.35rem; }
+.date-badge a { color: inherit; text-decoration: none; display: block; }
+
+/* How long a post is, what is in it, and where it sits in a series --
+   three ways of answering "is this worth starting" before the reader
+   commits, all in the quiet colour the other metadata uses. */
+/* Everything worth knowing before reading: how many people marked it, how
+   long it takes. One row, one gap, and the reading time is simply the
+   fourth item -- it wraps onto a second line on a narrow screen like any
+   other. The row is an element rather than two loose inline boxes because
+   the contents list floats beside it, and a float takes the top of the
+   line it lands in: unwrapped, the contents began level with the star
+   instead of level with the article. */
+.post-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+}
+/* Laid out inline rather than as a flex chip, and that is about alignment,
+   not tidiness: the baseline of a flex box is the baseline of its FIRST
+   item, which here is the icon -- so anywhere the neighbours are aligned
+   on their baselines (the hero's byline is), the whole thing rode 5px
+   above the author and the date. Inline, its baseline is the text's own,
+   which is what everything around it is aligned to. */
+.post-stat.reading-time {
+  white-space: nowrap;
+  color: var(--meta-text);
+  font-size: 0.85rem;
+}
+
+.series-note a { color: var(--text); }
+.series-note a:hover { color: var(--accent); }
+
+/* Two links that flow to opposite ends, and sit under each other on a
+   narrow screen rather than being squeezed into one line. */
+.series-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  justify-content: space-between;
+}
+.series-nav .series-next { margin-left: auto; text-align: right; }
+
+/* Both of these are <nav> for the landmark, so both have to undo what the
+   bar at the top of every page sets on the element itself -- the same
+   reset .pagination has carried since it was written. Without it a table
+   of contents comes out as an uppercase, right-aligned, 60px-per-row menu
+   with the site's nav background behind it. */
+.toc, .series-nav, .series-contents {
+  min-height: 0;
+  box-sizing: border-box;
+  border: none;
+  background: none;
+  padding: 0;
+  gap: 0;
+  align-items: initial;
+  justify-content: initial;
+}
+.toc li, .toc a, .series-nav a, .series-contents li, .series-contents a { height: auto; text-transform: none; letter-spacing: normal; }
+/* An explicit line-height, on the ITEM as well as the anchor. `inherit`
+   was here and was exactly wrong: on the anchor it inherits from the item,
+   and the item is what carries the menu bar's 60px. The engine's own
+   site.css sets that on `nav li`, so this was not a skin's doing -- every
+   default site had eight chapters spread over 547px. Found on sean.cz
+   after 1.3 went live, not in a test. */
+.toc li, .toc a, .series-nav a, .series-contents li, .series-contents a { line-height: 1.55; }
+.toc a, .series-nav a, .series-contents a {
+  height: auto;
+  display: inline;
+  margin-top: 0;
+  border: none;
+  color: var(--accent);
+}
+
+/* Half the column, floated, with the article beginning to its left -- so
+   the contents are a sidebar to the text rather than a gate in front of
+   it. No fill: a tinted panel is at the mercy of whatever pill_bg the
+   site's palette carries (on sean.cz that is #ccc, which lands as a slab),
+   while a rule in the accent colour reads the same in every palette and
+   in both schemes. */
+.toc {
+  display: block;
+  float: right;
+  width: 40%;
+  box-sizing: border-box;
+  border-left: 3px solid var(--accent);
+}
+.toc-heading { margin: 0 0 0.45rem; }
+.toc ol { margin: 0; padding-left: 1.15rem; font-size: 0.9rem; }
+.toc li { margin: 0.12rem 0; }
+
+/* Every part of a series under "part N of M" (layout.series_contents): the
+   table of contents' rule and type, but in the flow rather than floated --
+   a post can carry both, and two floats on one side would stack into a
+   column of their own. The part being read is set in the text colour and
+   not filled: the menu bar's current item is a filled tab, and this is a
+   list, not a bar. */
+.series-contents {
+  display: block;
+  margin: 0 0 1rem;
+  padding: 0.1rem 0 0.1rem 0.9rem;
+  border-left: 3px solid var(--accent);
+}
+.series-contents__heading { margin: 0 0 0.45rem; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; color: var(--meta-text); }
+.series-contents__heading a { color: inherit; text-transform: inherit; letter-spacing: inherit; }
+.series-contents ol { margin: 0; padding-left: 1.15rem; font-size: 0.9rem; }
+.series-contents li { margin: 0.12rem 0; font-size: inherit; color: var(--text); }
+.series-contents a[aria-current="page"],
+.series-contents a[aria-current="page"]:hover {
+  background: none;
+  color: var(--text);
+  font-weight: 600;
+  padding: 0;
+  margin: 0;
+}
+/* Whatever follows the article -- the tag pills, the next/previous nav --
+   must not ride up beside a contents list taller than the text. */
+.post-body::after { content: ""; display: block; clear: both; }
+
+/* On a phone the two cannot sit side by side, so the contents go back to
+   being a block: first the chapters, then the article under them. */
+@media (max-width: 700px) {
+  .toc { float: none; width: auto; margin: 0 0 1.5rem; }
+}
+/* Depth shown by indentation only: a numbered outline that restates the
+   heading levels would compete with the headings themselves. */
+.toc .toc-l3 { margin-left: 0.75rem; }
+.toc .toc-l4, .toc .toc-l5, .toc .toc-l6 { margin-left: 1.5rem; }
+
+/* layout.hero: the post's lead image above its title, instead of a date
+   badge beside the text. The header stops being a row and becomes a
+   column, and the negative margins .post-header already carries are what
+   let the image reach the card's edges -- so everything under it puts its
+   own horizontal padding back.
+   Deliberately plain. The engine supplies the shape (image, then title,
+   then a byline); anything beyond that -- a card overlapping the photo, a
+   tint, a raster -- is a stylesheet's business, which is exactly the line
+   site.extra_css exists to draw. */
+.card.has-hero .post-header { display: block; }
+.post-hero__media img { display: block; width: 100%; height: auto; }
+.post-hero__content { padding: 1.5rem 1.5rem 0; }
+.post-hero__content h1 { margin: 0 0 0.5rem; }
+.post-hero__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  margin: 0;
+  color: var(--meta-text);
+  font-size: 0.9rem;
+}
+/* In the hero the reading time is one of the byline's own items, so it
+   takes the byline's size and colour instead of the body row's -- and a
+   skin that restyles .post-hero__meta gets the clock restyled with it,
+   without having to know the clock exists. */
+.post-hero__meta .reading-time { color: inherit; font-size: inherit; letter-spacing: inherit; }
+
+.photo-grid { display: grid; grid-template-columns: repeat(2, 1fr); margin: 1rem 0; }
+/* The figure is a column and the image flexes into whatever space a
+   figcaption leaves. The obvious `height: 100%` on the image instead
+   made it absorb the entire grid-row height, pushing any caption out of
+   the layout entirely -- text following the grid then overlapped it.
+   Tiles in a row still end up equal-height: the stretched figure hands
+   the extra space to the image, and object-fit crops as before. */
+.photo-grid figure { margin: 0; display: flex; flex-direction: column; }
+.photo-grid img { width: 100%; flex: 1 1 auto; min-height: 0; object-fit: cover; display: block; }
+.photo-grid .span-2 { grid-column: 1 / -1; }
+
+.tag-pill {
+  display: inline-block;
+  text-decoration: none;
+  transition: 0.3s ease-in-out;
+}
+/* A tag with no listing page of its own -- drafts, unlisted posts and
+   pages are outside the stream that makes those pages. It says what the
+   post is about without pretending to be a way somewhere. */
+.tag-pill-flat { opacity: 0.75; cursor: default; }
+
+/* line-height is written out because this heading used to be an h2 and took
+   the 1.25 from that rule with it. As an h1 it would fall back to the
+   browser's `normal`, which in Open Sans is nearer 1.36 -- a listing
+   heading that grew a couple of pixels taller for no reason anyone could
+   see in the markup. */
+.listing-heading { --listing-heading-gap: 0.45rem; }
+
+/* The kind and the value are two spans with no whitespace between them --
+   markup written that way so the space cannot end up inside a heading that
+   hides its kind. Every variant that HAS hidden it (tag, search, home) took
+   the gap out of the question, so nothing ever supplied one; a series, the
+   only listing that says its kind out loud, therefore read "SérieNový
+   Sean.cz". Stated for all of them rather than for the series alone: the
+   rule below takes it back out with `margin: -1px` where the kind is
+   hidden, so a variant added later is spaced by default instead of
+   depending on somebody noticing. */
+.listing-heading__kind { margin-right: var(--listing-heading-gap); }
+
+/* The kind of listing ("Tag", "Search") stays in the markup and is taken
+   out of sight rather than out of the document -- clipped, never
+   display:none, because that would also take it out of the accessibility
+   tree, which is the one thing this markup exists to prevent. A site that
+   wants the word visible only has to undo this rule.
+   It is hidden exactly where the value can speak for itself: a tag name
+   arrives dressed as a pill, a query arrives behind a magnifier. The
+   search page opened WITHOUT a query has no value to show, so the word
+   stays and the page keeps a heading.
+
+   The landing page's own heading is clipped here for the same reason and
+   the whole way down: it says the site's name, which the banner is already
+   saying in much larger type, so there is nothing for it to show -- but a
+   page with no h1 is a page a reader who moves by headings cannot get into,
+   and until now the front page was one. Out of flow, so it costs that page
+   no space it did not already have. */
+.listing-heading--tag .listing-heading__kind,
+.listing-heading--search.has-query .listing-heading__kind,
+.listing-heading--series .listing-heading__kind,
+.listing-heading--home {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* The pill this used to wear is gone. It borrowed the shape tags have
+   everywhere else on the site, which was a good argument on paper and a
+   bad one at heading size: a tag under an article is a small quiet chip,
+   and the same shape blown up to 26px is a slab across the top of the
+   page. The label icon says the same thing at the weight the rest of the
+   listing headings say theirs -- and now the three of them, a tag, a
+   series and a search, are one family instead of two. */
+
+/* Stays put whether or not there is a query, so starting to type swaps the
+   text beside it instead of shifting the whole line. */
+/* Lifted to sit on the text's own middle rather than on its baseline: a
+   20px glyph hung from a 1.6rem baseline reads as having fallen off the
+   line. 0.02em rather than a round number because that is where the
+   calendar's box and the cap height of the heading line up. */
+.listing-heading__icon { vertical-align: 0.02em; margin-right: var(--listing-heading-gap); color: var(--meta-text); }
+
+/* A heading that is also a way back. It keeps the heading's own colour
+   until the pointer is on it -- underlined orange at 1.6rem would read as
+   a link that happens to be big rather than as a title you can click. */
+.listing-heading__link { color: inherit; text-decoration: none; }
+.listing-heading__link:hover,
+.listing-heading__link:focus-visible { text-decoration: underline; }
+
+.search-tagline { margin-bottom: 0.25rem; }
+
+/* The 404 signpost inherits the quiet meta color; its one accent arrow
+   is colored in the markup, so the palette decides both. Centred under
+   the heading; the desktop gets the larger of the two sizes. */
+.not-found-sign {
+  display: block;
+  width: 360px;
+  max-width: 100%;
+  height: auto;
+  margin: 1.2rem auto 1rem;
+}
+
+/* The two ways on the 404 page puts under its sentence. The field is the
+   bar's own form (.search-form) with a class added, so a skin that has
+   dressed the one has dressed the other; what is said here is only what
+   differs once it stands on the page's ground instead of the bar's -- a
+   line around it, since the bar's field is a light patch on a coloured
+   strip and here it would be white on white, and room to read a few
+   words back.
+   The input's width alone is said with `main` in front: it is structure,
+   not looks -- the field fills its form, whatever width a skin gave the
+   one in the bar -- and a skin's `.search-form input` must not win it by
+   coming later. Everything else is at the bar's own weight, so a skin
+   overrides it by saying nothing special. */
+.not-found-search { display: flex; width: 100%; max-width: 24rem; margin-top: 1.25rem; }
+main .not-found-search input[type="search"] { width: 100%; }
+.not-found-search input[type="search"] { height: 36px; border: 1px solid var(--border); font-size: 0.9rem; }
+.not-found-search button { width: 36px; height: 36px; }
+/* The pills are a post's tag pills (.tags, .tag-pill) with classes of
+   their own beside: the line above them is the one that closes a post
+   before its tags. A year's pill arrives hidden and the script shows the
+   one the address names (hidden means hidden: assets/css/site.css). */
+.not-found-links { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
+.search-tip { margin-bottom: 1.5rem; }
+.search-archive-pending { font-style: italic; }
+
+/* A listing card used to render the whole post and hide the rest here, at
+   500px, under a fade. Measured on a real front page, that meant every one
+   of fourteen cards carried between 794 and 2616 pixels of content and
+   showed 500 -- and 33 of the page's 154 focusable elements were reachable
+   by the keyboard while invisible on screen. The card is cut at a block
+   boundary before it is written now (lib/card_teaser.rb), so there is
+   nothing left here to hide and no fade over a cut that no longer falls
+   mid-sentence. */
+.read-more { display: inline-block; margin-top: 0.75rem; font-size: 0.85rem; font-weight: 400; }
+
+.pagination {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  height: auto;
+  background: none;
+  border: none;
+  padding: 0;
+  box-sizing: border-box;
+}
+.pagination a {
+  text-decoration: none;
+  height: auto;
+  margin: 0;
+  box-sizing: border-box;
+  transition: 0.3s ease-in-out;
+}
+/* The days a page covers stand under its number, not beside it. Beside
+   would be one line on a desk and none on a phone -- two links and "page
+   12 · 30. 12. 2025 – 2. 1. 2026" do not fit, and a flex row that runs out
+   of room breaks the dates wherever it happens to -- and a bar that is one
+   line here and two there is two bars to keep right. The dot that joins
+   the two in the markup is for a reader with no stylesheet; here the line
+   break says it. */
+.pagination > span { text-align: center; }
+.pagination-sep { display: none; }
+.pagination-dates { display: block; }
+
+.last {
+  border-top: 1px solid var(--border);
+  padding: 0.75rem 0;
+  font-size: 0.85rem;
+}
+.last:first-child { padding-top: 0; }
+.last-content a { word-break: break-word; }
+.pixelfed-thumb { width: 100%; height: auto; border-radius: 4px; margin-top: 0.3rem; }
+.last > a {
+  display: block;
+  word-break: break-all;
+  overflow-wrap: break-word;
+}
+/* On this day: the rest of the day, folded under the rows it chose. */
+.on-this-day-all {
+  padding-top: 0.6rem;
+}
+.on-this-day-all summary { cursor: pointer; }
+.on-this-day-all ul { list-style: none; margin: 0.5rem 0 0; padding: 0; }
+.on-this-day-all a { word-break: break-word; }
+
+/* A <p>, not a heading -- see share_links_html. */
+.share__heading {
+  margin: 0 0 0.6rem;
+}
+
+.share__links { display: flex; flex-wrap: wrap; }
+
+/* The tile the footer's social icons are: same size, same ground, same
+   corner, no frame. A row of icons offering somewhere to go is a thing
+   this site already has, and sharing had grown a second shape for it --
+   a ringed 2.2rem tile with an 8px corner, on a site whose badges and
+   pills are all 4px. One object, met twice. */
+.share__link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: none;
+  transition: 0.3s ease-in-out;
+  /* The button carries the browser's own font otherwise, and sits a
+     pixel off the links beside it. */
+  font: inherit;
+}
+
+.share__link svg { width: 20px; height: 20px; }
+
+/* A quiet way back, not a fifth button: it is only ever useful to the one
+   reader in a hundred who typed the wrong instance or moved to another. */
+.share__change {
+  margin-top: 0.5rem;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  opacity: 0.7;
+  font: inherit;
+  font-size: 0.8rem;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.share__change:hover, .share__change:focus-visible { opacity: 1; color: var(--accent); }
+.share__ask { margin-top: 0.75rem; }
+.share__ask-label { display: block; font-size: 0.8rem; opacity: 0.8; margin-bottom: 0.35rem; }
+.share__ask-row { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+
+.share__ask-input {
+  flex: 1 1 14rem;
+  min-width: 0;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+}
+
+.share__ask-input[aria-invalid="true"] { border-color: var(--accent); }
+
+.share__ask-go {
+  padding: 0.35rem 0.9rem;
+  border: 1px solid var(--border);
+  color: var(--text);
+  font: inherit;
+  font-size: 0.9rem;
+  cursor: pointer;
+}
+
+.share__ask-error { display: block; margin-top: 0.35rem; font-size: 0.8rem; color: var(--accent); }
+
+/* Only rendered where comments.approval is on -- it tells a reader that
+   what follows is a selection, so an answer that isn't there doesn't read
+   as the site having eaten it. */
+.comments-note { margin: 0 0 0.5rem; }
+
+.comment {
+  display: flex;
+  gap: 0.75rem;
+  padding: 0.85rem 0;
+}
+.comment:first-of-type { border-top: none; padding-top: 0; }
+/* An answer to a comment stands in under it by the width of a picture
+   and its gap, so its own picture lines up with the words above. One
+   step and no more, whatever the depth: see renderComment. Less on a
+   phone, where that much would take a fifth of the line. */
+.comment--reply { margin-left: 3.25rem; }
+@media (max-width: 700px) {
+  .comment--reply { margin-left: 1.5rem; }
+}
+
+.comment-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  flex: none;
+}
+
+.comment-body { min-width: 0; }
+.comment-meta { font-size: 0.85rem; margin-bottom: 0.25rem; }
+.comment-date { font-size: 0.78rem; }
+.comment-favs { font-size: 0.78rem; }
+
+/* Inside the row it is a flex item and carries no margins of its own; the
+   row owns the spacing. Still a flex container, so the three counts keep
+   their own gap. */
+.post-stats {
+  display: flex;
+  margin: 0;
+  color: var(--meta-text);
+  font-size: 0.85rem;
+}
+.post-stat { display: inline-flex; align-items: center; }
+.post-stat svg { flex: none; }
+.comment-content p { margin: 0.3rem 0; }
+.comment-content a { word-break: break-word; }
+
+.comment-media { display: flex; flex-wrap: wrap; gap: 0.4rem; margin-top: 0.45rem; }
+.comment-media img {
+  display: block;
+  max-width: 180px;
+  max-height: 180px;
+}
+
+footer {
+  display: grid;
+}
+
+@media (max-width: 700px) {
+  footer { grid-template-columns: 1fr; }
+}
+
+footer ul { list-style: none; margin: 0; padding: 0; }
+footer li::before { color: var(--accent); }
+/* A bullet list in the footer note keeps the chevron the links column uses --
+   it is the footer's own way of marking an item. A numbered one cannot: the
+   chevron would replace the numbers, which are the whole point of writing
+   "1." instead of "-". Nested levels indent, which padding: 0 above undoes. */
+footer .chrome-text ol { list-style: decimal; }
+footer .chrome-text ol > li::before { content: none; }
+footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
+
+.social-icons { display: flex; }
+/* The tiles take the tag pills' ground, not the bar's. They used to be
+   --nav-bg, which was a shade off the white card they sat on -- and became
+   invisible the moment the footer took that same colour for itself. The
+   pills are the site's other small raised thing, and they are raised
+   against exactly this background. */
+.social-icons a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  text-decoration: none;
+  transition: 0.3s ease-in-out;
+}
+.social-icons svg { width: 20px; height: 20px; }
+
+#scroll-top {
+  display: none;
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: 0.3s ease-in-out;
+  z-index: 10;
+}
+#scroll-top.visible { display: flex; }
+#scroll-top svg { width: 16px; height: 16px; }
+
+/* Placed last so it wins the cascade over the base .date-badge/h1 rules
+   above (equal specificity -- source order decides the tie). */
+@media (max-width: 700px) {
+  .date-badge {
+    width: 38px;
+    padding: 0.3rem 0.1rem;
+    font-size: 0.55rem;
+  }
+  .date-badge svg { width: 22px; height: 22px; margin-bottom: 0.2rem; }
+
+}
+
+/* The pinned post's copy at the top of the first listing page. The mark
+   rides the badge's corner rather than replacing the type icon, so the
+   badge still says what kind of post it is; its ground is the same pair
+   .date-badge:hover already uses (a genuine neutral, not a shade of the
+   accent -- see that rule's own comment), just applied to the resting
+   state instead of on hover. Hovering the badge then swaps the mark to
+   the inverse of that pair -- without it, the mark would land on the
+   exact same colour the badge's own background just became and vanish
+   into it. Only this copy carries it -- the post's ordinary chronological
+   entry further down looks like every other post. */
+.date-badge { position: relative; }
+.date-badge .pin-mark {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--hover-invert);
+  color: var(--badge-hover-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.date-badge:hover .pin-mark { background: var(--badge-hover-text); color: var(--hover-invert); }
+.date-badge .pin-mark svg { width: 13px; height: 13px; margin: 0; }
+
+/* Attachment cards (type "document" and any post carrying a file block).
+   The whole card is the link, so the tap target is the card and not a
+   word inside it; the extension rides a coloured tile instead of a
+   per-format icon file, which keeps a new whitelisted extension a
+   one-line change. The size is the point of the card -- a download
+   deserves to say what it costs before it starts. */
+.file-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem 0.9rem;
+  margin: 0.5rem 0;
+  border: 1px solid var(--border);
+  color: var(--text);
+  text-decoration: none;
+  transition: 0.2s ease-in-out;
+}
+.file-icon {
+  flex: 0 0 auto;
+  width: 34px;
+  height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 0.6rem;
+  font-weight: 700;
+}
+.file-meta { flex: 1 1 auto; min-width: 0; }
+.file-label { display: block; font-size: 0.9rem; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.file-sub { display: block; font-size: 0.75rem; margin-top: 0.15rem; color: var(--meta-text); }
+.file-arrow { flex: 0 0 auto; width: 18px; height: 18px; opacity: 0.5; }
+
+/* A reader who has asked the system for less movement gets the site with
+   its fades taken out. Most of what this switches off is colour -- the
+   fourteen `transition` declarations above, all but one of them the same
+   0.3s, nearly all of them a hover changing a background or a link
+   changing shade -- and colour on its own is not what the preference is
+   about. But `transition` with no property named animates every property
+   that changes, so the same declarations also carry the movement: the
+   appearance toggle changing width as its label goes from one glyph to
+   three, a nav item's borders arriving, a card's frame growing into
+   place. Naming which of the fourteen move and which only recolour would
+   be a list that goes stale the first time somebody adds a fifteenth, so
+   the whole set goes.
+
+   0.01ms rather than `none` because a duration of zero is still a
+   transition: it runs and it finishes, so anything that ever waits for
+   transitionend still gets its event. Nothing in assets/js does today.
+
+   Written last so it beats every rule above it on source order alone --
+   the !important is there for the shorthands, which would otherwise
+   re-set the duration they carry.
+
+   What this cannot reach is the one piece of genuine movement on the
+   site: the back-to-top button scrolls the page under the reader. That is
+   asked for in JavaScript (`behavior: 'smooth'`), and CSS scroll-behavior
+   does not govern a programmatic scroll -- so scroll-top.js reads the
+   preference itself. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* The archive index. A row per year with a strip of twelve months, so the
+   shape of the whole archive is visible at once -- which is the only thing
+   this page does that no listing could. An empty month is drawn rather
+   than skipped: on an archive spanning twenty-three years the silences are
+   as much of the picture as the busy stretches, and so is an empty year. */
+/* As wide as the strip needs and no wider, centred on the page: the row
+   is a table, and a table whose rule runs off past its last column reads
+   as an unfinished one. fit-content rather than a fixed max-width because
+   the twelve cells decide the width -- and they change size on a phone. */
+.archive-map {
+  list-style: none;
+  padding: 0;
+  max-width: 100%;
+}
+.archive-year {
+  display: flex;
+  align-items: center;
+}
+.archive-year-name { text-decoration: none; }
+.archive-year.is-empty .archive-year-name { color: var(--meta-text); font-weight: 400; }
+.archive-year-count { text-align: right; }
+.archive-months { display: flex; flex-wrap: nowrap; }
+/* Fixed width so the twelve cells line up down the page: the strip is only
+   readable as a shape if January sits above January. */
+.archive-month {
+  width: 1.6rem;
+  text-align: center;
+  font-size: 0.8rem;
+  border-radius: 4px;
+  color: var(--text);
+  text-decoration: none;
+}
+.archive-month:hover { outline-offset: 1px; }
+.archive-month.is-empty { border: 1px solid var(--border); }
+
+/* What the shading means: the four steps between two words, as the last
+   row of the map. The cells are the map's own, a little smaller and with
+   nothing in them, so there is no second set of colours to keep in step.
+   Not links, so the hover outline above is taken back off them. */
+.archive-legend {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  padding-top: 0.75rem;
+  color: var(--meta-text);
+  font-size: 0.8rem;
+}
+.archive-legend .archive-month { width: 1.1rem; height: 1.1rem; }
+.archive-legend .archive-month:hover { outline: 0; }
+.archive-legend__word:first-child { margin-right: 0.35rem; }
+.archive-legend__word:last-child { margin-left: 0.35rem; }
+
+/* The year's row of the map again, at the top of the year's own page, with
+   a word saying what it does. It may wrap under its label on a phone; the
+   strip itself still does not. */
+.archive-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 0.4rem 0.75rem; margin: 0 0 1.25rem; }
+.archive-jump__label { color: var(--meta-text); font-size: 0.8rem; }
+
+/* The month sticks while its own months' worth of posts scrolls past.
+   A year here can be four hundred lines long, and a number left at the top
+   of the section stops answering "which month am I in?" after the first
+   screenful. 70px is the sticky bar's own height, the same figure
+   scroll-padding-top uses above; the background is its own, or the lines
+   underneath show through as they pass. */
+.archive-section h2 {
+  position: sticky;
+  z-index: 1;
+}
+.archive-list { list-style: none; padding: 0; margin: 0; }
+.archive-list li { display: flex; align-items: baseline; }
+.archive-list time { flex: 0 0 auto; }
+
+@media (max-width: 700px) {
+    .archive-month { width: 1.35rem; font-size: 0.72rem; }
+}
+
+@media (max-width: 420px) {
+  /* ...and below that the cells stop holding a width at all. Twelve of
+     them at 1.35rem, the year and the count come to about 372px before
+     the page's own margins, so on a phone 320 to 375px wide the row ran
+     off the right edge and the whole page scrolled sideways (measured in
+     a browser on a real archive: 388px of page at every one of those
+     widths). Here the map takes the line, the strip takes what the year
+     and the count leave of it, and the twelve cells share that in equal
+     parts -- still one strip, still one shape, down to 320px.
+
+     A filled cell gets the 1px border an empty one draws, transparent:
+     sharing a width is done before borders are added, and without it
+     the outlined months came out 2px wider than the filled ones -- and
+     January stopped sitting above January.
+
+     Only the map's rows: the legend's cells and the strip at the top of
+     a year's page keep their size (that one wraps under its label). */
+  .archive-map { width: 100%; }
+  .archive-year .archive-months { flex: 1 1 auto; min-width: 0; }
+  .archive-year .archive-month { flex: 1 1 0; width: auto; min-width: 0; font-size: 0.68rem; }
+  .archive-year .archive-month:not(.is-empty) { border: 1px solid transparent; }
+}
+
+/* The card of a picture or video post opens with its medium (build/cards.rb).
+   A landscape one is drawn as it always was, at the width of the card. One
+   that is taller than wide -- or square -- would take a screen at that
+   width, in a list whose point is that the next card is in sight; it is
+   held to a height instead and keeps its shape. Only the medium the card
+   opens with: a second picture further down is whatever it was. The build
+   charges the card's budget this same height (Cards::MEDIA_TALL_HEIGHT), so
+   the two numbers have to move together. */
+.post-list-item--media-tall .content > figure:first-child img,
+.post-list-item--media-tall .content > figure:first-child video,
+.post-list-item--media-tall .content > video:first-child {
+  width: auto;
+  max-height: 22rem;
+}
+
+/* The index of series (build_blog.rb, SERIES_PAGES). A line each -- name,
+   parts, years -- under a rule, the way the archive map rules its years:
+   there are a
+   handful of these on a site where there are hundreds of tags, and each
+   is a thing to open rather than a word to scan for. */
+.series-index { list-style: none; margin: 0; padding: 0; }
+.series-index-item { display: flex; align-items: baseline; gap: 0.4rem; padding: 0.6rem 0; border-top: 1px solid var(--border); }
+.series-index-item:first-child { border-top: 0; }
+.series-index-name { font-size: 1.15rem; font-weight: 600; color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
+.series-index-name:hover { text-decoration: underline; }
+.series-index-count { font-size: 0.7rem; color: var(--meta-text); }
+.series-index-years { margin-left: auto; flex: 0 0 auto; color: var(--meta-text); font-size: 0.85rem; }
+
+/* The tag index at /tag/. Pills in long wrapped lines rather than a cloud:
+   a cloud sizes words by frequency and then asks the reader to compare type
+   sizes, which is a worse way of saying a number than the number is. Seven
+   hundred tags is a page, not a wall -- and a pill is the shape this engine
+   already uses for a tag everywhere else, so the index looks like what it
+   indexes. */
+.tag-index {
+  list-style: none;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+/* The archive's month band, at the width of the block rather than of a
+   name -- it labels the run under it, so it takes the line to itself.
+   Not sticky: a year is one long column and a heading that follows the
+   reader down it earns its place, while twenty-seven of them would spend
+   the page sticking over each other. */
+.tag-index-letter {
+  flex: 0 0 100%;
+}
+/* A tag with no space in it -- an imported hashtag can be sixty
+   characters long -- made the pill wider than the page and put a
+   horizontal scrollbar under the whole document, not just under the
+   list. It wraps inside the pill instead. */
+.tag-index-item { display: inline-flex; max-width: 100%; }
+.tag-index-item > .tag-pill { overflow-wrap: anywhere; }
+/* The same size as a tag pill anywhere else on the site: this page is an
+   index OF those pills, and a tag that changes size depending on which
+   page it is on is a tag the reader has to recognise twice. The margin
+   goes because the list has a gap of its own. */
+.tag-index-item > .tag-pill { margin: 0; }
+/* Two buttons meeting in the middle of the block, with the list's own gap
+   between them. */
+.tag-index-sort {
+  grid-template-columns: 1fr 1fr;
+}
+.tag-index-sort-button {
+  font: inherit;
+  font-size: 0.85rem;
+  padding: 0.2rem 0.7rem;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--card-bg);
+  color: var(--text);
+  cursor: pointer;
+}
+
+/* The letters that have a band below, each a link to it. Centred like the
+   switch it stands under. `hidden` has to be said again: the attribute
+   means display: none only until a rule gives the element a display of
+   its own, and this one does. */
+.tag-index-jump {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.15rem 0.6rem;
+  margin: 0 0 1rem;
+  font-size: 0.9rem;
+}
+.tag-index-jump__label { margin-right: 0.3rem; color: var(--meta-text); font-size: 0.8rem; }
+.tag-index-jump a { padding: 0.1rem 0.2rem; color: var(--accent); text-decoration: none; }
+.tag-index-jump a:hover { text-decoration: underline; }
+
+@media (max-width: 700px) {
+  .tag-index-sort { gap: 1rem; }
+}
+
+/* ---- part two: minimal itself ----
+
+   minimal -- a skin for blog.sh, and the base of the minimal family.
+
+   Paper and ink by day, ink and paper on black by night, and one colour
+   beside them: the site's own accent, which this file never sets. Three
+   voices of type: a monospace in lower case for what a page is, a plain
+   sans for what it holds, and the monospace again, small and bold, for what
+   the engine says about it -- a date, a count, a tag, a label. Both faces
+   are the ones the engine ships.
+
+   Worn with `site.skin: minimal`. This is its part two, after what it
+   keeps of classic; no template is touched. Where the engine has a reflow
+   for narrow screens this part says its own piece again under the same
+   breakpoint, because the later rule wins there too.
+
+   The other skins of the family are built on this file; sean.cz wears its
+   own edition, minimal-sean-cz.css, which differs in its faces alone. */
+
+/* The palette is the site's own: `colors:` in config/site.yml, which the
+   engine writes into colors.css as --bg, --text, --meta-text, --border and
+   --accent, for the day and for the night. This file sets none of the five.
+   It gives them the names it thinks in -- paper, ink, muted, line -- and
+   points the engine's OTHER names at those, so a card, the menu, the footer
+   and a pill all stand on the page's own ground instead of on tints of their
+   own. The selectors are the ones colors.css uses, at the same weight:
+   loaded later, these win.
+
+   So a site chooses the look by its colours alone. sean.cz says a
+   yellow-orange paper (#FFF7EB, #FFA826 over white at nine parts in a
+   hundred) under an ink of #1E1D1C, black under a warm #E6DCCB by night;
+   a site that says nothing gets the engine's blue on its cool grey. */
+:root,
+:root[data-theme="light"] {
+  --paper: var(--bg);
+  --ink: var(--text);
+  --muted: var(--meta-text);
+  /* A hairline is the ink at eighteen parts in a hundred, so it darkens
+     whatever it crosses -- the paper or a plate -- by the same step. Over
+     the paper it comes out as the site's own --border. */
+  --line: color-mix(in srgb, var(--text) 18%, transparent);
+  /* A plate is the ink laid over the paper very thin. */
+  --plate: color-mix(in srgb, var(--text) 3%, transparent);
+  --on-ink: var(--bg);
+  --on-accent: #ffffff;
+
+  --card-bg: var(--paper);
+  --footer-bg: var(--paper);
+  --nav-bg: var(--paper);
+  --nav-text: var(--muted);
+  --nav-border: var(--line);
+  --pill-bg: var(--plate);
+  --search-bg: var(--plate);
+  --hover-invert: var(--ink);
+  --badge-hover-text: var(--on-ink);
+  --lang-switch-bg: transparent;
+  --lang-switch-text: var(--on-ink);
+  --lang-switch-dim: var(--muted);
+
+  --display: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --ui: "Open Sans", -apple-system, "Segoe UI", Arial, sans-serif;
+  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --corner: 14px;
+}
+
+/* By night colors.css says the engine's other names again, later than the
+   block above reaches, so they are pointed at the palette once more -- and
+   the plate is laid a little thicker, because on a dark ground the day's
+   weight left pills and plates looking like loose words. Written twice, as
+   colors.css writes its own. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --line: color-mix(in srgb, var(--text) 26%, transparent);
+    --plate: color-mix(in srgb, var(--text) 6%, transparent);
+    --card-bg: var(--paper);
+    --footer-bg: var(--paper);
+    --nav-bg: var(--paper);
+    --nav-text: var(--muted);
+    --nav-border: var(--line);
+    --pill-bg: var(--plate);
+    --search-bg: var(--plate);
+    --hover-invert: var(--ink);
+    --badge-hover-text: var(--on-ink);
+  }
+}
+:root[data-theme="dark"] {
+  --line: color-mix(in srgb, var(--text) 26%, transparent);
+  --plate: color-mix(in srgb, var(--text) 6%, transparent);
+  --card-bg: var(--paper);
+  --footer-bg: var(--paper);
+  --nav-bg: var(--paper);
+  --nav-text: var(--muted);
+  --nav-border: var(--line);
+  --pill-bg: var(--plate);
+  --search-bg: var(--plate);
+  --hover-invert: var(--ink);
+  --badge-hover-text: var(--on-ink);
+}
+
+body {
+  font-family: var(--ui);
+  font-size: 16px;
+  line-height: 1.55;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+h1, h2, h3 { color: var(--ink); text-wrap: balance; }
+a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+a:hover { color: var(--ink); text-decoration-thickness: 2.5px; }
+
+/* The page: no frame, a wider measure, a gutter of its own. */
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px 20px 56px;
+}
+
+/* ------------------------------------------------------------------ head */
+
+/* The banner is a row now: the site's mark, its name and claim, and at the
+   far end the reader's own two switches. The picture is not shown; the
+   link that carried it is stretched over the row, so the mark and the name
+   are still the way home. */
+.banner-wrap {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 52px;
+  margin-bottom: 22px;
+}
+.banner { display: none; }
+.banner-link { position: absolute; inset: 0; z-index: 1; }
+.banner-link:focus-visible { outline-offset: 2px; }
+
+.banner-wrap:has(.banner-title)::before,
+.banner-wrap::before {
+  content: "";
+  position: static;
+  flex: none;
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  /* The picture is a square, and a square exactly as wide as the circle
+     shows its straight sides in it, with the ground behind them. So it is
+     drawn 4px wider than the circle, which then cuts into it all the way
+     round, and the mark has no rim and no ground of its own. */
+  border: 0;
+  background: url("/assets/images/favicon.png") center / calc(100% + 4px) no-repeat;
+}
+
+.banner-overlay {
+  gap: 2px;
+  min-width: 0;
+}
+.banner-title {
+  font-family: var(--display);
+  font-size: 34px;
+  font-weight: 500;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  text-transform: lowercase;
+  color: var(--ink);
+}
+.banner-claim {
+  align-self: flex-start;
+  margin-top: 0;
+  font-family: var(--ui);
+  font-size: 15px;
+  line-height: 1.35;
+  text-align: left;
+  color: var(--muted);
+}
+
+/* The two switches: a key for light and dark, a pill for the language. */
+.banner-tools {
+  position: relative;
+  top: auto;
+  right: auto;
+  margin-left: auto;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+#theme-toggle {
+  position: relative;
+  margin-left: auto;
+  flex: none;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: 13px;
+}
+.banner-tools #theme-toggle { margin-left: 0; }
+#theme-toggle:hover { background: none; border-color: var(--ink); color: var(--ink); }
+#theme-toggle:focus-visible { outline-color: var(--accent); outline-offset: 2px; }
+
+.lang-switch {
+  gap: 4px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+}
+.lang-switch__item { padding: 3px 9px; border-radius: 999px; color: var(--muted); }
+.lang-switch__item.is-current { background: var(--ink); color: var(--on-ink); }
+.lang-switch__item + .lang-switch__item::before { content: none; }
+a.lang-switch:hover { background: none; border-color: var(--ink); }
+a.lang-switch:hover .lang-switch__item { color: var(--ink); }
+a.lang-switch:hover .lang-switch__item.is-current { color: var(--on-ink); }
+a.lang-switch:focus-visible { outline-color: var(--accent); outline-offset: 2px; }
+
+/* ------------------------------------------------------------------ menu */
+
+/* The menu is a row of filters: an outline at rest, filled with ink when
+   it is the listing you are in. */
+.wrap > nav {
+  min-height: 0;
+  padding: 10px 0;
+  margin-bottom: 18px;
+  border: 0;
+  background: var(--paper);
+  align-items: center;
+  gap: 10px 14px;
+}
+html { scroll-padding-top: 64px; }
+
+nav ul { gap: 6px; }
+nav li {
+  margin-left: 0;
+  height: auto;
+  line-height: 1.3;
+  font-size: 12px;
+  text-transform: lowercase;
+}
+.wrap > nav a {
+  height: auto;
+  margin-top: 0;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.wrap > nav a:hover { color: var(--ink); border-color: var(--ink); }
+.wrap > nav a[aria-current="page"],
+.wrap > nav li:first-child a[aria-current="page"] {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--on-ink);
+  font-weight: 700;
+  padding: 5px 11px;
+  margin: 0;
+}
+.wrap > nav a[aria-current="page"]:hover { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.wrap > nav a:focus-visible,
+.wrap > nav a[aria-current="page"]:focus-visible { outline-color: var(--accent); outline-offset: 2px; }
+
+/* A group of the menu: its label in the voice the engine speaks in -- the
+   small monospace -- standing before its pills, which keep together. */
+nav .nav-group { display: flex; align-items: center; gap: 6px; }
+nav .nav-group > ul { flex-wrap: nowrap; }
+.nav-group__label {
+  margin-left: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+nav li:first-child > .nav-group__label { margin-left: 0; }
+
+.nav-toggle { display: none; }
+
+.search-form input[type="search"] {
+  width: 240px;
+  height: 36px;
+  padding: 0 38px 0 14px;
+  background: var(--plate);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.search-form input[type="search"]::placeholder { color: var(--muted); text-transform: lowercase; }
+.search-form input[type="search"]:focus { outline: none; border-color: var(--ink); }
+.search-form button { top: 3px; right: 4px; width: 30px; height: 30px; color: var(--muted); }
+.search-form button:hover { color: var(--ink); }
+
+/* The engine folds the menu behind a button on a phone. Seven short pills
+   wrap into two rows instead, so nothing is hidden -- and a bar three rows
+   tall has no business following the reader down the page. */
+@media (max-width: 700px) {
+  .wrap > nav { position: static; padding: 0; }
+  nav ul,
+  nav.nav-open ul { display: flex; flex-direction: row; flex-wrap: wrap; width: 100%; margin-top: 0; }
+  nav li { line-height: 1.3; }
+  .wrap > nav a,
+  .wrap > nav li:last-child a { padding: 7px 12px; border: 1px solid var(--line); }
+  .wrap > nav a:hover { border-color: var(--ink); }
+  .wrap > nav a[aria-current="page"],
+  .wrap > nav li:first-child a[aria-current="page"] { padding: 7px 12px; margin: 0; border-color: var(--ink); }
+  .search-form { flex: 1 1 100%; }
+  .search-form input[type="search"] { width: 100%; height: 40px; }
+  .search-form button { top: 5px; width: 30px; height: 30px; }
+  html { scroll-padding-top: 12px; }
+}
+
+/* ---------------------------------------------------------------- layout */
+.layout {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 48px;
+  align-items: start;
+}
+.layout--no-aside { grid-template-columns: minmax(0, 1fr); }
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+}
+
+/* ------------------------------------------------------------ a listing */
+
+/* What a listing is called: the kind of page in the terminal face, and --
+   where there is one -- the thing itself beside it in the plain one. */
+.listing-heading {
+  font-family: var(--display);
+  font-size: 29px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-transform: lowercase;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+.listing-heading__icon { display: none; }
+.listing-heading--tag .listing-heading__kind,
+.listing-heading--search.has-query .listing-heading__kind,
+.listing-heading--series .listing-heading__kind {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0 10px 0 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+}
+.listing-heading__kind ~ .listing-heading__value {
+  font-family: var(--ui);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.listing-heading__link:hover,
+.listing-heading__link:focus-visible { color: var(--ink); text-decoration-color: var(--accent); }
+
+/* A post in a listing is an open row: the date in the margin, a hairline
+   under it, and of the post only how it begins. */
+main .post-list-item {
+  padding: 20px 0;
+  border-bottom: 1px solid var(--line);
+}
+main .post-list-item:first-of-type { border-top: 1px solid var(--line); }
+.post-header { gap: 18px; }
+
+.date-badge,
+.date-badge:hover {
+  width: 92px;
+  padding: 5px 0 0;
+  background: none;
+  border-radius: 0;
+  text-align: left;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  line-height: 1.4;
+  text-transform: lowercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.date-badge:hover { color: var(--ink); }
+.date-badge svg { display: none; }
+.date-badge a:focus-visible { outline-color: var(--accent); outline-offset: 2px; }
+.date-badge .pin-mark,
+.date-badge:hover .pin-mark {
+  position: static;
+  margin-top: 8px;
+  width: 22px;
+  height: 22px;
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.date-badge .pin-mark svg { display: block; }
+
+.post-list-item .post-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px 14px;
+}
+.post-list-item .post-body > * { order: 5; flex: 0 0 100%; }
+.post-list-item .post-body::after { content: none; }
+.post-list-item .post-body > h2 {
+  order: 1;
+  margin: 0;
+  font-size: 21px;
+  font-weight: 600;
+  line-height: 1.25;
+  letter-spacing: -0.005em;
+}
+.post-list-item h2 a { color: var(--ink); text-decoration: none; }
+.post-list-item h2 a:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.post-list-item .series-note { order: 2; }
+/* The text of a row runs to the right edge of its column, where its
+   pictures and the row of facts under it end. It is held to no measure in
+   characters: the column is the measure, here and in every skin built on
+   this file, whatever width or size of type that skin gives it. */
+.post-list-item .content { order: 3; }
+/* ...but not a video, a picture or a player standing straight in the row:
+   those keep the engine's max-width: 100%. Released with the rest, a
+   1920-pixel video drew 1920 pixels wide across the sidebar and the page
+   ran sideways (found checking lead_card, 14. 10. 2026). */
+.post-list-item .content > :where(:not(video, img, iframe)) { max-width: none; }
+/* A row that opens with a block of code: the code scrolls inside itself
+   and the row keeps its column. */
+.post-list-item .post-body { min-width: 0; max-width: 100%; }
+.post-list-item .post-body > * { min-width: 0; }
+.post-list-item .content > pre { max-width: 100%; overflow-x: auto; }
+/* The reading time, the counts and the tags are one run of words: their
+   two boxes are dissolved, so a tag that does not fit goes to the start of
+   the next line instead of hanging under the first tag. */
+.post-list-item .post-body > .post-meta,
+.post-list-item .post-body > .tags { display: contents; }
+.post-list-item .post-meta > *,
+.post-list-item .tags > * { flex: 0 0 auto; }
+.post-list-item .post-meta > .reading-time { order: 6; }
+.post-list-item .post-meta > .post-stats { order: 7; }
+.post-list-item .tags > * { order: 8; }
+.post-list-item .read-more { display: none; }
+
+/* Only the first block of the teaser, and of a paragraph three lines. */
+.post-list-item .content > *:not(:first-child) { display: none; }
+.post-list-item .content > :first-child { margin: 0; }
+.post-list-item .content > p:first-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  opacity: 0.82;
+}
+
+/* The card that opens the front page leads with its picture
+   (layout.lead_card): under the title, with the opening words after it.
+   The engine puts the picture first in the card; this shows it whole
+   across the column and lets the first paragraph follow. */
+.post-list-item--lead .content > figure:first-child,
+.post-list-item--lead .content > .photo-grid:first-child { margin: 4px 0 12px; }
+.post-list-item--lead .content > figure:first-child img {
+  width: 100%;
+  max-height: 460px;
+  object-fit: cover;
+}
+.post-list-item--lead .content > p:first-of-type {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  opacity: 0.82;
+  margin: 0;
+}
+
+/* A picture that opens a post is shown, but a tall one does not get to
+   push the next three posts off the screen. */
+.post-list-item .content figure img { width: auto; max-width: 100%; max-height: 420px; }
+.post-list-item .content .photo-grid img { width: 100%; max-height: 260px; }
+
+/* What the engine says about a post: how long, how many, about what. */
+.post-meta { gap: 12px; }
+.post-meta,
+.post-stats,
+.post-stat.reading-time,
+.meta {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.post-stats { gap: 10px; }
+.post-stats:empty { display: none; }
+.post-stat { gap: 4px; }
+.post-stat svg { width: 12px; height: 12px; }
+.reading-time svg { margin-right: 4px; vertical-align: -0.1em; }
+.post-meta .reading-time { order: -1; }
+
+.post-list-item .tag-pill,
+.post-list-item a.tag-pill:hover {
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: none;
+  border-radius: 0;
+  color: var(--muted);
+}
+.post-list-item a.tag-pill:hover { color: var(--ink); }
+
+@media (max-width: 700px) {
+  .post-list-item h2 { font-size: 20px; }
+  .listing-heading { font-size: 25px; }
+}
+@media (max-width: 560px) {
+  .post-list-item .post-header { flex-direction: column; gap: 4px; }
+  .date-badge, .date-badge:hover { width: auto; padding: 0; }
+  .date-badge .pin-mark { display: inline-flex; margin: 0 0 0 8px; vertical-align: middle; }
+  .date-badge a { display: inline; }
+}
+
+/* Tags, wherever they are pills. */
+.tag-pill {
+  padding: 4px 11px;
+  margin: 0 6px 6px 0;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  text-transform: lowercase;
+}
+a.tag-pill:hover { background: none; border-color: var(--ink); color: var(--ink); }
+
+/* The way to the next page: the one filled thing on a listing. */
+.pagination {
+  margin-top: 18px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+}
+.pagination a {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  color: var(--muted);
+  font-weight: 400;
+}
+.pagination a:hover { color: var(--ink); border-color: var(--ink); }
+.pagination:not(.back) a:last-child,
+.pagination:not(.back) a:last-child:hover {
+  padding: 9px 18px;
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+  font-size: 13px;
+  font-weight: 700;
+}
+.pagination:not(.back) a:last-child:hover { opacity: 0.85; }
+
+/* ----------------------------------------------------------------- a post */
+
+/* The head of a post reads in three lines: when and of what series, what
+   it is called, and what the engine knows about it. The first line is set
+   over the body rather than woven into it: the date stands where a
+   listing keeps its dates, the series beside it where a listing starts its
+   titles -- so the body stays an ordinary block, and the contents of a
+   long post can float beside its text. A post that opens with its picture
+   keeps the engine's own shape. */
+.card:not(.has-hero) > article > .post-header {
+  display: block;
+  position: relative;
+  padding-top: 28px;
+}
+.card:not(.has-hero) > article > .post-header > .date-badge,
+.card:not(.has-hero) > article > .post-header > .date-badge:hover {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 92px;
+  padding: 0;
+}
+.card:not(.has-hero) > article > .post-header > .date-badge .pin-mark { display: none; }
+.card:not(.has-hero) > article > .post-header > .post-body > .series-note {
+  position: absolute;
+  top: 0;
+  left: 110px;
+  right: 0;
+  line-height: 1.4;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.card:not(.has-hero) > article > .post-header > .post-body > .post-meta {
+  margin: 8px 0 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.post-body h1 {
+  margin: 0;
+  font-size: clamp(27px, 4.4vw, 36px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+@media (max-width: 700px) {
+  .post-body h1 { font-size: clamp(25px, 7vw, 30px); }
+}
+
+.series-note {
+  margin: 0;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--accent);
+}
+.series-note a,
+.series-note a:hover { color: var(--accent); text-decoration: none; }
+.series-note a:hover { text-decoration: underline; }
+
+.content { font-size: 17.5px; line-height: 1.68; }
+/* A bare address, or any word longer than the column, is broken rather
+   than let to push the page wider than a phone. */
+.content { overflow-wrap: break-word; }
+.post-list-item .content { font-size: 16px; line-height: 1.55; }
+.content > p,
+.content > ul,
+.content > ol,
+.content > blockquote,
+.content > dl { max-width: 65ch; }
+.content > :first-child { margin-top: 10px; }
+.content h1, .content h2, .content h3, .content h4, .content h5, .content h6 { color: var(--ink); font-weight: 600; letter-spacing: -0.005em; }
+.content h1 { font-size: 1.45rem; }
+.content h2 { font-size: 1.3rem; }
+.content h3 { font-size: 1.1rem; }
+.content a:hover { color: var(--ink); }
+
+figure { margin: 1.2rem 0; }
+.content figure img,
+.content video,
+.photo-grid img { border-radius: var(--corner); border: 1px solid var(--line); }
+.photo-grid { gap: 10px; }
+figcaption { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; color: var(--muted); }
+
+blockquote { border-left: 2px solid var(--accent); }
+.content pre, .chrome-text pre { background: var(--plate); border: 1px solid var(--line); border-radius: var(--corner); }
+.content code, .chrome-text code { background: var(--plate); border-radius: 5px; font-family: "SF Mono", Menlo, Consolas, monospace; }
+.content pre code, .chrome-text pre code { background: none; }
+.content th { background: var(--plate); }
+.copy-code { border-radius: 8px; background: var(--paper); }
+.embed-responsive, .embed-audio { border-radius: var(--corner); }
+.draft-banner { border-radius: var(--corner); }
+.draft-banner strong, .draft-banner a { color: var(--on-accent); }
+.file-card { border-radius: var(--corner); background: var(--plate); }
+.file-card:hover { border-color: var(--ink); background: var(--plate); }
+.file-icon { border-radius: 8px; }
+.lightbox-overlay img { border-radius: var(--corner); }
+
+/* The contents of a long post: a plate a third of the column wide,
+   floated to the right with the text beginning beside it, the way the
+   engine floats it. Under 700px the engine stops floating it and so does
+   this -- there it is a block above the text. */
+.toc {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--corner);
+  background: var(--plate);
+}
+@media (min-width: 701px) {
+  .toc { float: right; width: 34%; margin: 18px 0 14px 24px; }
+}
+.toc-heading { font-family: var(--mono); font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: lowercase; color: var(--muted); }
+.toc a { color: var(--ink); text-decoration: none; }
+.toc a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+
+.tags { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.post-list-item .tags { padding-top: 0; border-top: 0; }
+
+.series-nav { margin: 16px 0 0; font-size: 12px; }
+.series-nav a,
+.series-nav a:hover {
+  display: inline-block;
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--mono);
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  text-decoration: none;
+  color: var(--muted);
+}
+.series-nav a:hover { color: var(--ink); border-color: var(--ink); }
+
+/* Sharing: outlines, and the first of them -- the fediverse, where this
+   site's own conversation is -- the one filled. */
+.share { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.share__heading { font-family: var(--mono); font-weight: 700; font-size: 12px; letter-spacing: 0.06em; text-transform: lowercase; color: var(--muted); opacity: 1; }
+.share__links { gap: 6px; }
+.share__link { border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); }
+.share__link:hover, .share__link:focus-visible { background: none; border-color: var(--ink); color: var(--ink); }
+.share__link[data-share-mastodon],
+.share__link[data-share-mastodon]:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.share__link[data-share-mastodon]:hover { opacity: 0.85; }
+.share__link.is-done { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+.share__ask-input { border-radius: 999px; background: var(--plate); padding: 0.4rem 0.9rem; font-family: var(--mono); }
+.share__ask-go { border-radius: 999px; background: none; font-family: var(--mono); text-transform: lowercase; }
+.share__ask-go:hover, .share__ask-go:focus-visible { border-color: var(--ink); color: var(--ink); }
+.share__change { font-family: var(--mono); }
+
+.comments { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
+.comments h3 {
+  font-family: var(--display);
+  font-size: 22px;
+  font-weight: 500;
+  letter-spacing: -0.01em;
+  text-transform: lowercase;
+  margin-bottom: 12px;
+}
+.comment { border-top: 1px solid var(--line); }
+.comment-avatar { border: 1px solid var(--line); }
+/* Who wrote it and when are a line of labels; the underline is kept for
+   links inside what they wrote. */
+.comment-meta a { text-decoration: none; }
+.comment-meta a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.comment-meta a:first-child { font-weight: 600; }
+.comment-date { color: var(--muted); }
+.comment-date, .comment-favs, .comments-note { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; }
+.comment-media img { border-radius: 10px; }
+
+/* --------------------------------------------------------------- sidebar */
+
+/* Each widget is a label in the engine's voice over a plate: one hairline
+   card holding its rows. */
+aside .card { margin-bottom: 22px; }
+aside h3,
+footer h3 {
+  margin: 0 0 8px 2px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+}
+aside .card > div {
+  border: 1px solid var(--line);
+  border-radius: var(--corner);
+  background: var(--plate);
+  overflow: hidden;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+aside .card > div:empty { display: none; }
+aside .chrome-text { padding: 11px 13px; }
+aside .chrome-text p { margin: 0 0 0.6rem; }
+aside .chrome-text p:last-child { margin-bottom: 0; }
+/* A portrait opening the about text sits beside it, small, whatever size
+   the text's own markup asked for. */
+aside .chrome-text p > img:first-child {
+  float: right;
+  width: 56px !important;
+  height: 56px !important;
+  margin: 3px 0 4px 12px !important;
+  border: 1px solid var(--line);
+}
+
+.last,
+.last:first-child { padding: 11px 13px; font-size: 14.5px; border-top: 1px solid var(--line); }
+.last:first-child { border-top: 0; }
+.last-date {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+}
+.last-content p { margin: 2px 0 0; }
+.last-content a { text-decoration: none; }
+.last-content a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.last-content strong { font-family: var(--mono); font-size: 12px; letter-spacing: 0.04em; }
+.last > a {
+  margin-top: 4px;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--muted);
+  text-decoration: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.last > a:hover { color: var(--ink); }
+
+/* A picture row: the thumbnail beside its date and name, not under them. */
+.last:has(.pixelfed-thumb) {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  column-gap: 11px;
+  align-items: center;
+}
+.last:has(.pixelfed-thumb) .last-date { grid-column: 2; grid-row: 1; }
+.last:has(.pixelfed-thumb) .last-content { display: contents; }
+.last:has(.pixelfed-thumb) .last-content p { grid-column: 2; grid-row: 2; }
+.last:has(.pixelfed-thumb) .pixelfed-thumb {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  width: 46px;
+  height: 46px;
+  margin: 0;
+  object-fit: cover;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+}
+.last:has(.pixelfed-thumb) > a { grid-column: 2; grid-row: 3; }
+
+.on-this-day-all { padding: 11px 13px; border-top: 1px solid var(--line); font-size: 14.5px; }
+.on-this-day-all summary {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  color: var(--muted);
+}
+.on-this-day-all summary:hover { color: var(--ink); }
+.on-this-day-all a { text-decoration: none; }
+.on-this-day-all a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+
+/* ------------------------------------------------------------------ foot */
+
+footer {
+  margin-top: 40px;
+  padding: 24px 0 0;
+  border-top: 1px solid var(--line);
+  grid-template-columns: 1fr 2fr 1.4fr;
+  gap: 28px;
+  font-size: 14.5px;
+}
+@media (max-width: 760px) {
+  footer { grid-template-columns: minmax(0, 1fr); }
+}
+footer li { margin-bottom: 4px; }
+footer p { color: var(--ink); font-size: 14.5px; margin: 0 0 8px; }
+footer .copyright {
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+}
+.social-icons { gap: 6px; flex-wrap: wrap; }
+.social-icons a { border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
+.social-icons a:hover { background: none; border-color: var(--ink); color: var(--ink); }
+
+#scroll-top {
+  width: 34px;
+  height: 34px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--muted);
+}
+#scroll-top:hover { background: var(--paper); border-color: var(--ink); color: var(--ink); }
+
+/* --------------------------------------------------------------- archive */
+
+/* A year a row: its name, how many, and its twelve months as keys -- the
+   fuller the month, the more ink. */
+.archive-map { width: 100%; margin: 0; border-top: 1px solid var(--line); }
+.archive-year { gap: 8px 14px; padding: 11px 0; border-bottom: 1px solid var(--line); }
+.archive-year-name {
+  min-width: 74px;
+  font-family: var(--display);
+  font-size: 21px;
+  font-weight: 500;
+  color: var(--ink);
+}
+a.archive-year-name:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.archive-year-count {
+  min-width: 44px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+}
+.archive-year.is-empty .archive-year-count { color: var(--muted); }
+.archive-months { gap: 5px; margin-left: auto; }
+.archive-month,
+.archive-month.is-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.archive-month.is-empty { border-style: dashed; color: var(--muted); opacity: 0.45; }
+.archive-month.is-l1 { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
+.archive-month.is-l2 { background: color-mix(in srgb, var(--ink) 22%, transparent); color: var(--ink); }
+.archive-month.is-l3 { background: color-mix(in srgb, var(--ink) 48%, transparent); color: var(--paper); }
+.archive-month.is-l4 { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
+.archive-month:hover { outline: 0; border-color: var(--accent); }
+.archive-month:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+@media (max-width: 700px) {
+  .archive-year { flex-wrap: wrap; gap: 8px 12px; }
+  .archive-year-name { min-width: 0; }
+  .archive-year-count { min-width: 0; margin-left: auto; font-size: 12px; }
+  .archive-months { flex: 0 0 100%; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
+  .archive-month, .archive-month.is-empty { width: auto; height: auto; aspect-ratio: 1; font-size: 10px; border-radius: 6px; }
+}
+
+/* A year: each month a key over a plate of its days. */
+.archive-section { margin: 0 0 22px; }
+.archive-section h2 {
+  top: 56px;
+  margin: 0 0 8px;
+  padding: 6px 2px;
+  background: var(--paper);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.archive-list { border: 1px solid var(--line); border-radius: var(--corner); background: var(--plate); overflow: hidden; }
+.archive-list li { gap: 8px; padding: 9px 13px; border-top: 1px solid var(--line); font-size: 15.5px; }
+.archive-list li:first-child { border-top: 0; }
+.archive-list time {
+  min-width: 28px;
+  text-align: left;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+.archive-list a { text-decoration: none; }
+.archive-list a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+@media (max-width: 700px) {
+  .archive-section h2 { position: static; }
+}
+
+/* ------------------------------------------------------------------ tags */
+
+.tag-index { margin: 0; gap: 6px; }
+.tag-index-letter {
+  margin: 14px 0 4px;
+  padding: 10px 2px 0;
+  border-top: 1px solid var(--line);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+}
+.tag-index-letter:first-child { margin-top: 0; }
+.tag-index-count { font-size: 10px; font-weight: 700; opacity: 1; margin-left: 4px; color: var(--accent); }
+.tag-index-sort { display: flex; gap: 6px; margin: 0 0 14px; }
+.tag-index-sort-button,
+.tag-index-sort-button:first-child,
+.tag-index-sort-button:last-child {
+  padding: 5px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: none;
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+}
+.tag-index-sort-button:hover { color: var(--ink); border-color: var(--ink); }
+.tag-index-sort-button[aria-pressed="true"] { background: var(--ink); border-color: var(--ink); color: var(--on-ink); font-weight: 700; }
+
+/* ---------------------------------------------------------------- search */
+
+.search-tagline { margin: 0 0 12px; color: var(--muted); font-size: 14.5px; max-width: 58ch; }
+.search-tip {
+  margin: 0 0 16px;
+  padding: 11px 13px;
+  border: 1px solid var(--line);
+  border-radius: var(--corner);
+  background: var(--plate);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.search-status {
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--accent);
+}
+.search-result h2 { margin: 4px 0 6px; font-size: 21px; font-weight: 600; line-height: 1.25; }
+.search-result p { margin: 0; }
+.search-result p:not(.meta) { opacity: 0.82; }
+.not-found-sign { margin-left: 0; color: var(--muted); }
+
+/* ---------------------------------------------------------------- accent */
+
+/* Where the site's own colour speaks, beyond links and the one filled
+   button: the filter that is on, when a thing was written, what a box is
+   called, the headings inside an article and the marks beside its counts.
+   Titles and running text stay ink -- on paper this light the accent
+   reads in fills, rules and bold labels, not in small regular type.
+   Written last, so one block can be taken out to have the quiet version
+   back. */
+.wrap > nav a[aria-current="page"],
+.wrap > nav li:first-child a[aria-current="page"],
+.wrap > nav a[aria-current="page"]:hover,
+.tag-index-sort-button[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--on-accent);
+}
+.lang-switch__item.is-current,
+a.lang-switch:hover .lang-switch__item.is-current { background: var(--accent); color: var(--on-accent); }
+
+.date-badge,
+.date-badge:hover,
+.archive-list time { color: var(--accent); }
+
+/* The cursor of the terminal the site is written in, standing after its
+   name. */
+.banner-title::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 0.92em;
+  margin-left: 0.14em;
+  background: var(--accent);
+  vertical-align: -0.1em;
+}
+
+aside h3,
+footer h3,
+.toc-heading,
+.share__heading { color: var(--accent); }
+
+.content h1,
+.content h2,
+.content h3,
+.content h4,
+.content h5,
+.content h6 { color: var(--accent); }
+
+.post-stat svg { color: var(--accent); }
+
+/* Two rules in the accent close the head of the page and open its foot:
+   one under the menu, one over the footer. */
+.wrap > nav { padding-bottom: 14px; border-bottom: 2px solid var(--accent); }
+footer { border-top: 2px solid var(--accent); }
+@media (max-width: 700px) {
+  .wrap > nav { padding-bottom: 14px; }
+}
+/* On the front page and its continuations nothing stands between the
+   menu's rule and the first post, so that post gives up its own. */
+
+/* The archive counts in the accent rather than in ink: the fuller the
+   month, the more of it -- four steps mixed into the paper, the way the
+   engine's own map mixes them. The month over a year's list too. */
+.archive-month.is-l1 { background: color-mix(in srgb, var(--accent) 14%, var(--paper)); border-color: color-mix(in srgb, var(--accent) 30%, var(--paper)); color: var(--ink); }
+.archive-month.is-l2 { background: color-mix(in srgb, var(--accent) 36%, var(--paper)); border-color: transparent; color: var(--ink); }
+.archive-month.is-l3 { background: color-mix(in srgb, var(--accent) 66%, var(--paper)); border-color: transparent; color: var(--on-accent); }
+.archive-month.is-l4 { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+.archive-month:hover { border-color: var(--ink); }
+.archive-section h2 { color: var(--accent); }
+
+/* On a tag's listing the word "tag" stays ink and the tag itself is said
+   in the accent. */
+.listing-heading--tag .listing-heading__value,
+.listing-heading--tag .listing-heading__link:hover,
+.listing-heading--tag .listing-heading__link:focus-visible { color: var(--accent); }
+/* The same on a series' listing and on a search that has a query: the
+   kind of page in ink, the thing itself in the accent. */
+.listing-heading--series .listing-heading__value,
+.listing-heading--search .listing-heading__value { color: var(--accent); }
+
+/* Three small marks join the accent: the glass that starts a search, the
+   heart beside a comment somebody starred, the arrow back to the top. */
+.search-form button,
+.search-form button:hover { color: var(--accent); }
+.search-form button:hover { opacity: 0.7; }
+.comment-favs { color: var(--accent); }
+#scroll-top,
+#scroll-top:hover { color: var(--accent); }
+
+/* Under the pointer, whatever can be clicked takes the accent: its frame
+   and its words. The filled ones keep their fill, and the archive's
+   months -- already the accent -- keep their ink frame. */
+.wrap > nav a:hover,
+#theme-toggle:hover,
+a.tag-pill:hover,
+.pagination a:hover,
+.series-nav a:hover,
+.share__link:hover,
+.share__link:focus-visible,
+.share__ask-go:hover,
+.share__ask-go:focus-visible,
+.social-icons a:hover,
+.tag-index-sort-button:hover,
+.file-card:hover { border-color: var(--accent); color: var(--accent); }
+#scroll-top:hover { border-color: var(--accent); }
+a.lang-switch:hover { border-color: var(--accent); }
+a.lang-switch:hover .lang-switch__item { color: var(--accent); }
+a.lang-switch:hover .lang-switch__item.is-current { color: var(--on-accent); }
+.post-list-item a.tag-pill:hover { color: var(--accent); }
+
+.wrap > nav a[aria-current="page"]:hover,
+.tag-index-sort-button[aria-pressed="true"]:hover,
+.pagination:not(.back) a:last-child:hover,
+.share__link[data-share-mastodon]:hover,
+.share__link[data-share-mastodon]:focus-visible { color: var(--on-accent); }
+.share__link.is-done,
+.share__link.is-done:hover { background: var(--ink); border-color: var(--ink); color: var(--on-ink); }
+
+/* Nothing here: the one page that is a notice rather than a listing, so
+   its three lines -- what it says, the signpost, what to do -- stand in
+   the middle of the column. */
+main:has(> .not-found-sign) > .listing-heading { text-align: center; margin-top: 24px; }
+main > .not-found-sign { margin: 24px auto 20px; }
+main:has(> .not-found-sign) > .search-tagline { margin: 0 auto 40px; text-align: center; max-width: 52ch; }
+
+/* The tag index: the letter over each run is a mark to find one's place
+   by on a long page, so it is set large and in the accent; and a tag's
+   count stands on the line after its name rather than above it. */
+.tag-index-letter {
+  padding-top: 14px;
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.1;
+  text-transform: lowercase;
+  color: var(--accent);
+}
+.tag-index-count {
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 700;
+  vertical-align: baseline;
+  margin-left: 6px;
+  letter-spacing: 0;
+}
+
+/* How much has been written under a tag, by the length of its count: one
+   digit plain, two tinted, three or more filled further. A stylesheet
+   cannot compare numbers, so the two rules name the counts they do NOT
+   mean -- 1 to 9, and 1 to 99 -- and take what is left. */
+.tag-index-item:not(:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"])) > .tag-pill {
+  background: color-mix(in srgb, var(--accent) 12%, var(--paper));
+  border-color: color-mix(in srgb, var(--accent) 40%, var(--paper));
+  color: var(--ink);
+  font-weight: 700;
+}
+.tag-index-item:not(:is(
+    [data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"], [data-count="10"],
+    [data-count="11"], [data-count="12"], [data-count="13"], [data-count="14"], [data-count="15"], [data-count="16"], [data-count="17"], [data-count="18"], [data-count="19"], [data-count="20"],
+    [data-count="21"], [data-count="22"], [data-count="23"], [data-count="24"], [data-count="25"], [data-count="26"], [data-count="27"], [data-count="28"], [data-count="29"], [data-count="30"],
+    [data-count="31"], [data-count="32"], [data-count="33"], [data-count="34"], [data-count="35"], [data-count="36"], [data-count="37"], [data-count="38"], [data-count="39"], [data-count="40"],
+    [data-count="41"], [data-count="42"], [data-count="43"], [data-count="44"], [data-count="45"], [data-count="46"], [data-count="47"], [data-count="48"], [data-count="49"], [data-count="50"],
+    [data-count="51"], [data-count="52"], [data-count="53"], [data-count="54"], [data-count="55"], [data-count="56"], [data-count="57"], [data-count="58"], [data-count="59"], [data-count="60"],
+    [data-count="61"], [data-count="62"], [data-count="63"], [data-count="64"], [data-count="65"], [data-count="66"], [data-count="67"], [data-count="68"], [data-count="69"], [data-count="70"],
+    [data-count="71"], [data-count="72"], [data-count="73"], [data-count="74"], [data-count="75"], [data-count="76"], [data-count="77"], [data-count="78"], [data-count="79"], [data-count="80"],
+    [data-count="81"], [data-count="82"], [data-count="83"], [data-count="84"], [data-count="85"], [data-count="86"], [data-count="87"], [data-count="88"], [data-count="89"], [data-count="90"],
+    [data-count="91"], [data-count="92"], [data-count="93"], [data-count="94"], [data-count="95"], [data-count="96"], [data-count="97"], [data-count="98"], [data-count="99"])) > .tag-pill {
+  background: color-mix(in srgb, var(--accent) 42%, var(--paper));
+  border-color: var(--accent);
+}
+.tag-index-item:not(:is(
+    [data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"], [data-count="10"],
+    [data-count="11"], [data-count="12"], [data-count="13"], [data-count="14"], [data-count="15"], [data-count="16"], [data-count="17"], [data-count="18"], [data-count="19"], [data-count="20"],
+    [data-count="21"], [data-count="22"], [data-count="23"], [data-count="24"], [data-count="25"], [data-count="26"], [data-count="27"], [data-count="28"], [data-count="29"], [data-count="30"],
+    [data-count="31"], [data-count="32"], [data-count="33"], [data-count="34"], [data-count="35"], [data-count="36"], [data-count="37"], [data-count="38"], [data-count="39"], [data-count="40"],
+    [data-count="41"], [data-count="42"], [data-count="43"], [data-count="44"], [data-count="45"], [data-count="46"], [data-count="47"], [data-count="48"], [data-count="49"], [data-count="50"],
+    [data-count="51"], [data-count="52"], [data-count="53"], [data-count="54"], [data-count="55"], [data-count="56"], [data-count="57"], [data-count="58"], [data-count="59"], [data-count="60"],
+    [data-count="61"], [data-count="62"], [data-count="63"], [data-count="64"], [data-count="65"], [data-count="66"], [data-count="67"], [data-count="68"], [data-count="69"], [data-count="70"],
+    [data-count="71"], [data-count="72"], [data-count="73"], [data-count="74"], [data-count="75"], [data-count="76"], [data-count="77"], [data-count="78"], [data-count="79"], [data-count="80"],
+    [data-count="81"], [data-count="82"], [data-count="83"], [data-count="84"], [data-count="85"], [data-count="86"], [data-count="87"], [data-count="88"], [data-count="89"], [data-count="90"],
+    [data-count="91"], [data-count="92"], [data-count="93"], [data-count="94"], [data-count="95"], [data-count="96"], [data-count="97"], [data-count="98"], [data-count="99"])) > .tag-pill .tag-index-count { color: var(--ink); }
+.tag-index-item > a.tag-pill:hover { border-color: var(--accent); }
+
+/* A search result is laid out like any other row of posts: its date in
+   the margin and in the accent, the title and the excerpt beside it. */
+.search-result {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  column-gap: 18px;
+  align-items: start;
+}
+.search-result > .meta { grid-column: 1; grid-row: 1 / span 2; margin: 0; padding-top: 5px; line-height: 1.4; color: var(--accent); }
+.search-result > h2 { grid-column: 2; margin: 0 0 6px; }
+.search-result > p:not(.meta) { grid-column: 2; }
+@media (max-width: 560px) {
+  .search-result { grid-template-columns: minmax(0, 1fr); }
+  .search-result > .meta { grid-row: auto; padding-top: 0; margin-bottom: 4px; }
+  .search-result > h2,
+  .search-result > p:not(.meta) { grid-column: 1; }
+}
+/* Once there are results the page is theirs: the two lines on how to
+   search step aside, and come back when a query finds nothing. */
+main:has(.search-result) > .search-tagline,
+main:has(.search-result) > .search-tip { display: none; }
+/* What the search says about itself is a sentence, and keeps the capital
+   the engine gave it; a count comes in lower case on its own. */
+.search-status { text-transform: none; }
+
+/* The foot of a post is two blocks, not four: what it belongs to and
+   where it can be sent -- the series, the tags, the sharing -- under one
+   rule, and the conversation under another. */
+article .series-nav { margin: 24px 0 0; padding-top: 16px; border-top: 1px solid var(--line); }
+article .tags { margin-top: 14px; padding-top: 0; border-top: 0; }
+article .content + .tags { margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+article .share { margin-top: 14px; padding-top: 0; border-top: 0; }
+
+/* The one filled thing there is the way into the conversation; sending
+   the post on is an outline like its neighbours. */
+.share__link[data-share-mastodon] { background: none; border-color: var(--line); color: var(--muted); opacity: 1; }
+.share__link[data-share-mastodon]:hover,
+.share__link[data-share-mastodon]:focus-visible { background: none; border-color: var(--accent); color: var(--accent); opacity: 1; }
+.comments-reply { margin: 0 0 16px; display: flex; flex-wrap: wrap; gap: 8px; }
+.comments-reply a,
+.comments-reply a:hover {
+  display: inline-block;
+  padding: 9px 18px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: var(--on-accent);
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.05em;
+  text-transform: lowercase;
+  text-decoration: none;
+}
+.comments-reply a:hover { opacity: 0.85; }
+
+/* A gallery in a post runs three across on a wide screen -- where it has
+   three pictures, or five and more. Two stay a pair and four a square,
+   as the engine lays them; so does every gallery on a phone. In three
+   columns the odd last picture keeps its own cell instead of the row. */
+@media (min-width: 701px) {
+  article .content .photo-grid:has(> figure:nth-child(3)):not(:has(> figure:nth-child(4))),
+  article .content .photo-grid:has(> figure:nth-child(5)) { grid-template-columns: repeat(3, 1fr); }
+  article .content .photo-grid:has(> figure:nth-child(3)):not(:has(> figure:nth-child(4))) .span-2,
+  article .content .photo-grid:has(> figure:nth-child(5)) .span-2 { grid-column: auto; }
+}
+
+/* The line over the comments is a sentence to the reader, not a reading
+   off an instrument: the plain face, at the size of a label. */
+.comments-note { font-family: var(--ui); font-size: 14.5px; letter-spacing: 0; line-height: 1.45; color: var(--muted); }
+
+/* The parts on either side of this one are named by their titles, and a
+   title is the post's own words: the plain face, its own capitals, ink.
+   Side by side on a wide screen; on a phone one under the other, each the
+   width of the column, the earlier to the left and the later to the right. */
+.series-nav a,
+.series-nav a:hover {
+  max-width: 48%;
+  padding: 9px 16px;
+  font-family: var(--ui);
+  font-weight: 600;
+  font-size: 15px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.series-nav a:hover { color: var(--accent); }
+@media (max-width: 700px) {
+  .series-nav { flex-direction: column; gap: 8px; }
+  .series-nav a,
+  .series-nav a:hover { display: block; max-width: none; padding: 11px 14px; border-radius: var(--corner); line-height: 1.35; }
+  .series-nav .series-next { margin-left: 0; text-align: right; }
+}
+
+/* A row in the sidebar is a glimpse, not the thing: what somebody posted
+   or committed is cut at four lines, and the whole of it is a click away. */
+#last-toots .last-content,
+#last-commits .last-content,
+#last-bluesky .last-content,
+#last-rss .last-content {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* The bare address under each sidebar row is not shown; the link that
+   carried it is stretched over the row instead, so the row itself is the
+   way to the thing. Links inside a row's own text stand above it and keep
+   working. */
+.last { position: relative; }
+.last > a,
+.last:has(.pixelfed-thumb) > a {
+  position: absolute;
+  inset: 0;
+  /* No cell of its own: placed in the grid of a picture row it would be
+     laid over that one cell, not over the row. */
+  grid-area: auto;
+  margin: 0;
+  font-size: 0;
+  z-index: 0;
+}
+.last > a:focus-visible { outline-offset: -3px; }
+.last-content a { position: relative; z-index: 1; }
+.last:has(> a:hover) { background: var(--plate); }
+
+/* The foot: its three labels stand flush over what they name; its links
+   are a plain list that takes the accent under the pointer; and on a
+   narrow screen there is room under it for the arrow back to the top,
+   which would otherwise sit on its last row. */
+footer h3 { margin-left: 0; }
+footer li a { text-decoration: none; }
+footer li a:hover { color: var(--accent); }
+@media (max-width: 1160px) {
+  .wrap { padding-bottom: 84px; }
+}
+/* The foot's links are set small: a list of addresses beside a sentence. */
+footer li { margin-bottom: 3px; }
+footer li a { font-size: 12px; }
+
+/* The copyright closes the foot on a line of its own, under all three
+   columns. It is written inside the middle one, so that column's box is
+   dissolved and its three children are placed in the foot's grid by hand:
+   label and note where the column stood, the copyright across the bottom. */
+/* The middle row takes whatever height the side columns need, so the
+   label's own row stays as tall as the label. */
+footer { row-gap: 0; grid-template-rows: min-content 1fr min-content; }
+footer > div:nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+footer > div:nth-child(3) { grid-column: 3; grid-row: 1 / span 2; }
+footer > div:nth-child(2) { display: contents; }
+footer > div:nth-child(2) > h3 { grid-column: 2; grid-row: 1; }
+footer > div:nth-child(2) > .chrome-text { grid-column: 2; grid-row: 2; }
+footer > div:nth-child(2) > .copyright {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin: 24px 0 0;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 760px) {
+  footer > div:nth-child(1) { grid-column: 1; grid-row: 1; margin-bottom: 24px; }
+  footer > div:nth-child(2) > h3 { grid-column: 1; grid-row: 2; }
+  footer > div:nth-child(2) > .chrome-text { grid-column: 1; grid-row: 3; margin-bottom: 24px; }
+  footer > div:nth-child(3) { grid-column: 1; grid-row: 4; }
+  footer > div:nth-child(2) > .copyright { grid-column: 1; grid-row: 5; }
+}
+/* ...and stands in the middle of its line, a colophon rather than the end
+   of the left column. */
+footer > div:nth-child(2) > .copyright { text-align: center; }
+
+/* The head. On a wide screen the search field is as wide as the sidebar
+   under it, so the two share an edge. On a phone the menu is one row that
+   slides sideways, running off the right edge to say there is more of it,
+   instead of two rows standing between the reader and the first post. */
+@media (min-width: 701px) {
+  .search-form input[type="search"] { width: 300px; }
+}
+@media (max-width: 700px) {
+  nav ul,
+  nav.nav-open ul {
+    flex-wrap: nowrap;
+    flex: 1 1 100%;
+    margin-right: -20px;
+    padding-right: 20px;
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  nav ul::-webkit-scrollbar { display: none; }
+  nav li { flex: none; }
+}
+/* The row that slides holds the groups too; the list inside a group is
+   no second row of its own, only its pills in this one. */
+@media (max-width: 700px) {
+  nav .nav-group > ul,
+  nav.nav-open .nav-group > ul { flex: none; margin: 0; padding: 0; overflow: visible; }
+}
+
+/* The cursor after the site's name blinks the way a terminal's does: on,
+   then off, with nothing in between. It stands still for a reader who has
+   asked the system for less movement. */
+@keyframes minimal-cursor {
+  0%, 59% { opacity: 1; }
+  60%, 100% { opacity: 0; }
+}
+.banner-title::after { animation: minimal-cursor 1.1s steps(1, end) infinite; }
+@media (prefers-reduced-motion: reduce) {
+  .banner-title::after { animation: none; }
+}
+
+/* A year's page: the month over each list is set like the letters of the
+   tag index, large and in the accent, because it is the one mark to find
+   one's place by; and a row is one line -- a post with no title is listed
+   by its first sentence, which would otherwise run to two or three. */
+.archive-section h2 {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: 0;
+}
+.archive-list li a {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* The month follows the reader down its list in a band of its own, clear
+   of the menu's rule above it, with a hairline under it. */
+.archive-section h2 {
+  top: 62px;
+  margin: 0 0 10px;
+  padding: 10px 2px 8px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+}
+
+/* On a series' listing the order matters more than the day: the date
+   steps back to grey and leaves the accent to the line that says which
+   part this is. */
+.listing-heading--series ~ .post-list-item .date-badge { color: var(--muted); }
+.listing-heading--series ~ .post-list-item .date-badge:hover { color: var(--ink); }
+
+/* The date's column is wide enough for the longest date a year has --
+   two digits of day and two of month -- and a date never breaks: the
+   year under the day read as two dates. The places that line up with
+   that column move with it. */
+.date-badge,
+.date-badge:hover { width: 104px; white-space: nowrap; }
+.search-result { grid-template-columns: 104px minmax(0, 1fr); }
+.card:not(.has-hero) > article > .post-header > .date-badge,
+.card:not(.has-hero) > article > .post-header > .date-badge:hover { width: 104px; }
+.card:not(.has-hero) > article > .post-header > .post-body > .series-note { left: 122px; }
+@media (max-width: 560px) {
+  .date-badge, .date-badge:hover { width: auto; }
+  .search-result { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* A quotation that opens a card is cut like a paragraph is, a little
+   later: six lines of somebody else's words, the rest on the post's page. */
+.post-list-item .content > blockquote:first-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+.post-list-item .content > blockquote:first-child > :first-child { margin-top: 0; }
+
+/* On the listings of pictures and of video a card shows its picture or
+   its film as well as its opening words -- where the engine's cut of the
+   card left it in. The listing is known by the menu item that is on. */
+.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item .content > figure:first-of-type,
+.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item .content > .photo-grid:first-of-type,
+.wrap:has(> nav a[aria-current="page"][href$="/type/video/"]) .post-list-item .content > figure:first-of-type,
+.wrap:has(> nav a[aria-current="page"][href$="/type/video/"]) .post-list-item .content > .embed-responsive:first-of-type {
+  display: block;
+  margin: 10px 0 0;
+}
+.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item .content > .photo-grid:first-of-type { display: grid; }
+.post-list-item .content figure video { display: block; width: 100%; max-height: 420px; border-radius: var(--corner); border: 1px solid var(--line); background: #000; }
+
+/* A listing by type is named by the menu item that is on, right above
+   it; the heading saying the same word again is kept for a reader who
+   moves by headings and taken out of sight. With nothing between the
+   menu's rule and the first post, that post gives up its own rule. */
+.listing-heading--type {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* A post with no title of its own -- a toot, a tweet, a photograph --
+   shows its picture or film in its card on every listing: there the
+   picture is half of what was said. A titled post stays words. It shows
+   only what the engine's cut of the card left in, which today is not
+   much; the rule waits for the day the card carries its media. */
+.post-list-item .post-body:not(:has(> h2)) .content > figure:first-of-type,
+.post-list-item .post-body:not(:has(> h2)) .content > .embed-responsive:first-of-type { display: block; margin: 10px 0 0; }
+.post-list-item .post-body:not(:has(> h2)) .content > .photo-grid:first-of-type { display: grid; margin: 10px 0 0; }
+
+/* On black the same two tints sink into brown and towards each other, so
+   the dark scheme mixes more of the accent into both. Written twice, as
+   the palette is: once for a reader who follows the system, once for one
+   who switched by hand. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tag-index-item:not(:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"])) > .tag-pill {
+    background: color-mix(in srgb, var(--accent) 26%, var(--paper));
+    border-color: color-mix(in srgb, var(--accent) 55%, var(--paper));
+  }
+  :root:not([data-theme="light"]) .tag-index-item:not(:is(
+      [data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"], [data-count="10"],
+      [data-count="11"], [data-count="12"], [data-count="13"], [data-count="14"], [data-count="15"], [data-count="16"], [data-count="17"], [data-count="18"], [data-count="19"], [data-count="20"],
+      [data-count="21"], [data-count="22"], [data-count="23"], [data-count="24"], [data-count="25"], [data-count="26"], [data-count="27"], [data-count="28"], [data-count="29"], [data-count="30"],
+      [data-count="31"], [data-count="32"], [data-count="33"], [data-count="34"], [data-count="35"], [data-count="36"], [data-count="37"], [data-count="38"], [data-count="39"], [data-count="40"],
+      [data-count="41"], [data-count="42"], [data-count="43"], [data-count="44"], [data-count="45"], [data-count="46"], [data-count="47"], [data-count="48"], [data-count="49"], [data-count="50"],
+      [data-count="51"], [data-count="52"], [data-count="53"], [data-count="54"], [data-count="55"], [data-count="56"], [data-count="57"], [data-count="58"], [data-count="59"], [data-count="60"],
+      [data-count="61"], [data-count="62"], [data-count="63"], [data-count="64"], [data-count="65"], [data-count="66"], [data-count="67"], [data-count="68"], [data-count="69"], [data-count="70"],
+      [data-count="71"], [data-count="72"], [data-count="73"], [data-count="74"], [data-count="75"], [data-count="76"], [data-count="77"], [data-count="78"], [data-count="79"], [data-count="80"],
+      [data-count="81"], [data-count="82"], [data-count="83"], [data-count="84"], [data-count="85"], [data-count="86"], [data-count="87"], [data-count="88"], [data-count="89"], [data-count="90"],
+      [data-count="91"], [data-count="92"], [data-count="93"], [data-count="94"], [data-count="95"], [data-count="96"], [data-count="97"], [data-count="98"], [data-count="99"])) > .tag-pill {
+    background: color-mix(in srgb, var(--accent) 62%, var(--paper));
+    border-color: var(--accent);
+  }
+  :root:not([data-theme="light"]) .tag-index-item:not(:is(
+      [data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"], [data-count="10"],
+      [data-count="11"], [data-count="12"], [data-count="13"], [data-count="14"], [data-count="15"], [data-count="16"], [data-count="17"], [data-count="18"], [data-count="19"], [data-count="20"],
+      [data-count="21"], [data-count="22"], [data-count="23"], [data-count="24"], [data-count="25"], [data-count="26"], [data-count="27"], [data-count="28"], [data-count="29"], [data-count="30"],
+      [data-count="31"], [data-count="32"], [data-count="33"], [data-count="34"], [data-count="35"], [data-count="36"], [data-count="37"], [data-count="38"], [data-count="39"], [data-count="40"],
+      [data-count="41"], [data-count="42"], [data-count="43"], [data-count="44"], [data-count="45"], [data-count="46"], [data-count="47"], [data-count="48"], [data-count="49"], [data-count="50"],
+      [data-count="51"], [data-count="52"], [data-count="53"], [data-count="54"], [data-count="55"], [data-count="56"], [data-count="57"], [data-count="58"], [data-count="59"], [data-count="60"],
+      [data-count="61"], [data-count="62"], [data-count="63"], [data-count="64"], [data-count="65"], [data-count="66"], [data-count="67"], [data-count="68"], [data-count="69"], [data-count="70"],
+      [data-count="71"], [data-count="72"], [data-count="73"], [data-count="74"], [data-count="75"], [data-count="76"], [data-count="77"], [data-count="78"], [data-count="79"], [data-count="80"],
+      [data-count="81"], [data-count="82"], [data-count="83"], [data-count="84"], [data-count="85"], [data-count="86"], [data-count="87"], [data-count="88"], [data-count="89"], [data-count="90"],
+      [data-count="91"], [data-count="92"], [data-count="93"], [data-count="94"], [data-count="95"], [data-count="96"], [data-count="97"], [data-count="98"], [data-count="99"])) > .tag-pill .tag-index-count { color: var(--ink); }
+}
+:root[data-theme="dark"] .tag-index-item:not(:is([data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"])) > .tag-pill {
+  background: color-mix(in srgb, var(--accent) 26%, var(--paper));
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--paper));
+}
+:root[data-theme="dark"] .tag-index-item:not(:is(
+    [data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"], [data-count="10"],
+    [data-count="11"], [data-count="12"], [data-count="13"], [data-count="14"], [data-count="15"], [data-count="16"], [data-count="17"], [data-count="18"], [data-count="19"], [data-count="20"],
+    [data-count="21"], [data-count="22"], [data-count="23"], [data-count="24"], [data-count="25"], [data-count="26"], [data-count="27"], [data-count="28"], [data-count="29"], [data-count="30"],
+    [data-count="31"], [data-count="32"], [data-count="33"], [data-count="34"], [data-count="35"], [data-count="36"], [data-count="37"], [data-count="38"], [data-count="39"], [data-count="40"],
+    [data-count="41"], [data-count="42"], [data-count="43"], [data-count="44"], [data-count="45"], [data-count="46"], [data-count="47"], [data-count="48"], [data-count="49"], [data-count="50"],
+    [data-count="51"], [data-count="52"], [data-count="53"], [data-count="54"], [data-count="55"], [data-count="56"], [data-count="57"], [data-count="58"], [data-count="59"], [data-count="60"],
+    [data-count="61"], [data-count="62"], [data-count="63"], [data-count="64"], [data-count="65"], [data-count="66"], [data-count="67"], [data-count="68"], [data-count="69"], [data-count="70"],
+    [data-count="71"], [data-count="72"], [data-count="73"], [data-count="74"], [data-count="75"], [data-count="76"], [data-count="77"], [data-count="78"], [data-count="79"], [data-count="80"],
+    [data-count="81"], [data-count="82"], [data-count="83"], [data-count="84"], [data-count="85"], [data-count="86"], [data-count="87"], [data-count="88"], [data-count="89"], [data-count="90"],
+    [data-count="91"], [data-count="92"], [data-count="93"], [data-count="94"], [data-count="95"], [data-count="96"], [data-count="97"], [data-count="98"], [data-count="99"])) > .tag-pill {
+  background: color-mix(in srgb, var(--accent) 62%, var(--paper));
+  border-color: var(--accent);
+}
+:root[data-theme="dark"] .tag-index-item:not(:is(
+    [data-count="1"], [data-count="2"], [data-count="3"], [data-count="4"], [data-count="5"], [data-count="6"], [data-count="7"], [data-count="8"], [data-count="9"], [data-count="10"],
+    [data-count="11"], [data-count="12"], [data-count="13"], [data-count="14"], [data-count="15"], [data-count="16"], [data-count="17"], [data-count="18"], [data-count="19"], [data-count="20"],
+    [data-count="21"], [data-count="22"], [data-count="23"], [data-count="24"], [data-count="25"], [data-count="26"], [data-count="27"], [data-count="28"], [data-count="29"], [data-count="30"],
+    [data-count="31"], [data-count="32"], [data-count="33"], [data-count="34"], [data-count="35"], [data-count="36"], [data-count="37"], [data-count="38"], [data-count="39"], [data-count="40"],
+    [data-count="41"], [data-count="42"], [data-count="43"], [data-count="44"], [data-count="45"], [data-count="46"], [data-count="47"], [data-count="48"], [data-count="49"], [data-count="50"],
+    [data-count="51"], [data-count="52"], [data-count="53"], [data-count="54"], [data-count="55"], [data-count="56"], [data-count="57"], [data-count="58"], [data-count="59"], [data-count="60"],
+    [data-count="61"], [data-count="62"], [data-count="63"], [data-count="64"], [data-count="65"], [data-count="66"], [data-count="67"], [data-count="68"], [data-count="69"], [data-count="70"],
+    [data-count="71"], [data-count="72"], [data-count="73"], [data-count="74"], [data-count="75"], [data-count="76"], [data-count="77"], [data-count="78"], [data-count="79"], [data-count="80"],
+    [data-count="81"], [data-count="82"], [data-count="83"], [data-count="84"], [data-count="85"], [data-count="86"], [data-count="87"], [data-count="88"], [data-count="89"], [data-count="90"],
+    [data-count="91"], [data-count="92"], [data-count="93"], [data-count="94"], [data-count="95"], [data-count="96"], [data-count="97"], [data-count="98"], [data-count="99"])) > .tag-pill .tag-index-count { color: var(--ink); }
+
+/* A tag used once is the quiet ground the others stand on: small grey
+   words with no frame and no count -- being unframed says the one. It is
+   still a link, and takes the accent under the pointer like the rest. */
+.tag-index-item[data-count="1"] > .tag-pill {
+  border-color: transparent;
+  padding-left: 4px;
+  padding-right: 4px;
+  font-size: 11px;
+  opacity: 0.75;
+}
+.tag-index-item[data-count="1"] > a.tag-pill:hover { border-color: transparent; opacity: 1; }
+.tag-index-item[data-count="1"] > .tag-pill .tag-index-count { display: none; }
+
+/* The letter over a run of tags follows the reader down the page, as the
+   month does on a year's page: under the menu, in a band of its own. The
+   letters and the tags are one list, so a letter stays until the next
+   one rides up over it. Not on a phone, where the menu does not stick
+   either. */
+@media (min-width: 701px) {
+  .tag-index-letter {
+    position: sticky;
+    top: 62px;
+    z-index: 1;
+    margin: 14px 0 6px;
+    padding: 10px 2px 8px;
+    background: var(--paper);
+    border-top: 0;
+    border-bottom: 1px solid var(--line);
+  }
+}
+
+/* A page that is not a post -- the Markdown cheat sheet -- is written as
+   a title straight over its text, with no header around them. Its title
+   is set like a post's; the list of its sections, which opens it, is a
+   row of pills rather than a column of sixteen bullets; and each section's
+   heading follows the reader down under the menu, as a month does in the
+   archive. Only headings a contents link points at stick, so a heading
+   shown as an example stays where it was written. */
+.card > article > h1 {
+  margin: 0 0 14px;
+  font-size: clamp(27px, 4.4vw, 36px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+.card > article > .content > ul:has(> li > a[href^="#"]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  max-width: none;
+  margin: 18px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.card > article > .content > ul:has(> li > a[href^="#"]) > li > a {
+  display: inline-block;
+  padding: 4px 11px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.05em;
+  line-height: 1.3;
+  text-transform: lowercase;
+  text-decoration: none;
+  color: var(--muted);
+}
+.card > article > .content > ul:has(> li > a[href^="#"]) > li > a:hover { border-color: var(--accent); color: var(--accent); }
+@media (min-width: 701px) {
+  .card > article > .content > h2[id] {
+    position: sticky;
+    top: 62px;
+    z-index: 2;
+    margin: 28px 0 18px;
+    padding: 10px 0 8px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+}
+@media (max-width: 700px) {
+  .card > article > h1 { font-size: clamp(25px, 7vw, 30px); }
+}
+
+/* The signpost of the page that is not there is drawn at the weight of
+   everything else here: half the size, a thinner line. The sentence under
+   it is the one thing the page has to say, so it is said in the text's own
+   size and colour. */
+main > .not-found-sign,
+.not-found-sign { width: 170px; stroke-width: 2; }
+main:has(> .not-found-sign) > .search-tagline { font-size: 16px; line-height: 1.55; color: var(--ink); }
+@media (max-width: 700px) {
+  .not-found-sign { width: 140px; }
+}
+
+/* By night a picture is turned down a fifth, so a white screenshot does
+   not stand on a black page like a lamp. Under the pointer it comes back
+   to what it is, and the enlarged view was never dimmed. Written twice,
+   as the palette is. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .content figure img,
+  :root:not([data-theme="light"]) .photo-grid img,
+  :root:not([data-theme="light"]) .content video,
+  :root:not([data-theme="light"]) .pixelfed-thumb { filter: brightness(0.82); transition: filter 0.2s ease-in-out; }
+  :root:not([data-theme="light"]) .content figure img:hover,
+  :root:not([data-theme="light"]) .photo-grid img:hover,
+  :root:not([data-theme="light"]) .content video:hover,
+  :root:not([data-theme="light"]) .last:hover .pixelfed-thumb { filter: none; }
+}
+:root[data-theme="dark"] .content figure img,
+:root[data-theme="dark"] .photo-grid img,
+:root[data-theme="dark"] .content video,
+:root[data-theme="dark"] .pixelfed-thumb { filter: brightness(0.82); transition: filter 0.2s ease-in-out; }
+:root[data-theme="dark"] .content figure img:hover,
+:root[data-theme="dark"] .photo-grid img:hover,
+:root[data-theme="dark"] .content video:hover,
+:root[data-theme="dark"] .last:hover .pixelfed-thumb { filter: none; }
+
+/* The phone, second pass. An article is set a size down, so a line holds
+   more than five words; the arrow back to the top sits tight in the
+   corner and lets the text under it show through, since on a phone there
+   is no margin for it to stand in; and on the narrowest screens the
+   site's name and claim are set smaller, so the head stays one row. */
+@media (max-width: 700px) {
+  .content { font-size: 16px; line-height: 1.62; }
+  #scroll-top { right: 8px; bottom: 12px; opacity: 0.72; }
+  #scroll-top:hover { opacity: 1; }
+}
+@media (max-width: 360px) {
+  .banner-wrap { gap: 10px; }
+  .banner-wrap::before,
+  .banner-wrap:has(.banner-title)::before { width: 42px; height: 42px; }
+  .banner-title { font-size: 25px; }
+  .banner-claim { font-size: 12.5px; }
+}
+
+/* Under a post on a phone the sidebar keeps what is about the author and
+   the day, and leaves out the three feeds -- toots, pictures, commits --
+   that would put two more screens between the last comment and the foot.
+   Listings keep all of it, and so does a wide screen. */
+@media (max-width: 860px) {
+  .layout:has(main article > .post-header) aside .card:has(#last-toots),
+  .layout:has(main article > .post-header) aside .card:has(#last-pixelfeds),
+  .layout:has(main article > .post-header) aside .card:has(#last-commits),
+  .layout:has(main article > .post-header) aside .card:has(#last-bluesky),
+  .layout:has(main article > .post-header) aside .card:has(#last-rss) { display: none; }
+}
+
+/* A letter may reach a pixel or two past the edge of its column -- the
+   hook of a j does -- and whatever sticks is exactly as wide as that
+   column, so the reach showed beside it as a speck while the line passed
+   underneath. The ground of each sticking band is carried a little way out
+   on both sides to cover it. */
+@media (min-width: 701px) {
+  .wrap > nav { box-shadow: -12px 0 0 var(--paper), 12px 0 0 var(--paper); }
+  .archive-section h2,
+  .tag-index-letter,
+  .card > article > .content > h2[id] { box-shadow: -8px 0 0 var(--paper), 8px 0 0 var(--paper); }
+}
+
+/* The tablet. Between a phone and a full desk the head and the two
+   columns are fitted to what room there is. Up to 860px, where the
+   sidebar has gone under the content, the search field gives way so the
+   menu stays one row -- the sticking headings below count on a bar one
+   row tall. From there to 1000px the sidebar is narrower, so the column
+   of posts is not squeezed to four words a line, and the search field
+   matches it. */
+@media (min-width: 701px) and (max-width: 860px) {
+  .search-form { flex: 1 1 140px; min-width: 140px; max-width: 300px; }
+  .search-form input[type="search"] { width: 100%; }
+}
+@media (min-width: 861px) and (max-width: 1000px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 240px; gap: 32px; }
+  .search-form input[type="search"] { width: 240px; }
+}
+
+/* Where the sidebar has gone under the content and there is still room
+   for two of its boxes abreast -- a tablet held upright -- they are poured
+   into two columns the way a newspaper pours text: down the first, on
+   down the second, the browser keeping the two the same height and never
+   cutting a box in half. Laid out in rows instead, a short box left a
+   hole beside a long one. */
+@media (min-width: 561px) and (max-width: 860px) {
+  aside { display: block; column-count: 2; column-gap: 24px; }
+  aside .card { break-inside: avoid; margin: 0 0 22px; }
+}
+
+/* A site in more than one language, on a phone. The two switches together
+   are too wide to stand beside the name and the claim -- the claim was
+   squeezed into a column three words wide and the head came apart. So
+   there the pair is pinned to the top right, level with the site's name,
+   which is short, and the claim runs the full width under both. */
+@media (max-width: 700px) {
+  .banner-wrap:has(.banner-tools) .banner-tools {
+    position: absolute;
+    top: 4px;
+    right: 0;
+    margin-left: 0;
+  }
+}
+@media (max-width: 360px) {
+  .banner-wrap:has(.banner-tools) .banner-tools { top: 0; gap: 4px; }
+  .banner-wrap:has(.banner-tools) .lang-switch__item { padding: 3px 7px; }
+}
+/* On the narrowest screens the name's cursor would run into the pair, so
+   there -- and only on a site with a second language -- it is left out. */
+@media (max-width: 360px) {
+  .banner-wrap:has(.banner-tools) .banner-title::after { content: none; }
+}
+/* And the name itself gives way to the pair instead of running under it.
+   A stylesheet cannot see two things overlap, but it can work out the room:
+   the screen less the mark, the pair and the air between them is what the
+   name has, and a monospace is six tenths of its size to a character. So
+   the name is set as large as that room allows for a name of --name-chars
+   characters, between a floor and its full size. Nine is the base's guess
+   -- "./blog.sh" -- and a site with a shorter or longer name says its own
+   number in a stylesheet of its own. */
+:root { --name-chars: 9; --name-floor: 19px; }
+@media (max-width: 700px) {
+  .banner-wrap:has(.lang-switch) .banner-title { font-size: clamp(var(--name-floor), calc((100vw - 250px) / (0.6 * var(--name-chars))), 34px); }
+}
+
+/* The two switches in the head are one kind of thing -- a setting, not a
+   place to go -- and are drawn alike: keys, the shape the appearance
+   switch and the arrow back to the top already have. A pill is left to
+   mean a filter or a link. */
+.lang-switch { height: 28px; box-sizing: border-box; padding: 2px; border-radius: 8px; }
+.lang-switch__item { padding: 2px 8px; border-radius: 6px; }
+@media (max-width: 360px) {
+  .banner-wrap:has(.banner-tools) .lang-switch__item { padding: 2px 6px; }
+}
+
+/* Sharing, two details. The field that asks for an instance shows where
+   the typing goes with its own frame in the accent and nothing around it
+   -- frame and ring together were the heaviest thing on the page. And an
+   address that has been copied says so the way everything switched on
+   here does, filled with the accent, now that no neighbour of that button
+   wears it at rest. */
+.share__ask-input:focus,
+.share__ask-input:focus-visible { outline: none; border-color: var(--accent); }
+.share__link.is-done,
+.share__link.is-done:hover,
+.share__link.is-done:focus-visible { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
+
+/* Somebody named at the head of a reply is an address, not the point of
+   it: a mention -- in a comment, and in a toot in the sidebar -- is said in
+   the accent with no rule under it, so the underline is left to links in
+   what was actually written. */
+.comment-content a.mention,
+.last-content a.mention { color: var(--accent); text-decoration: none; }
+.comment-content a.mention:hover,
+.last-content a.mention:hover { color: var(--accent); text-decoration: underline; }
+
+/* The whole of a day, unfolded: the year stands in a narrow column of
+   its own and the titles line up beside it, the way days do on a year's
+   page -- so a title that wraps does not run back under its year, and a
+   year that comes six times can be read past. */
+.on-this-day-all li {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  column-gap: 8px;
+  align-items: baseline;
+  margin: 0;
+  padding: 5px 0;
+}
+.on-this-day-all li .last-date { font-size: 11px; font-variant-numeric: tabular-nums; }
+.on-this-day-all ul { margin-top: 6px; }
+
+/* A post that opens with its picture (layout.hero, or `hero: true` in a
+   post). The engine draws it for a card this skin does not have, so it is
+   brought into line with the rest: the picture framed and cornered like
+   any other and held to a height that leaves the title on the first
+   screen, the title at a post's size and flush with the column, and the
+   byline in the engine's voice -- the date in the accent, as everywhere. */
+.card.has-hero .post-hero__media img {
+  width: 100%;
+  max-height: 460px;
+  object-fit: cover;
+  border-radius: var(--corner);
+  border: 1px solid var(--line);
+}
+.card.has-hero .post-hero__content { padding: 18px 0 0; }
+.card.has-hero .post-hero__content h1 {
+  margin: 0 0 8px;
+  font-size: clamp(27px, 4.4vw, 36px);
+  font-weight: 700;
+  line-height: 1.15;
+  letter-spacing: -0.015em;
+}
+.card.has-hero .post-hero__meta {
+  gap: 4px 14px;
+  align-items: baseline;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+}
+.card.has-hero .post-hero__meta a,
+.card.has-hero .post-hero__meta a:hover { order: -1; color: var(--accent); text-decoration: none; }
+.card.has-hero .post-hero__meta a:hover { text-decoration: underline; }
+.card.has-hero .post-body > .post-meta { margin: 8px 0 0; }
+.card.has-hero .post-body > .series-note { margin: 10px 0 0; }
+.card.has-hero .post-body > .content { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
+@media (max-width: 700px) {
+  .card.has-hero .post-hero__content h1 { font-size: clamp(25px, 7vw, 30px); }
+  .card.has-hero .post-hero__media img { max-height: 300px; }
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .post-hero__media img { filter: brightness(0.82); transition: filter 0.2s ease-in-out; }
+  :root:not([data-theme="light"]) .post-hero__media img:hover { filter: none; }
+}
+:root[data-theme="dark"] .post-hero__media img { filter: brightness(0.82); transition: filter 0.2s ease-in-out; }
+:root[data-theme="dark"] .post-hero__media img:hover { filter: none; }
+/* The contents box floats from above the rule that opens the text there,
+   so it is set down clear of it. */
+@media (min-width: 701px) {
+  .card.has-hero .post-body > .toc { margin-top: 36px; }
+}
+
+/* A continuation of the front page -- /page/300/ -- has no heading to
+   see, so nothing at its top said it was not the front page. The number
+   the engine writes between "newer" and "older" at the foot is lifted to
+   the head of the list instead: a stylesheet cannot say it twice, and
+   the top is where a reader asks where they are. Listings with a heading
+   of their own keep the number at the foot. */
+body.page-cont main:has(> .listing-heading--home) { position: relative; padding-top: 34px; }
+body.page-cont main:has(> .listing-heading--home) > .pagination > span {
+  position: absolute;
+  top: 0;
+  left: 0;
+  color: var(--accent);
+}
+body.page-cont main:has(> .listing-heading--home) > .post-list-item:first-of-type { border-top: 1px solid var(--line); }
+
+/* A film shot upright is held to about a screen's height and stands in
+   the middle of the column; across the full width it came out twelve
+   hundred pixels tall, its controls two screens down. One shot on its
+   side already fits and is not touched. */
+article .content figure video {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  max-height: min(78vh, 720px);
+  margin: 0 auto;
+  background: #000;
+}
+
+/* A post with no title -- a toot, a tweet, a photograph -- had a gap in
+   its head where the title would be. Its counts stand on the date's own
+   line instead, in the date's line height: in the meta row's own 1.55
+   they sat a pixel below the date beside them, two on a Retina screen. A
+   part of a series keeps the old shape: that line is the series' there. */
+.card:not(.has-hero) > article > .post-header:not(:has(> .post-body > h1)):not(:has(> .post-body > .series-note)) { padding-top: 0; }
+.card:not(.has-hero) > article > .post-header:not(:has(> .post-body > h1)):not(:has(> .post-body > .series-note)) > .post-body > .post-meta {
+  margin-top: 0;
+  padding-left: 122px;
+  min-height: 17px;
+  line-height: 1.4;
+}
+
+/* ------------------------------------------------- after the engine of 6. 10.
+   The engine began marking what a skin could not select, and put new
+   things on three pages. What follows takes those up. */
+
+/* The page that is not there: its field and its pills stand in the middle
+   with the sentence above them. */
+main > .not-found-search { margin: 22px auto 0; }
+main > .not-found-links { margin-top: 22px; text-align: center; }
+.not-found-links .tag-pill { margin: 0 3px 6px; }
+.not-found-link[hidden] { display: none; }
+
+/* A continuation of the front page has its number at the head of the
+   list; the days it covers now come with it, on the same line, quieter.
+   The word that marks the page the numbering starts from stays at the
+   foot, where the link to older posts would be. */
+body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagination-start) {
+  text-align: left;
+  white-space: nowrap;
+}
+body.page-cont main:has(> .listing-heading--home) > .pagination .pagination-sep { display: inline; color: var(--muted); }
+body.page-cont main:has(> .listing-heading--home) > .pagination .pagination-dates { display: inline; color: var(--muted); }
+body.page-cont main:has(> .listing-heading--home) > .pagination > .pagination-start {
+  position: static;
+  margin-left: auto;
+  color: var(--muted);
+}
+.pagination-dates { margin-top: 2px; }
+
+/* How many a listing holds: beside its name, in the engine's voice. */
+.listing-heading__count {
+  margin-left: 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  vertical-align: baseline;
+  opacity: 1;
+  color: var(--muted);
+}
+
+/* An archive year reads like a tag or a series: the kind in ink, the year
+   in the accent. */
+.listing-heading--archive .listing-heading__kind ~ .listing-heading__value,
+.listing-heading--archive .listing-heading__kind ~ .listing-heading__value .listing-heading__link:hover { color: var(--accent); }
+
+/* On a series' own listing the heading has said the name; each card says
+   only which part it is. */
+.listing-heading--series ~ .post-list-item .series-note__name,
+.listing-heading--series ~ .post-list-item .series-note__sep { display: none; }
+
+/* On a tag's listing every card carries that tag; there it steps back. */
+.tag-pill-own { opacity: 0.45; }
+
+/* A count of nothing is not written. */
+.post-stat--zero { display: none; }
+
+/* On the cheat sheet, what a source becomes is set off from the prose
+   around it by a rule in the accent. */
+.md-example { margin: 14px 0 18px; padding-left: 16px; border-left: 2px solid var(--accent); }
+.md-example > :first-child { margin-top: 0; }
+.md-example > :last-child { margin-bottom: 0; }
+/* ...and when all three are nothing, the box that held them leaves the
+   row too, or its gap stays behind between the reading time and the tags. */
+.post-stats:has(.post-stat):not(:has(.post-stat:not(.post-stat--zero))) { display: none; }
+
+/* "Comments the author chose" over no comments reads as if some were
+   missing; the line waits for the first one. */
+#comments:not(:has(.comment)) .comments-note { display: none; }
+
+/* By night the archive's lightest month sank into the black beside it and
+   read as an empty one; the dark scheme mixes more of the accent into the
+   three lower steps, as it does for the tags. Written twice, as the
+   palette is. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .archive-month.is-l1 { background: color-mix(in srgb, var(--accent) 26%, var(--paper)); border-color: color-mix(in srgb, var(--accent) 50%, var(--paper)); color: var(--ink); }
+  :root:not([data-theme="light"]) .archive-month.is-l2 { background: color-mix(in srgb, var(--accent) 46%, var(--paper)); border-color: transparent; color: var(--ink); }
+  :root:not([data-theme="light"]) .archive-month.is-l3 { background: color-mix(in srgb, var(--accent) 72%, var(--paper)); border-color: transparent; color: var(--on-accent); }
+}
+:root[data-theme="dark"] .archive-month.is-l1 { background: color-mix(in srgb, var(--accent) 26%, var(--paper)); border-color: color-mix(in srgb, var(--accent) 50%, var(--paper)); color: var(--ink); }
+:root[data-theme="dark"] .archive-month.is-l2 { background: color-mix(in srgb, var(--accent) 46%, var(--paper)); border-color: transparent; color: var(--ink); }
+:root[data-theme="dark"] .archive-month.is-l3 { background: color-mix(in srgb, var(--accent) 72%, var(--paper)); border-color: transparent; color: var(--on-accent); }
+
+/* By night a tag used once was dimmed twice -- the muted grey and then
+   three quarters of it -- and sat at the edge of reading. There it keeps
+   the grey whole. Written twice, as the palette is. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tag-index-item[data-count="1"] > .tag-pill { opacity: 1; }
+}
+:root[data-theme="dark"] .tag-index-item[data-count="1"] > .tag-pill { opacity: 1; }
+
+/* ------------------------------------------------ one heading, everywhere
+   A listing is headed the same way wherever it is: what kind of page in
+   the display face and ink, the thing itself in the accent, how many in
+   small grey type. Three places had gone their own way. */
+
+/* A listing by type has its heading back. It says the word the menu's
+   pill says, and it is where the count stands. */
+.listing-heading--type {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0 0 14px;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+}
+main .listing-heading--type ~ .post-list-item:first-of-type { border-top: 1px solid var(--line); }
+
+/* A continuation of the front page: "page 300" is the kind of page, set
+   as one, and the days it covers take the count's place and voice. */
+body.page-cont main:has(> .listing-heading--home) { padding-top: 49px; }
+body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagination-start) {
+  font-family: var(--display);
+  font-weight: 500;
+  font-size: 29px;
+  line-height: 1.2;
+  letter-spacing: -0.01em;
+  text-transform: lowercase;
+  color: var(--ink);
+}
+body.page-cont main:has(> .listing-heading--home) > .pagination .pagination-sep { display: none; }
+body.page-cont main:has(> .listing-heading--home) > .pagination .pagination-dates {
+  margin: 0 0 0 10px;
+  font-family: var(--mono);
+  font-weight: 700;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+@media (max-width: 700px) {
+  body.page-cont main:has(> .listing-heading--home) { padding-top: 44px; }
+  body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagination-start) { font-size: 25px; }
+}
+
+/* What a search found is a count like the others, and grey like them. */
+.search-status { color: var(--muted); }
+
+/* By night the listing's own tag, dimmed to under a half, was not there
+   at all; it keeps more of itself. Written twice, as the palette is. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .tag-pill-own { opacity: 0.7; }
+}
+:root[data-theme="dark"] .tag-pill-own { opacity: 0.7; }
+
+/* A search that found something says how many beside what was asked, as
+   every other listing does. The count is written inside the list of
+   results, so that list's box is dissolved and the count flows up beside
+   the heading. A search that found nothing keeps its sentence on a line
+   of its own, under the two lines on how to search. */
+main:has(.search-result) > .listing-heading--search { display: inline-block; margin-right: 10px; }
+main:has(.search-result) > #search-results { display: contents; }
+main:has(.search-result) .search-status { display: inline; margin: 0; letter-spacing: 0.04em; }
+main:has(.search-result) .search-result:first-of-type { border-top: 1px solid var(--line); }
+/* The field and the pills are one thing -- the ways on -- so no rule runs
+   between them. */
+main > .not-found-links { margin-top: 16px; padding-top: 0; border-top: 0; }
+
+/* On the cheat sheet a source is a filled plate and what it becomes is an
+   outline of the same shape under it. The rule in the accent that marked
+   a result stood beside a quotation's own and doubled it; an outline
+   leaves the accent to what wears it on the site. */
+.md-example {
+  margin: 10px 0 20px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-left: 1px solid var(--line);
+  border-radius: var(--corner);
+}
+
+/* The claim breaks into lines of a like length, so a narrow screen does not
+   leave its last word alone on a line. */
+.banner-claim { text-wrap: balance; }
+
+/* The pin is written before the date, and is shown after it: centred under the
+   date on a wide screen, so the date stays level with the title as on every other
+   card, and beside it on a narrow one. */
+.post-list-item .date-badge.is-pinned {
+  display: grid;
+  grid-template-columns: max-content;
+  justify-items: center;
+}
+.post-list-item .date-badge.is-pinned .pin-mark { order: 1; }
+@media (max-width: 560px) {
+  .post-list-item .date-badge.is-pinned { display: flex; align-items: center; }
+}
+
+/* The sidebar's rows, shortened. A toot's address is the short form Mastodon
+   sends with it, on one line, so the text and the hashtags keep the room; a
+   commit's message is three lines, not four. */
+#last-toots .invisible { display: none; }
+#last-toots .ellipsis::after { content: "\2026"; }
+#last-toots .last-content a:has(> .ellipsis) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+#last-commits .last-content { -webkit-line-clamp: 3; }
+
+/* Two abreast under the content, the boxes go left, right, left, right in
+   the order the sidebar has them, and each sits right under the one above it
+   on its side: floats, the odd ones to the left and the even to the right,
+   each clearing its own side only. */
+@media (min-width: 561px) and (max-width: 860px) {
+  aside { display: flow-root; column-count: auto; }
+  aside > .card { width: calc((100% - 24px) / 2); }
+  aside > .card:nth-child(odd) { float: left; clear: left; }
+  aside > .card:nth-child(even) { float: right; clear: right; }
+}
+
+/* Where the sidebar has gone under the content, the text runs as wide as the
+   pictures do: held to its measure it left an empty strip beside every
+   paragraph, and the page two right-hand edges. */
+@media (max-width: 860px) {
+  .content > p,
+  .content > ul,
+  .content > ol,
+  .content > blockquote,
+  .content > dl { max-width: none; }
+}
+
+/* After the engine of 8. 10. -- what it now marks, said the skin's way. */
+
+/* A page of the listing: the word in ink, the number as the thing a heading
+   names is everywhere -- the text face, 21px, in the accent -- as a
+   year of the archive and a tag are. */
+body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagination-start) .pagination-number {
+  font-family: var(--ui);
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--accent);
+}
+
+/* The search's count stands beside the query as a number alone; the word
+   stays for a screen reader. What was asked for is tinted where it was found. */
+.search-unit {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.search-result mark {
+  background: color-mix(in srgb, var(--accent) 24%, transparent);
+  color: inherit;
+  border-radius: 3px;
+  padding: 0 2px;
+}
+
+/* A mention in a post's own text, as in a comment and a toot. */
+.content a.mention { color: var(--accent); text-decoration: none; }
+.content a.mention:hover { text-decoration: underline; }
+
+/* The author among the replies wears the accent round the picture. */
+.comment--author .comment-avatar {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 1px var(--accent);
+}
+
+/* The labels of the rows that jump, and the legend's two words, are labels. */
+.archive-jump__label,
+.tag-index-jump__label,
+.archive-legend__word {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: lowercase;
+  color: var(--muted);
+}
+
+/* With a language switch in the head a phone has no room for the name's
+   cursor: the switch stood on it. Up to 430px the cursor is left out there. */
+@media (max-width: 430px) {
+  .banner-wrap:has(.lang-switch) .banner-title::after { content: none; }
+}
+
+/* The row under a card on one axis. The reading time was a block set on the
+   text's baseline and the numbers from the network a row that centres its
+   own icons, so the two groups stood at two heights. Now the reading time
+   centres its icon as the others do, and the row centres all of it. */
+.post-stat.reading-time { display: inline-flex; align-items: center; }
+.post-list-item .post-body > .post-meta > *,
+.post-list-item .post-body > .tags > * { align-self: center; }
+
+/* The lead. The post that opens the front page -- the pinned one where
+   there is one, the newest where there is none -- is the one row of a
+   listing that is not an open row: it stands on a ground of its own, its
+   title is set large, its date goes above the title instead of beside it,
+   and its opening words run to five lines instead of three.
+
+   It is told by its place, the first post of the first page of the front
+   page, and not by the engine's post-list-item--lead alone: the engine
+   gives that class (layout.lead_card) only to a post with a picture to
+   lead with, and a blog's newest post is the lead whether it has one or
+   not. Where the engine did lift a picture, it is shown.
+
+   The ground is the site's accent laid thin over the paper -- twelve parts
+   in a hundred by day, ten by night -- so it is the paper a step warmer
+   and not a second colour, and it follows a site that says another accent.
+   No hairline round it; the tone is the edge. */
+:root,
+:root[data-theme="light"] { --lead-ground: color-mix(in srgb, var(--accent) 12%, var(--paper)); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --lead-ground: color-mix(in srgb, var(--accent) 10%, var(--paper)); }
+}
+:root[data-theme="dark"] { --lead-ground: color-mix(in srgb, var(--accent) 10%, var(--paper)); }
+
+/* Under it, air: fifty-four pixels to the next date, against forty-one
+   between two rows, and no hairline, so the listing is seen to begin below
+   the lead and the lead is not read as its first row. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) {
+  margin: 18px 0 34px;
+  padding: 24px 26px 22px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--lead-ground);
+}
+/* From 561px up, which is where a row stops stacking by itself: below that
+   the date is above the title already. */
+@media (min-width: 561px) {
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .post-header { display: block; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .date-badge { margin: 0 0 10px; }
+}
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .post-body > h2 {
+  font-size: clamp(26px, 3.3vw, 36px);
+  line-height: 1.1;
+  letter-spacing: -0.015em;
+  margin: 0 0 10px;
+  text-wrap: balance;
+}
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .content > figure:first-child { margin: 12px 0 16px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .content > figure:first-child figcaption { display: none; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .content > p:first-of-type { -webkit-line-clamp: 5; font-size: 17px; line-height: 1.6; opacity: 0.88; }
+@media (max-width: 700px) {
+  /* Ten pixels into the gutter on each side, so the words inside keep the
+     edge the rest of the page reads from. */
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) { margin: 16px -10px 28px; padding: 16px 10px 14px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .post-body > h2 { margin-bottom: 8px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .content > figure:first-child { margin: 4px 0 12px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .content > p:first-of-type { font-size: 16px; line-height: 1.55; }
+}
+
+/* A lead with no picture has room, and takes it: it shows everything the
+   engine put in its card -- the teaser the author wrote, or as much of the
+   opening as the engine's own budget for a card lets through -- as whole
+   paragraphs, not five clamped lines. How long that is, is the engine's and
+   the author's to say, not a count in this file. A heading the cut happened
+   to end on is left out, since nothing follows it; and because whole
+   paragraphs do not trail off, the way on to the rest is said in words. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > * { display: block; margin: 0 0 12px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > :last-child { margin-bottom: 0; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { display: block; overflow: visible; font-size: 16.5px; line-height: 1.6; opacity: 0.88; -webkit-line-clamp: none; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > .photo-grid { display: grid; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > table { display: table; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > :is(h1, h2, h3, h4, h5, h6, hr):last-child { display: none; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .read-more {
+  /* one of the row it stands in: the engine's voice, the row's size, on the
+     row's own axis */
+  display: inline-block; order: 5; flex: 0 0 auto; align-self: center; margin: 0; color: var(--ink);
+  font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.2; text-transform: lowercase;
+  text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px;
+}
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .read-more:hover { color: var(--accent); }
+@media (max-width: 700px) {
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { font-size: 16px; line-height: 1.55; }
+}
+
+/* A pinned lead says so before its date: the pin, plain and in the accent,
+   the size of the date it stands beside. It is the answer to the question a
+   reader would otherwise have -- why a post months old is the first thing on
+   the page -- and a lead that is simply the newest post has none. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned { display: flex; align-items: center; justify-items: start; gap: 6px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned .pin-mark,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned:hover .pin-mark { display: inline-flex; order: -1; width: 14px; height: 14px; margin: 0; border-radius: 0; background: none; color: var(--accent); }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned .pin-mark svg { display: block; width: 14px; height: 14px; }
+
+/* ---- journal: the layer over minimal ---------------------------------- */
+
+:root { --rail: 28px; }
+
+/* ------------------------------------------------------------ the line
+
+   A listing is a line of time. It runs down the left edge of the entries,
+   and every entry hangs on it by a mark in the accent, level with its date.
+   The entries stand one against the next, so the line is not broken; the
+   air between two of them is inside the upper one. There are no hairlines
+   between entries: the line is what holds them together. The lead of the
+   front page keeps minimal's shape, and the line begins under it.
+   (:not(.x):not(.y) is weight only: minimal's own rules for the first row
+   of a listing are heavy.) */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) {
+  margin: 0 0 0 4px;
+  padding: 0 0 38px var(--rail);
+  border: 0;
+  border-left: 1px solid var(--line);
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .post-header { display: block; }
+
+/* under a listing's heading the line begins after a breath of air */
+main > .listing-heading + .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) { margin-top: 26px; }
+
+/* a later page of the front page opens with the line too, not with the
+   hairline minimal draws over its first row */
+body.page-cont main:has(> .listing-heading--home) > .post-list-item:first-of-type:not(.x):not(.y) { margin-top: 14px; border-top: 0; }
+
+/* ------------------------------------------------------------ the date
+
+   The date is the entry's heading: the engine's voice, in the accent, large, because time is what leads here, over the entry and not beside it. */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge:hover {
+  position: relative;
+  width: auto;
+  margin: 0 0 8px;
+  padding: 0;
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 24px;
+  letter-spacing: 0.02em;
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge a:hover { color: var(--ink); }
+/* the mark on the line: a dot in the accent with a ring of paper round it,
+   so the line stops short of it on both sides */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: calc(-1 * var(--rail) - 10px);
+  width: 11px;
+  height: 11px;
+  border: 4px solid var(--paper);
+  border-radius: 50%;
+  background: var(--accent);
+  background-clip: padding-box;
+}
+
+/* ----------------------------------------------------------- the entry
+
+   A title, where there is one, is the entry's first line, not its head: the
+   size of a heading inside a text. Then the entry itself, whole: everything
+   the engine put in the card, as paragraphs, pictures and quotations, not a
+   clamped opening. Where the engine cut it, the way on is said in words in
+   the row of what the engine knows. */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .post-body > h2 { font-size: 19px; line-height: 1.3; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content { max-width: none; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > * { display: block; margin: 0 0 12px; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > :last-child { margin-bottom: 0; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p:first-child,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > blockquote:first-child { display: block; overflow: visible; max-width: 68ch; opacity: 1; -webkit-line-clamp: none; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p:first-child { font-size: 16.5px; line-height: 1.6; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > .photo-grid { display: grid; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > :is(h1, h2, h3, h4, h5, h6, hr):last-child { display: none; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .read-more {
+  display: inline-block; order: 5; flex: 0 0 auto; align-self: center; margin: 0; color: var(--ink);
+  font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.2; text-transform: lowercase;
+  text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px;
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .read-more:hover { color: var(--accent); }
+
+/* The hour. A diary says not only which day but when in it. The engine does
+   not write the hour into a card yet; where it does (a span it keeps hidden
+   for skins that do not want it), it stands after the date, smaller and
+   muted: the day is the heading, the hour a note to it. */
+main > .post-list-item:not(.x):not(.y) .date-badge .date-time { display: inline; margin-left: 10px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: 0.05em; }
+
+/* A heading inside an entry is under the entry's title, not over it: the
+   text's own size, bold, in the ink. The accent on this page is the date. */
+main > .post-list-item:not(.x):not(.y) .content > :is(h1, h2, h3, h4, h5, h6) { margin: 16px 0 6px; color: var(--ink); font-size: 16.5px; font-weight: 700; line-height: 1.4; letter-spacing: 0; }
+
+/* Text runs to the right edge of its column -- an entry's and the lead's
+   alike. Minimal holds a listing's text to a measure in characters; with
+   the whole entry shown here, that measure would end every line short of
+   the pictures and the row under them. */
+main > .post-list-item:not(.x):not(.y) .content,
+main > .post-list-item:not(.x):not(.y) .content > *,
+main > .post-list-item:not(.x):not(.y) .content > p,
+main > .post-list-item:not(.x):not(.y) .content > p:first-child,
+main > .post-list-item:not(.x):not(.y) .content > p:first-of-type,
+main > .post-list-item:not(.x):not(.y) .content > blockquote,
+main > .post-list-item:not(.x):not(.y) .content > blockquote:first-child,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .content > *,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x):not(.y) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x):not(.y) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x):not(.y) .content > blockquote { max-width: none; }
+
+/* A whole entry brings in what three lines of an opening never did: a long
+   address, a block of code, a table, a player. None of them may make the
+   entry wider than its column -- on a phone that would push the page out
+   sideways. The parts of an entry may shrink below their content, and what
+   is wider than the column scrolls inside itself or is scaled down. */
+main > .post-list-item:not(.x):not(.y) .post-body,
+main > .post-list-item:not(.x):not(.y) .post-body > *,
+main > .post-list-item:not(.x):not(.y) .content > * { min-width: 0; }
+main > .post-list-item:not(.x):not(.y) .content { overflow-wrap: anywhere; }
+main > .post-list-item:not(.x):not(.y) .content :is(img, video, iframe) { max-width: 100%; }
+main > .post-list-item:not(.x):not(.y) .content > :is(pre, table) { max-width: 100%; overflow-x: auto; }
+main > .post-list-item:not(.x):not(.y) .content > table { display: block; }
+
+/* -------------------------------------------------------------- the lead
+
+   The lead keeps minimal's ground and shape, but here too the date leads:
+   the size it has on the line, over a title brought down to answer it. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge:hover { margin: 0 0 8px; color: var(--accent); font-size: 20px; line-height: 24px; letter-spacing: 0.02em; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge .pin-mark,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge .pin-mark svg { width: 18px; height: 18px; }
+/* its title is brought down to answer the date, in the face every title on
+   the page is in */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .post-body > h2 { font-size: 26px; line-height: 1.2; }
+
+@media (max-width: 700px) {
+  :root { --rail: 20px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .post-body > h2 { font-size: 22px; }
+  main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) { padding-bottom: 32px; }
+  main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p,
+  main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p:first-child { font-size: 16px; line-height: 1.55; }
+}

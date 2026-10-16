@@ -1,0 +1,231 @@
+/* minimal manual -- a skin for blog.sh, of the minimal family.
+
+   The page is a handbook. Minimal stands underneath, whole. This file turns
+   a post into a page of a manual -- its sections numbered, its contents
+   standing beside the text and staying there, a note set apart from the
+   text, the way to the next page said large at the foot -- and a listing
+   into a table of contents: a title, a line of what it is about, and which
+   part of which series it is.
+
+   The palette is the site's, the faces the engine's, as in minimal.
+
+   Worn with `site.skin: minimal-manual`. Made by skins/src/build.rb:
+   skins/minimal.css whole, then the layer in skins/src/manual.css --
+   change the layer, never the file made from it. */
+
+/* ---- manual: the layer over minimal ----------------------------------- */
+
+:root { --contents: 250px; --page: 700px; --bar: 86px; }
+
+/* ------------------------------------------------------------- a page
+
+   A post with sections is a page of the manual. Its contents stand to the
+   right of the text and stay on the screen while the text moves, so a
+   reader always sees where in the page they are and can jump. What minimal
+   keeps beside a post goes under it on such a page, three cards across:
+   beside a manual's text there is room for one thing, and it is the
+   contents. A post with no sections has no contents and keeps minimal's
+   shape. Under nine hundred pixels the contents are a block over the text,
+   as in minimal. */
+@media (min-width: 901px) {
+  .layout:has(article .toc) { display: block; }
+  .layout:has(article .toc) > aside { margin-top: 56px; padding-top: 30px; border-top: 1px solid var(--line); columns: 3 280px; column-gap: 28px; }
+  .layout:has(article .toc) > aside > .card { margin: 0 0 22px; break-inside: avoid; }
+  .card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body:has(> .toc) {
+    display: grid;
+    grid-template-columns: minmax(0, var(--page)) var(--contents);
+    justify-content: space-between;
+    column-gap: 56px;
+    align-items: start;
+  }
+  .card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body:has(> .toc) > * { grid-column: 1; min-width: 0; }
+  .card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body:has(> .toc) > .toc {
+    grid-column: 2;
+    grid-row: 1 / span 40;
+    position: sticky;
+    top: var(--bar);
+    float: none;
+    width: auto;
+    max-height: calc(100vh - var(--bar) - 24px);
+    margin: 4px 0 0;
+    padding: 0 0 0 18px;
+    overflow-y: auto;
+    border: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
+    background: none;
+  }
+}
+
+/* The text of a page runs to the right edge of its column, where its
+   pictures, its tables and its code end; the column is the measure. */
+.card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body:has(> .toc) > .content > * { max-width: none; }
+
+/* The contents and the sections are numbered alike, by the stylesheet: the
+   first section is 1 in the list and 1 over its text, and a section inside
+   it is 1.1 in both. The number is the engine's voice, in the accent. */
+.toc ol { margin: 8px 0 0; padding: 0; list-style: none; counter-reset: toc-a; }
+.toc li { margin: 0; padding: 4px 0; font-size: 14px; line-height: 1.35; }
+.toc li::before { display: inline-block; min-width: 2.2em; color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; }
+.toc li.toc-l2 { counter-increment: toc-a; counter-reset: toc-b; }
+.toc li.toc-l2::before { content: counter(toc-a); }
+.toc li:not(.toc-l2) { counter-increment: toc-b; padding-left: 14px; font-size: 13px; }
+.toc li:not(.toc-l2)::before { content: counter(toc-a) "." counter(toc-b); min-width: 2.8em; }
+
+article .content { counter-reset: sec-a; }
+article .content > h2 { counter-increment: sec-a; counter-reset: sec-b; }
+article .content > h3 { counter-increment: sec-b; }
+article .content > h2::before,
+article .content > h3::before { margin-right: 0.6em; color: var(--accent); font-family: var(--mono); font-size: 0.72em; font-weight: 700; letter-spacing: 0.02em; vertical-align: 0.08em; }
+article .content > h2::before { content: counter(sec-a); }
+article .content > h3::before { content: counter(sec-a) "." counter(sec-b); }
+
+/* A section opens under a hairline, with air over it: a manual is looked
+   things up in, and where a section starts has to be found at a glance.
+   Headings are in the ink; the accent on them is their number. When a
+   heading is jumped to, it stops under the menu, not behind it. */
+article .content > :is(h2, h3) { color: var(--ink); scroll-margin-top: var(--bar); }
+article .content > h2 { margin-top: 2.2em; padding-top: 1.1em; border-top: 1px solid var(--line); font-size: 1.45rem; }
+article .content > h3 { margin-top: 1.7em; font-size: 1.12rem; }
+
+/* A note is set apart from the text: a plate with the accent down its left
+   edge. (The engine has one way of setting words apart, the quotation, and
+   in a manual that is what it is used for.) */
+article .content blockquote {
+  margin: 1.3em 0;
+  padding: 12px 16px;
+  border: 0;
+  border-left: 3px solid var(--accent);
+  border-radius: 0 var(--corner) var(--corner) 0;
+  background: var(--plate);
+  font-size: 0.95em;
+}
+article .content blockquote > :first-child { margin-top: 0; }
+article .content blockquote > :last-child { margin-bottom: 0; }
+
+/* A link that leads off the site says so: a small arrow after it, in the
+   accent. In a manual it matters whether a link is the next page or another
+   place altogether. A stylesheet tells the two apart by the address alone:
+   a link written with its protocol leads out, one written from the root
+   stays. (A link to the site's own pages written in full is marked too;
+   the engine writes its own links from the root.) */
+article .content a:is([href^="http://"], [href^="https://"]):not(:has(img))::after { content: "\2197"; margin-left: 0.15em; color: var(--accent); font-family: var(--mono); font-size: 0.72em; font-weight: 700; vertical-align: 0.25em; text-decoration: none; display: inline-block; }
+
+/* A table is ruled in full and takes the column's width: in a manual it is
+   read across and down. */
+article .content table { width: 100%; border-collapse: collapse; font-size: 0.9em; }
+article .content :is(th, td) { padding: 7px 10px; border: 1px solid var(--line); text-align: left; vertical-align: top; }
+
+/* The way on. At the foot of a page the page before and the page after are
+   two cards side by side, as wide as the text, the next one on the right. */
+article .series-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin-top: 36px; }
+article .series-nav a,
+article .series-nav a:hover { display: block; max-width: none; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--corner); background: var(--plate); color: var(--ink); font-family: var(--ui); font-size: 15px; font-weight: 600; line-height: 1.35; letter-spacing: 0; text-transform: none; white-space: normal; }
+article .series-nav a:hover { border-color: var(--accent); color: var(--accent); }
+article .series-nav .series-next { grid-column: 2; text-align: right; }
+article .series-nav .series-prev { grid-column: 1; }
+
+/* The date of a page says when it was written, not what it is: muted. */
+.card:not(.has-hero) > article > .post-header > .date-badge,
+.card:not(.has-hero) > article > .post-header > .date-badge:hover { color: var(--muted); }
+
+/* --------------------------------------------------------- the contents
+
+   A listing is a table of contents: rows closer together than minimal's,
+   each a title, two lines of what it is about, and the line of what the
+   engine knows -- which part of which series first. */
+main .post-list-item { padding: 14px 0; }
+.post-list-item .content > p:first-child { -webkit-line-clamp: 2; }
+.post-list-item .series-note { order: 4; flex: 0 0 auto; align-self: center; }
+/* The date is where minimal literal has it: not in a margin of its own but
+   in the row's line of what the engine knows, under the excerpt, in the
+   engine's voice and the accent. A table of contents is read by its titles;
+   the day a page was written is one of the facts about it. The lead keeps
+   minimal's shape. */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))) .post-header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px 14px;
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))) .post-body { display: contents; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))) .date-badge {
+  order: 5;
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0;
+}
+
+/* The list of series is the list of chapters. The years a series ran say
+   nothing about a chapter, so they are not shown; its name and how many
+   pages it has are. */
+.series-index-years { display: none; }
+/* Chapters are numbered as sections are: by the stylesheet, the number in
+   the engine's voice and in the accent, the name in the ink. The engine
+   lists the series whose newest page is newest first, so the numbers follow
+   the manual's order when its first chapter holds its newest pages. */
+.series-index { counter-reset: chapter; }
+.series-index-item { counter-increment: chapter; }
+.series-index-item::before { content: counter(chapter); display: inline-block; min-width: 2.4em; color: var(--accent); font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: 0.02em; }
+.series-index-name,
+.series-index-name:hover { color: var(--ink); }
+.series-index-name:hover { text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 2px; text-underline-offset: 4px; }
+
+@media (max-width: 700px) {
+  article .series-nav { grid-template-columns: minmax(0, 1fr); }
+  article .series-nav .series-next,
+  article .series-nav .series-prev { grid-column: 1; }
+}
+
+/* ------------------------------------------------------------ the menu
+
+   A manual's menu is its list of chapters -- what the site writes under
+   `nav:` in its settings, each entry a series or a tag. On a wide screen it
+   stands to the left of the page and stays there: search first, then the
+   chapters one under another, the one being read filled with the accent.
+   The page is then three things side by side: the chapters, the text, and
+   the contents of the page. The line in the accent that minimal draws under
+   its menu is drawn under the head instead, across the whole page. What
+   minimal keeps beside the content goes under it, on every page. Under
+   eleven hundred pixels the menu is minimal's row under the head. */
+@media (min-width: 1100px) {
+  :root { --menu: 184px; --contents: 200px; --page: 560px; --bar: 22px; }
+  html { scroll-padding-top: 22px; }
+  .wrap { display: grid; grid-template-columns: var(--menu) minmax(0, 1fr); column-gap: 44px; align-items: start; }
+  .wrap > * { grid-column: 1 / -1; }
+  .wrap > .banner-wrap { margin-bottom: 26px; padding-bottom: 18px; border-bottom: 2px solid var(--accent); }
+  .wrap > nav,
+  .wrap > .layout { grid-row: 2; }
+  .wrap > .layout,
+  .wrap > .layout:has(article .toc) { grid-column: 2; display: block; }
+  .wrap > .layout > aside { margin-top: 56px; padding-top: 30px; border-top: 1px solid var(--line); columns: 2 280px; column-gap: 28px; }
+  .wrap > .layout > aside > .card { margin: 0 0 22px; break-inside: avoid; }
+
+  .wrap > nav {
+    grid-column: 1;
+    position: sticky;
+    top: 22px;
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    max-height: calc(100vh - 44px);
+    margin: 0;
+    padding: 0;
+    overflow-y: auto;
+    border: 0;
+    background: none;
+  }
+  .wrap > nav .search-form { order: -1; flex: 0 0 auto; width: 100%; min-width: 0; max-width: none; margin: 0; }
+  .wrap > nav .search-form input[type="search"] { width: 100%; }
+  .wrap > nav ul { display: flex; flex-direction: column; flex-wrap: nowrap; gap: 2px; width: 100%; overflow: visible; }
+  .wrap > nav li { width: 100%; font-size: 13px; text-transform: none; }
+  /* a chapter is a row, not a pill: its name from the left, as written */
+  .wrap > nav a,
+  .wrap > nav li:last-child a { display: block; padding: 7px 10px; border: 0; border-radius: 8px; color: var(--ink); font-family: var(--ui); font-size: 14.5px; font-weight: 400; letter-spacing: 0; line-height: 1.3; white-space: normal; }
+  .wrap > nav a:hover { background: var(--plate); color: var(--accent); }
+  .wrap > nav a[aria-current="page"],
+  .wrap > nav li:first-child a[aria-current="page"],
+  .wrap > nav a[aria-current="page"]:hover { padding: 7px 10px; margin: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; }
+}

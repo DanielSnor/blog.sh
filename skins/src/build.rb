@@ -41,7 +41,9 @@ SKINS = File.join(ROOT, 'skins')
 VARIANTS = {
   'minimal-literal' => { base: 'minimal', layer: 'literal.css' },
   'minimal-terminal' => { base: 'classic', layer: 'terminal.css', reduce: true, counts: true },
-  'minimal-pictorial' => { base: 'minimal', layer: 'pictorial.css', rowcard: true }
+  'minimal-pictorial' => { base: 'minimal', layer: 'pictorial.css', rowcard: true },
+  'minimal-journal' => { base: 'minimal', layer: 'journal.css' },
+  'minimal-manual' => { base: 'minimal', layer: 'manual.css' }
 }.freeze
 
 def read(path)

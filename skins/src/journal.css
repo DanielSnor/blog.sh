@@ -1,0 +1,159 @@
+/* minimal journal -- a skin for blog.sh, of the minimal family.
+
+   The page is a diary. Minimal stands underneath, whole: the head, the
+   menu, the lead, the sidebar, a post's page, the engine's pages. This file
+   changes the listing: it is led by time, not by titles. A line runs down
+   the left of it, each entry hangs on that line by its date, and an entry
+   is read whole, as the engine put it in its card -- not three lines of how
+   it begins.
+
+   The palette is the site's, the faces the engine's, as in minimal.
+
+   Worn with `site.skin: minimal-journal`. Made by skins/src/build.rb:
+   skins/minimal.css whole, then the layer in skins/src/journal.css --
+   change the layer, never the file made from it. */
+
+/* ---- journal: the layer over minimal ---------------------------------- */
+
+:root { --rail: 28px; }
+
+/* ------------------------------------------------------------ the line
+
+   A listing is a line of time. It runs down the left edge of the entries,
+   and every entry hangs on it by a mark in the accent, level with its date.
+   The entries stand one against the next, so the line is not broken; the
+   air between two of them is inside the upper one. There are no hairlines
+   between entries: the line is what holds them together. The lead of the
+   front page keeps minimal's shape, and the line begins under it.
+   (:not(.x):not(.y) is weight only: minimal's own rules for the first row
+   of a listing are heavy.) */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) {
+  margin: 0 0 0 4px;
+  padding: 0 0 38px var(--rail);
+  border: 0;
+  border-left: 1px solid var(--line);
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .post-header { display: block; }
+
+/* under a listing's heading the line begins after a breath of air */
+main > .listing-heading + .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) { margin-top: 26px; }
+
+/* a later page of the front page opens with the line too, not with the
+   hairline minimal draws over its first row */
+body.page-cont main:has(> .listing-heading--home) > .post-list-item:first-of-type:not(.x):not(.y) { margin-top: 14px; border-top: 0; }
+
+/* ------------------------------------------------------------ the date
+
+   The date is the entry's heading: the engine's voice, in the accent, large, because time is what leads here, over the entry and not beside it. */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge:hover {
+  position: relative;
+  width: auto;
+  margin: 0 0 8px;
+  padding: 0;
+  color: var(--accent);
+  font-size: 20px;
+  line-height: 24px;
+  letter-spacing: 0.02em;
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge a:hover { color: var(--ink); }
+/* the mark on the line: a dot in the accent with a ring of paper round it,
+   so the line stops short of it on both sides */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .date-badge::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: calc(-1 * var(--rail) - 10px);
+  width: 11px;
+  height: 11px;
+  border: 4px solid var(--paper);
+  border-radius: 50%;
+  background: var(--accent);
+  background-clip: padding-box;
+}
+
+/* ----------------------------------------------------------- the entry
+
+   A title, where there is one, is the entry's first line, not its head: the
+   size of a heading inside a text. Then the entry itself, whole: everything
+   the engine put in the card, as paragraphs, pictures and quotations, not a
+   clamped opening. Where the engine cut it, the way on is said in words in
+   the row of what the engine knows. */
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .post-body > h2 { font-size: 19px; line-height: 1.3; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content { max-width: none; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > * { display: block; margin: 0 0 12px; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > :last-child { margin-bottom: 0; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p:first-child,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > blockquote:first-child { display: block; overflow: visible; max-width: 68ch; opacity: 1; -webkit-line-clamp: none; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p,
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p:first-child { font-size: 16.5px; line-height: 1.6; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > .photo-grid { display: grid; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > :is(h1, h2, h3, h4, h5, h6, hr):last-child { display: none; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .read-more {
+  display: inline-block; order: 5; flex: 0 0 auto; align-self: center; margin: 0; color: var(--ink);
+  font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.2; text-transform: lowercase;
+  text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px;
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .read-more:hover { color: var(--accent); }
+
+/* The hour. A diary says not only which day but when in it. The engine does
+   not write the hour into a card yet; where it does (a span it keeps hidden
+   for skins that do not want it), it stands after the date, smaller and
+   muted: the day is the heading, the hour a note to it. */
+main > .post-list-item:not(.x):not(.y) .date-badge .date-time { display: inline; margin-left: 10px; color: var(--muted); font-size: 13px; font-weight: 700; letter-spacing: 0.05em; }
+
+/* A heading inside an entry is under the entry's title, not over it: the
+   text's own size, bold, in the ink. The accent on this page is the date. */
+main > .post-list-item:not(.x):not(.y) .content > :is(h1, h2, h3, h4, h5, h6) { margin: 16px 0 6px; color: var(--ink); font-size: 16.5px; font-weight: 700; line-height: 1.4; letter-spacing: 0; }
+
+/* Text runs to the right edge of its column -- an entry's and the lead's
+   alike. Minimal holds a listing's text to a measure in characters; with
+   the whole entry shown here, that measure would end every line short of
+   the pictures and the row under them. */
+main > .post-list-item:not(.x):not(.y) .content,
+main > .post-list-item:not(.x):not(.y) .content > *,
+main > .post-list-item:not(.x):not(.y) .content > p,
+main > .post-list-item:not(.x):not(.y) .content > p:first-child,
+main > .post-list-item:not(.x):not(.y) .content > p:first-of-type,
+main > .post-list-item:not(.x):not(.y) .content > blockquote,
+main > .post-list-item:not(.x):not(.y) .content > blockquote:first-child,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .content > *,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x):not(.y) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x):not(.y) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x):not(.y) .content > blockquote { max-width: none; }
+
+/* A whole entry brings in what three lines of an opening never did: a long
+   address, a block of code, a table, a player. None of them may make the
+   entry wider than its column -- on a phone that would push the page out
+   sideways. The parts of an entry may shrink below their content, and what
+   is wider than the column scrolls inside itself or is scaled down. */
+main > .post-list-item:not(.x):not(.y) .post-body,
+main > .post-list-item:not(.x):not(.y) .post-body > *,
+main > .post-list-item:not(.x):not(.y) .content > * { min-width: 0; }
+main > .post-list-item:not(.x):not(.y) .content { overflow-wrap: anywhere; }
+main > .post-list-item:not(.x):not(.y) .content :is(img, video, iframe) { max-width: 100%; }
+main > .post-list-item:not(.x):not(.y) .content > :is(pre, table) { max-width: 100%; overflow-x: auto; }
+main > .post-list-item:not(.x):not(.y) .content > table { display: block; }
+
+/* -------------------------------------------------------------- the lead
+
+   The lead keeps minimal's ground and shape, but here too the date leads:
+   the size it has on the line, over a title brought down to answer it. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge:hover { margin: 0 0 8px; color: var(--accent); font-size: 20px; line-height: 24px; letter-spacing: 0.02em; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge .pin-mark,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .date-badge .pin-mark svg { width: 18px; height: 18px; }
+/* its title is brought down to answer the date, in the face every title on
+   the page is in */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .post-body > h2 { font-size: 26px; line-height: 1.2; }
+
+@media (max-width: 700px) {
+  :root { --rail: 20px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x):not(.y) .post-body > h2 { font-size: 22px; }
+  main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) { padding-bottom: 32px; }
+  main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p,
+  main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))):not(.x):not(.y) .content > p:first-child { font-size: 16px; line-height: 1.55; }
+}
