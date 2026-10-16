@@ -578,13 +578,16 @@ A single linear pass, no framework:
    `templates/`, `lib/`, `build/`, `locales/` and `config/`, plus the
    facts the build works out for itself (the menu, the types present, the
    page size), so a template edit or a new menu item throws it away.
-   `assets/` is deliberately not among them: a page links a stylesheet, a
-   script and a favicon rather than carrying their bytes, and there is no
-   `?v=` on those links, so nothing under `assets/` can change a rendered
-   page. Assets have their own path -- `emit_copy` compares them byte for
-   byte on every build, before the cache is opened -- and `colors.css`,
-   the one asset a page's own colours come from, is generated out of
-   `config/`, which IS in the fingerprint. The cache is an optimisation and never an authority: anything
+   `assets/` is not among them: a page links a stylesheet, a script and a
+   favicon rather than carrying their bytes. Assets have their own path --
+   `emit_copy` compares them byte for byte on every build, before the
+   cache is opened. A stylesheet's link, though, ends in `?v=` and ten hex
+   digits of the SHA-256 of what was published (since 1.11), so that a
+   reader whose host kept the old stylesheet is never handed it with a new
+   page; those fingerprints (`CSS_VERSIONS`: `colors.css`, `site.css` --
+   the engine's rules with the skin -- and every `extra_css` file) are
+   sealed in with the facts above, and a changed stylesheet rewrites every
+   page that asks for it. The cache is an optimisation and never an authority: anything
    it cannot vouch for is rendered and compared the old way, and `--full`
    believes none of it while still recording what it wrote.
 5. **Render.** Per-post pages, then listings: homepage, per-tag,

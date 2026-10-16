@@ -296,7 +296,24 @@ EXTRA_CSS = extra_css_hrefs.freeze
 # adding the feature would rewrite every page of every existing archive to
 # say exactly what it said yesterday.
 def extra_css_links
-  EXTRA_CSS.map { |href| %(\n  <link rel="stylesheet" href="#{h(href)}">) }.join
+  EXTRA_CSS.map { |href| %(\n  <link rel="stylesheet" href="#{h(css_href(href))}">) }.join
+end
+
+# A stylesheet's address carries a fingerprint of its bytes: ?v= and the
+# first ten hex digits of their SHA-256. A host keeps a stylesheet for a
+# while (Surfer says an hour) and a page for no time at all, so after a
+# change of look a returning reader got the new page with the old
+# stylesheet -- a site moved from extra_css to site.skin looked like
+# classic for an hour (16. 10. 2026). A changed stylesheet is a new
+# address, the same one is the same address. A file the build cannot
+# read keeps its bare address.
+def css_href(path)
+  version = CSS_VERSIONS[path]
+  version ? "#{path}?v=#{version}" : path
+end
+
+def css_fingerprint(bytes)
+  Digest::SHA256.hexdigest(bytes)[0, 10]
 end
 
 # Mastodon reads this off a shared link and puts the author's account on
@@ -2803,14 +2820,27 @@ end
 ENGINE_BEFORE, ENGINE_AFTER = File.read(ENGINE_CSS, encoding: 'utf-8').split(%r{^/\* ---- after the skin ---- \*/\n}, 2)
 # Without the comments: they are for whoever edits the files, and they are
 # most of the bytes (lib/css_text.rb).
-Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'site.css'),
-            CssText.without_comments("#{ENGINE_BEFORE.rstrip}\n\n#{File.read(File.join(SKINS_DIR, "#{SITE_SKIN}.css"), encoding: 'utf-8').rstrip}\n" \
-                                     "#{ENGINE_AFTER ? "\n#{ENGINE_AFTER.lstrip}" : ''}"))
-Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
-     ColorsCss.generate(colors: SITE_COLORS,
-                        plain_banner: !BANNER_SHOW_IMAGE,
-                        fonts: SiteConfig.get('fonts', default: {}),
-                        fonts_dir: File.join(ROOT, 'assets', 'fonts')))
+SITE_CSS_TEXT = CssText.without_comments("#{ENGINE_BEFORE.rstrip}\n\n#{File.read(File.join(SKINS_DIR, "#{SITE_SKIN}.css"), encoding: 'utf-8').rstrip}\n" \
+                                         "#{ENGINE_AFTER ? "\n#{ENGINE_AFTER.lstrip}" : ''}")
+Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'site.css'), SITE_CSS_TEXT)
+COLORS_CSS_TEXT = ColorsCss.generate(colors: SITE_COLORS,
+                                     plain_banner: !BANNER_SHOW_IMAGE,
+                                     fonts: SiteConfig.get('fonts', default: {}),
+                                     fonts_dir: File.join(ROOT, 'assets', 'fonts'))
+Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'), COLORS_CSS_TEXT)
+# What css_href puts after each address: the two the build writes, from
+# the bytes it just wrote, and every extra_css file the site has under
+# assets/, from the bytes that were copied. Sealed into the build cache
+# below, so a stylesheet that changed rewrites every page that asks for it.
+CSS_VERSIONS = EXTRA_CSS.each_with_object(
+  '/assets/css/colors.css' => css_fingerprint(COLORS_CSS_TEXT),
+  '/assets/css/site.css' => css_fingerprint(SITE_CSS_TEXT)
+) do |href, versions|
+  file = File.expand_path(href.delete_prefix('/'), ROOT)
+  next unless file.start_with?(File.join(ROOT, 'assets', '')) && File.file?(file)
+
+  versions[href] ||= css_fingerprint(File.binread(file))
+end.freeze
 ico = build_favicon_ico
 Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:favicon]), ico) if ico
 
@@ -3355,7 +3385,7 @@ TIMEZONE_FACT = timezone_fact
 # says in its head and in its switcher whether that language has the same
 # listing, and the post that decides it need not be one this listing
 # shows.
-BuildCache.seal!(NAV_TREE, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
+BuildCache.seal!(NAV_TREE, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL, CSS_VERSIONS,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
                  SITE_BASE_URL, TIMEZONE_FACT,
                  TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG },

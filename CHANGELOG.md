@@ -34,6 +34,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Changed
 
+- **A stylesheet link carries a fingerprint of the file.** `site.css?v=…`, `colors.css` and every `extra_css` file the same: a new look is a new address, so a returning reader is never handed the new page with the old stylesheet (a host keeps CSS for a while -- Surfer an hour). The price: a changed stylesheet rewrites, and deploys, every page.
 - **`./style.sh` knows what 1.11 can be told.** Layout asks the skin (`site.skin`) and the lead card (`layout.lead_card`); on a site with a series, also whether a part lists the whole series (`layout.series_contents`) and what the page of every series is called and which way it runs (`series_index`).
 - **A draft on a site in more than one language can be translated where it was written** (#66). The question after the editor offers `[t] translate: Deutsch` -- or asks which, where there are several -- and comes back once the words are saved.
 - **The published stylesheet leaves its comments behind.** 92 kB became 39, 29 kB over the wire became 8.
