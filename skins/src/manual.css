@@ -228,4 +228,26 @@ main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--h
   .wrap > nav a[aria-current="page"],
   .wrap > nav li:first-child a[aria-current="page"],
   .wrap > nav a[aria-current="page"]:hover { padding: 7px 10px; margin: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; }
+  /* A group of chapters (`group: true` in nav:) is a heading over them,
+     in the voice the family labels things in -- small, bold, monospace,
+     lower case, muted -- with air above it; its chapters stand under it
+     as every chapter stands. */
+  .wrap > nav .nav-group { display: block; }
+  .wrap > nav .nav-group__label {
+    display: block;
+    margin: 16px 0 4px;
+    padding: 0 10px;
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: lowercase;
+    color: var(--muted);
+    white-space: normal;
+  }
+  .wrap > nav li:first-child > .nav-group__label { margin-top: 4px; }
+  /* On a part of a chapter its row says so -- the reader is in it, not on
+     its listing (aria-current="true", where the listing's own is "page"):
+     in the accent and bold, the fill left to the listing. */
+  .wrap > nav a[aria-current="true"] { color: var(--accent); font-weight: 600; }
 }
