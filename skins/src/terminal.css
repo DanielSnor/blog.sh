@@ -529,7 +529,16 @@ body.page-cont main:has(> .listing-heading--home) > .post-list-item:first-of-typ
 .post-list-item h2 a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
 .post-list-item .series-note { order: 2; margin: 0; }
 .post-list-item .post-body > .content { order: 3; max-width: none; font-size: 16px; line-height: 1.55; }
-.post-list-item .post-body > .content > * { max-width: 65ch; }
+/* A card's words keep a reader's measure, and nothing in it is wider than
+   its column: at 65ch alone a video, a picture or a block of code standing
+   first in the lead card stood 595px wide in a 350px column and pushed the
+   page sideways on a phone (390 to 600 pixels). The row is held to its
+   column too, and a long line of code scrolls inside its block -- as
+   minimal's rows are. */
+.post-list-item .post-body > .content > * { max-width: min(65ch, 100%); }
+.post-list-item .post-body { min-width: 0; max-width: 100%; }
+.post-list-item .post-body > * { min-width: 0; }
+.post-list-item .content > pre { max-width: 100%; overflow-x: auto; }
 /* The reading time, the counts and the tags are one run of words: their two
    boxes are dissolved, so a tag that does not fit goes to the start of the
    next line instead of hanging under the first tag. */
