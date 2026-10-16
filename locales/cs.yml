@@ -1814,7 +1814,7 @@ setup:
   target_missing: "%{dir} zatím neexistuje — první nasazení ho vytvoří. Jestli už tam být má, zkontroluj cestu."
 
   env_permissions: "%{path} drží živé přihlašovací údaje a čte ho jen tvůj účet (práva 600)."
-  next_steps: "Dál: v ./blog.sh add napíšeš první příspěvek, ./blog.sh preview ukáže web na http://localhost:8000/ a ./style.sh nastaví paletu, obrázek hlavičky a postranní panel."
+  next_steps: "Dál: v ./blog.sh add napíšeš první příspěvek a ./style.sh nastaví paletu, obrázek hlavičky a postranní panel. Na tomhle počítači web ukáže ./blog.sh preview — na http://localhost:8000/, dokud běží. Na webu má adresu %{url}: ./blog.sh rebuild ho sestaví, a je-li nastavený cíl nasazení, pošle ho tam."
   doctor_clean: "✅ Nic dalšího nepotřebuje pozornost."
   doctor_rest: "Ještě by stálo za to"
   doctor_hint: "./blog.sh doctor tohle řekne kdykoli znovu a ty vzhledové věci vyřeší ./style.sh."
@@ -2091,7 +2091,7 @@ style:
   q_list_url: "Adresa, kam míří"
 
   q_rebuild: "Znovu sestavit web hned, ať se na to můžeš podívat? [a/N] "
-  rebuilt: "✅ Sestaveno. ./blog.sh preview to naservíruje na http://localhost:8000/ a ./blog.sh rebuild to nasadí."
+  rebuilt: "✅ Sestaveno. Na tomhle počítači to ukáže ./blog.sh preview (na http://localhost:8000/, dokud běží); ./blog.sh rebuild to nasadí."
   rebuild_failed: "Sestavení nedoběhlo — proč, říkají řádky výš. Konfigurace se zapsala tak jako tak."
   rebuild_busy: "Zámek drží jiný běh, web se teď znovu nesestavil. Nic není rozbité a konfigurace se zapsala — zkus to za minutu znovu."
 

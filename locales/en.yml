@@ -1845,7 +1845,7 @@ setup:
   target_missing: "%{dir} does not exist yet -- the first deploy creates it. If it should be there already, check the path."
 
   env_permissions: "%{path} holds live credentials and is readable only by you (mode 600)."
-  next_steps: "Next: ./blog.sh add writes your first post, ./blog.sh preview shows the site at http://localhost:8000/, and ./style.sh sets the palette, the header image and the sidebar."
+  next_steps: "Next: ./blog.sh add writes your first post, and ./style.sh sets the palette, the header image and the sidebar. On this machine ./blog.sh preview shows the site -- at http://localhost:8000/ for as long as it runs. Its address on the web is %{url}: ./blog.sh rebuild builds it, and with a deploy target sends it there."
   doctor_clean: "✅ Nothing else needs attention."
   doctor_rest: "Still worth doing"
   doctor_hint: "./blog.sh doctor says this again any time, and ./style.sh handles the appearance ones."
@@ -2122,7 +2122,7 @@ style:
   q_list_url: "Address it points at"
 
   q_rebuild: "Rebuild the site now, so you can look at it? [y/N] "
-  rebuilt: "✅ Built. ./blog.sh preview serves it at http://localhost:8000/, and ./blog.sh rebuild deploys it."
+  rebuilt: "✅ Built. On this machine ./blog.sh preview shows it (at http://localhost:8000/ for as long as it runs); ./blog.sh rebuild deploys it."
   rebuild_failed: "The build did not finish -- the lines above say why. Your config was written either way."
   rebuild_busy: "Another run holds the lock, so the site was not rebuilt. Nothing is broken and your config was written -- try again in a minute."
 

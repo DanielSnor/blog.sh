@@ -742,9 +742,25 @@ def review_and_write(site, env)
   puts Tui.paint(t('env_permissions', path: relative(ENV_SH)), :dim) if env.changed?
   offer_launcher
   puts
-  puts t('next_steps')
+  # Where the site can be seen, said as it is (backlog, 16. 10. 2026): this
+  # read "./blog.sh preview shows the site at http://localhost:8000/" -- true
+  # only while a preview runs, and read as the site's address by somebody
+  # whose site was served from somewhere else entirely. The preview, while
+  # it runs; the address just given, once a rebuild has built it.
+  puts t('next_steps', url: site_address(site))
   puts
   run_doctor
+end
+
+# The address the run ended with: env.sh's, which the build reads first,
+# or site.yml's.
+def site_address(site)
+  from_env = ENV['SITE_BASE_URL'].to_s.strip
+  return from_env unless from_env.empty?
+
+  (YAML.safe_load(site.current) || {}).dig('site', 'base_url').to_s
+rescue Psych::Exception
+  ''
 end
 
 def relative(path)
