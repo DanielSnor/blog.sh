@@ -2676,6 +2676,13 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
 }
 .lang-switch__item.is-current,
 a.lang-switch:hover .lang-switch__item.is-current { background: var(--accent); color: var(--on-accent); }
+/* The chapter the reader is in (aria-current="true", a part of a series
+   the menu names): its pill drawn in the accent rather than filled --
+   the fill is the chapter's own listing, the filter that is on. On a
+   phone too, where the last pill's own rule would otherwise take its
+   border back. */
+.wrap > nav li a[aria-current="true"],
+.wrap > nav li a[aria-current="true"]:hover { border-color: var(--accent); color: var(--accent); }
 
 .date-badge,
 .date-badge:hover,

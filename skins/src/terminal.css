@@ -328,6 +328,10 @@ nav li {
   box-sizing: border-box;
 }
 .wrap > nav a:hover { background: var(--plate); color: var(--ink); }
+/* The chapter the reader is in (aria-current="true", a part of a series
+   the menu names): in the accent and bold -- inverse video stays where
+   the reader is, on the chapter's own listing. */
+.wrap > nav a[aria-current="true"] { color: var(--accent); font-weight: 700; }
 .wrap > nav a[aria-current="page"],
 .wrap > nav li:first-child a[aria-current="page"],
 .wrap > nav a[aria-current="page"]:hover {

@@ -22,6 +22,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **Minimal Literal, the first variant of the family.** `site.skin: minimal-literal` -- one column in the middle, a book's serif and measure; made from minimal and a layer of its own (`skins/src/`).
 - **Minimal Journal.** `site.skin: minimal-journal` -- a diary, read by its days: a line of time down the left, the date the heading.
 - **Minimal Manual.** `site.skin: minimal-manual` -- a manual: a series is a chapter, the menu of chapters down the side, the sections of a page numbered, and with `layout.series_contents` the chapter's parts listed on each part the way the page's own contents are.
+- **The chapter a part belongs to shows in every menu.** A `series:` item lights up on its parts in Classic (the bar's line, in the accent), Minimal and its variants (the pill drawn, not filled) and Terminal (accent, bold), as it did only in Manual's side menu.
 - **Minimal Pictorial.** `site.skin: minimal-pictorial` -- a wall of pictures three across where the listing stood; the picture first, the words its caption.
 - **Minimal Terminal.** `site.skin: minimal-terminal` -- a page the way a terminal would print it: two faces, square brackets, inverse video for where you are.
 - **`pair --list` says when each device was last seen.** The door notes every request; `last_seen` in `--json`.

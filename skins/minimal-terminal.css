@@ -207,6 +207,17 @@ nav a[aria-current="page"]:hover {
   border-color: transparent;
 }
 
+/* The chapter the reader is in (aria-current="true"): on a part of a
+   series the menu names with `series:`. Not the fill -- that is the
+   chapter's own listing, the filter that is on -- but the line the bar
+   draws under an item the pointer is over, kept: the reader is inside
+   this item rather than on it. In the stacked menu on a phone the same
+   line is the row's own separator, in the accent. */
+nav a[aria-current="true"] {
+  color: var(--accent);
+  border-bottom-color: var(--accent);
+}
+
 /* A group of items under a label of its own (`group: true` in nav:): the
    label first, quieter than the items -- smaller, in the bar's own colour
    at a lower strength, and no link -- then the group's items in the same
@@ -2075,6 +2086,10 @@ nav li {
   box-sizing: border-box;
 }
 .wrap > nav a:hover { background: var(--plate); color: var(--ink); }
+/* The chapter the reader is in (aria-current="true", a part of a series
+   the menu names): in the accent and bold -- inverse video stays where
+   the reader is, on the chapter's own listing. */
+.wrap > nav a[aria-current="true"] { color: var(--accent); font-weight: 700; }
 .wrap > nav a[aria-current="page"],
 .wrap > nav li:first-child a[aria-current="page"],
 .wrap > nav a[aria-current="page"]:hover {
