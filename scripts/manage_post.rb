@@ -111,6 +111,13 @@ def draft_path(post)
   "/draft/#{post['draft_token']}/#{post['slug']}/"
 end
 
+# A translation's draft is the post's own, under the root of its language:
+# every language but the site's own is built under /<code>/
+# (build/languages.rb), the draft's token and slug with it.
+def translation_draft_path(post, lang)
+  "/#{lang}#{draft_path(post)}"
+end
+
 # A page is served at the root, without a year -- so every message built
 # from a year told the author about an address the site never answered at,
 # and a rename recorded a redirect from one.
@@ -4084,6 +4091,17 @@ def props_preview_url(post)
   draft_url(post)
 end
 
+# The same for a translation of a draft -- nil when the post is not a
+# draft or has no words in the language, where there is nothing to look at.
+def translation_preview_url(post, lang)
+  return nil unless draft?(post) && post.dig('translations', lang).is_a?(Hash)
+
+  site_path = translation_draft_path(post, lang)
+  return "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}" if placeholder_base_url?
+
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"
+end
+
 # [q] only where a QR code can do its job: a draft, in a terminal, on a
 # site with a real address. A phone that scans example.com or localhost
 # lands on a domain this author does not own, or on itself.
@@ -5297,9 +5315,12 @@ def translation_from_file(file, raw, meta, path, original_raw, post, json:, conf
   cleanup_incoming({}, [file])
   deployed, more = quietly(json) { rebuild_and_deploy(t('cli.updating_preview')) }
   if json
-    puts JSON.pretty_generate(acted_answer(path, warnings + more, rebuilt: deployed).merge('lang' => lang))
+    written = JSON.parse(File.read(path, encoding: 'utf-8'))
+    puts JSON.pretty_generate(acted_answer(path, warnings + more, rebuilt: deployed)
+                                .merge('lang' => lang, 'translation_url' => translation_preview_url(written, lang)))
   else
     puts t('cli.translate_saved', lang: lang, slug: slug)
+    print_translation_preview(path, lang)
   end
 end
 
@@ -5351,7 +5372,26 @@ def cmd_translate(slug, lang)
   discard_editor_buffer
   puts
   puts said
-  draft?(post) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+  return maybe_rebuild unless draft?(post)
+
+  rebuild_and_deploy(t('cli.updating_preview'))
+  print_translation_preview(path, lang)
+end
+
+# Where the translation just written can be read (#67). `add` and `edit`
+# end a draft on its preview address; `translate` rebuilt the preview and
+# said nothing of where it was, so the one page the writer wanted to look
+# at next had to be found by hand. The address is the language's own:
+# the site's root for the post's own words, /<code>/ for these. Nothing
+# when the save took the language off the post.
+def print_translation_preview(path, lang)
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  return unless translation_preview_url(post, lang)
+
+  site_path = translation_draft_path(post, lang)
+  puts Tui.paint(t('cli.preview_label', url: "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"), :cyan)
+  puts_local_preview_hint(site_path)
+  puts
 end
 
 # The save itself: the words of one language parsed, checked for an
