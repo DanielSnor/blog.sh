@@ -566,7 +566,7 @@ cli:
   queue_move_blocked: "eine Kopie ist unter %{temp} gerettet, und %{home} ist belegt -- vergleiche beide von Hand, bevor du eines davon verschiebst oder löschst, denn diese über das Vorhandene zu benennen überschreibt einen Beitrag"
   menu_hint: "↑↓ bewegen · Enter wählen · Zahl = Zeile · Tippen = Slug · Esc zurück"
   menu_hint_plain: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc abbrechen"
-  wizard_menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc beenden"
+  wizard_menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · 0/Esc beenden"
   wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"
   qr_hint: "Mit dem Handy scannen, um die Vorschau zu öffnen."
   announcing: "Kündige an"

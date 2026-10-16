@@ -553,7 +553,7 @@ cli:
   queue_move_blocked: "kopie je zachráněná v %{temp} a %{home} je obsazený — obojí ručně porovnej, než něco přesuneš nebo smažeš, protože přejmenovat tuhle přes to, co tam je, znamená přepsat příspěvek"
   menu_hint: "↑↓ pohyb · Enter výběr · číslo = volba · psaní = slug · Esc zpět"
   menu_hint_plain: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · Esc zrušit"
-  wizard_menu_hint: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · Esc konec"
+  wizard_menu_hint: "↑↓ pohyb · Enter výběr · 1-%{count} rychlá volba · 0/Esc konec"
   wizard_continue_prompt: "Stiskni klávesu pro pokračování…"
   qr_hint: "Naskenuj telefonem a náhled se otevře."
   announcing: "Oznamuji"
