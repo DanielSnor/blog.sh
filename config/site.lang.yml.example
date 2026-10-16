@@ -111,13 +111,16 @@ footer:
 # the same place as the same item there, in the same order, and only the
 # label changes. Write the address the way site.yml does -- the build takes
 # it to the German copy of that post, or to the German listing of a tag.
-# Switched on only together with the menu in site.yml; a site whose menu is
+# A group (`group: true`) is worded the same way and stands where it
+# stands there. Switched on only together with the menu in site.yml; a site whose menu is
 # the engine's own has nothing here to translate, and the engine's own
 # menu speaks every language it knows already.
 # nav:
 #   - { label: "Start", url: "/" }
 #   - { label: "Fotografie", tag: "photography" }
 #   - { label: "Syntax", url: "/markdown/" }
+#   - { label: "Grundlagen", group: true }
+#   - { label: "Erste Schritte", series: "Getting started" }
 # --- end of nav ---
 
 # A widget's heading, for a widget whose heading site.yml writes itself --
