@@ -4,9 +4,16 @@
 
    Two parts. Minimal was made as a stylesheet loaded after classic, and
    part one is what it keeps of classic -- the rules it does not say itself;
-   part two is minimal as it was written. Folding the two together further
-   -- taking out what minimal says only to undo classic -- is left for a
-   later pass, checked rule by rule in a browser. */
+   part two is minimal as it was written, less what it said only to undo
+   classic. Where part two set a property back (none, 0, auto, transparent)
+   and all that made it necessary was a declaration of part one, both are
+   gone: each pair was first switched off in a browser, and is out only
+   where the computed style of every element stayed as it was -- on every
+   page, at seven widths, by day and by night, with the link transitions
+   run to their end. A reset that holds back the browser's own style, one
+   of minimal's own rules, or a classic rule that reaches more than the
+   reset does (`nav a` against `.wrap > nav a`) stays, and so does one that
+   matters only under the pointer. */
 
 /* ---- part one: what minimal keeps of classic ----
 
@@ -55,21 +62,6 @@ nav a:focus-visible { outline-offset: -3px; }
    text in. The badge holds its ring a further pixel in, so the corners
    stay clear of the 4px radius rather than crossing it. */
 nav a[aria-current="page"]:focus-visible { outline-color: #ffffff; }
-
-.wrap {
-  border-top: 5px solid var(--nav-border);
-  border-bottom: 5px solid var(--nav-border);
-  /* The sides close the frame the two rules above open. Thin where they
-     are thick, deliberately: the horizontal rules carry the weight --
-     they are what separates the site from the page around it -- while
-     these only have to say where the block ends. At the same 5px the
-     page reads as a picture in a mount, and it would cost 10 of the 940
-     the bar above measures its menu against.
-     Drawn in the bar's own line colour, which follows the theme: #767676
-     in light, #8c8c8c in dark. */
-  border-left: 1px solid var(--nav-border);
-  border-right: 1px solid var(--nav-border);
-}
 
 /* The bar holds two things that both want the width: the type filters and
    the search box. With every content type present the menu is nine items,
@@ -257,7 +249,6 @@ nav a[aria-current="page"]:hover {
    stood would have got it back, on sites that never touched the setting. */
 .banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-title)::before,
 .banner-wrap:where(:not(.banner-wrap--plain)):has(.banner-claim)::after {
-  content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
@@ -311,12 +302,8 @@ nav a[aria-current="page"]:hover {
    repeat the engine's default as the var() fallback, so a page served with
    a stylesheet older than this rule still gets a monospace header rather
    than the browser's default serif. */
-.banner-title {
-  max-width: 60%;
-}
 
 .banner-claim {
-  max-width: 55%;
   font-weight: 400;
 }
 
@@ -343,11 +330,8 @@ nav a[aria-current="page"]:hover {
      frame has nothing to enclose -- and two more lines take two more
      pixels from a column that has none to spare. A tablet keeps them:
      there the page still sits on a background. */
-  .wrap { border-left: 0; border-right: 0; }
-
-  .banner-overlay { padding: 10px 14px; }
-  .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); max-width: 65%; }
-  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); max-width: 100%; }
+  .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.667); }
+  .banner-claim { font-size: calc(var(--banner-claim-size, 20px) * 0.7); }
 
   /* The claim's scrim follows it. A corner gradient darkens the corner a
      corner-anchored text sits in, and the claim is no longer one: it runs
@@ -383,15 +367,11 @@ nav a[aria-current="page"]:hover {
    sizes and the padding here are for every width. */
 :where(.banner-wrap--plain) { min-height: 3.25rem; }
 :where(.banner-wrap--plain) .banner-link { position: absolute; inset: 0; z-index: 1; }
-:where(.banner-wrap--plain) .banner-overlay { position: static; padding: 1.4rem 1.5rem 1.2rem; }
-:where(.banner-wrap--plain) .banner-title,
-:where(.banner-wrap--plain) .banner-claim { text-shadow: none; }
 /* Scaled from the configured sizes, as the phone's are: 45px and 20px are
    sizes for a line laid across a picture, and 32px and 16px are what the
    same two lines want on a page. A site that set its own keeps the ratio. */
 :where(.banner-wrap--plain) .banner-title { font-size: calc(var(--banner-title-size, 45px) * 0.711); }
 :where(.banner-wrap--plain) .banner-claim {
-  max-width: none;
   align-self: flex-start;
   margin-top: 0.3rem;
   font-size: calc(var(--banner-claim-size, 20px) * 0.8);
@@ -551,7 +531,7 @@ a.lang-switch:hover .lang-switch__item.is-current {
      before reaching the field above them. Closed, the items are display:none
      and there is nothing to disagree about -- and open is a state the reader
      has just asked for, with the items being what they asked for. */
-  nav ul { display: none; width: 100%; order: 1; }
+  nav ul { display: none; }
   nav.nav-open ul { display: flex; flex-direction: column; margin-top: 0.5rem; }
 
   /* Takes what the button leaves. min-width: 0 because a flex item will not
@@ -593,7 +573,6 @@ a.lang-switch:hover .lang-switch__item.is-current {
 /* No horizontal padding: the 260px grid track IS the sidebar's content
    width. The air on both sides is layout-level -- grid gap on the left,
    the layout's own edge padding on the right. */
-aside .card { padding-left: 0; padding-right: 0; }
 
 h1 { color: var(--accent); font-size: 1.6rem; margin-top: 0; }
 h2 { color: var(--accent); font-size: 1.75rem; font-weight: 600; line-height: 1.25; margin-top: 0; }
@@ -1083,8 +1062,7 @@ blockquote {
   height: auto;
   margin: 1.2rem auto 1rem;
 }
-@media (max-width: 700px) {
-}
+
 /* The two ways on the 404 page puts under its sentence. The field is the
    bar's own form (.search-form) with a class added, so a skin that has
    dressed the one has dressed the other; what is said here is only what
@@ -1108,9 +1086,6 @@ main .not-found-search input[type="search"] { width: 100%; }
 .not-found-links { margin-top: 1.5rem; padding-top: 1.25rem; border-top: 1px solid var(--border); }
 .search-tip { margin-bottom: 1.5rem; }
 .search-archive-pending { font-style: italic; }
-
-main .post-list-item { margin-bottom: 1.5rem; }
-main .post-list-item:last-child { margin-bottom: 0; }
 
 /* A listing card used to render the whole post and hide the rest here, at
    500px, under a fade. Measured on a real front page, that meant every one
@@ -1479,16 +1454,14 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
    readable as a shape if January sits above January. */
 .archive-month {
   width: 1.6rem;
-  padding: 0.15rem 0;
   text-align: center;
   font-size: 0.8rem;
   border-radius: 4px;
-  background: var(--pill-bg);
   color: var(--text);
   text-decoration: none;
 }
 .archive-month:hover { outline-offset: 1px; }
-.archive-month.is-empty { background: transparent; border: 1px solid var(--border); }
+.archive-month.is-empty { border: 1px solid var(--border); }
 
 /* What the shading means: the four steps between two words, as the last
    row of the map. The cells are the map's own, a little smaller and with
@@ -1502,7 +1475,7 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
   color: var(--meta-text);
   font-size: 0.8rem;
 }
-.archive-legend .archive-month { width: 1.1rem; height: 1.1rem; padding: 0; }
+.archive-legend .archive-month { width: 1.1rem; height: 1.1rem; }
 .archive-legend .archive-month:hover { outline: 0; }
 .archive-legend__word:first-child { margin-right: 0.35rem; }
 .archive-legend__word:last-child { margin-left: 0.35rem; }
@@ -1619,8 +1592,6 @@ footer .chrome-text li ul, footer .chrome-text li ol { margin-left: 1rem; }
 .tag-index-sort {
   grid-template-columns: 1fr 1fr;
 }
-.tag-index-sort-button:first-child { justify-self: end; }
-.tag-index-sort-button:last-child { justify-self: start; }
 .tag-index-sort-button {
   font: inherit;
   font-size: 0.85rem;
@@ -1761,7 +1732,6 @@ body {
 }
 
 h1, h2, h3 { color: var(--ink); text-wrap: balance; }
-b, strong { color: inherit; }
 a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
 a:hover { color: var(--ink); text-decoration-thickness: 2.5px; }
 
@@ -1770,8 +1740,6 @@ a:hover { color: var(--ink); text-decoration-thickness: 2.5px; }
   max-width: 1080px;
   margin: 0 auto;
   padding: 28px 20px 56px;
-  border: 0;
-  border-radius: 0;
 }
 
 /* ------------------------------------------------------------------ head */
@@ -1806,16 +1774,11 @@ a:hover { color: var(--ink); text-decoration-thickness: 2.5px; }
   border: 0;
   background: url("/assets/images/favicon.png") center / calc(100% + 4px) no-repeat;
 }
-.banner-wrap:has(.banner-claim)::after { content: none; }
 
 .banner-overlay {
-  position: static;
-  padding: 0;
   gap: 2px;
   min-width: 0;
 }
-.banner-title,
-.banner-claim { text-shadow: none; max-width: none; }
 .banner-title {
   font-family: var(--display);
   font-size: 34px;
@@ -1847,8 +1810,6 @@ a:hover { color: var(--ink); text-decoration-thickness: 2.5px; }
 }
 #theme-toggle {
   position: relative;
-  top: auto;
-  right: auto;
   margin-left: auto;
   flex: none;
   min-width: 0;
@@ -1957,9 +1918,8 @@ nav li {
    tall has no business following the reader down the page. */
 @media (max-width: 700px) {
   .wrap > nav { position: static; padding: 0; }
-  .nav-toggle { display: none; }
   nav ul,
-  nav.nav-open ul { display: flex; flex-direction: row; flex-wrap: wrap; width: 100%; order: 0; margin-top: 0; }
+  nav.nav-open ul { display: flex; flex-direction: row; flex-wrap: wrap; width: 100%; margin-top: 0; }
   nav li { line-height: 1.3; }
   .wrap > nav a,
   .wrap > nav li:last-child a { padding: 7px 12px; border: 1px solid var(--line); }
@@ -1973,20 +1933,15 @@ nav li {
 }
 
 /* ---------------------------------------------------------------- layout */
-
-.layout, .layout main, .layout aside { background: none; }
 .layout {
   grid-template-columns: minmax(0, 1fr) 300px;
   gap: 48px;
-  padding: 0;
   align-items: start;
 }
 .layout--no-aside { grid-template-columns: minmax(0, 1fr); }
 @media (max-width: 860px) {
   .layout { grid-template-columns: minmax(0, 1fr); gap: 36px; }
 }
-
-.card { background: none; padding: 0; border-radius: 0; }
 
 /* ------------------------------------------------------------ a listing */
 
@@ -2028,12 +1983,11 @@ nav li {
 /* A post in a listing is an open row: the date in the margin, a hairline
    under it, and of the post only how it begins. */
 main .post-list-item {
-  margin: 0;
   padding: 20px 0;
   border-bottom: 1px solid var(--line);
 }
 main .post-list-item:first-of-type { border-top: 1px solid var(--line); }
-.post-header { margin: 0; gap: 18px; }
+.post-header { gap: 18px; }
 
 .date-badge,
 .date-badge:hover {
@@ -2083,12 +2037,12 @@ main .post-list-item:first-of-type { border-top: 1px solid var(--line); }
 }
 .post-list-item h2 a { color: var(--ink); text-decoration: none; }
 .post-list-item h2 a:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
-.post-list-item .series-note { order: 2; margin: 0; }
+.post-list-item .series-note { order: 2; }
 /* The text of a row runs to the right edge of its column, where its
    pictures and the row of facts under it end. It is held to no measure in
    characters: the column is the measure, here and in every skin built on
    this file, whatever width or size of type that skin gives it. */
-.post-list-item .content { order: 3; max-width: none; }
+.post-list-item .content { order: 3; }
 /* ...but not a video, a picture or a player standing straight in the row:
    those keep the engine's max-width: 100%. Released with the rest, a
    1920-pixel video drew 1920 pixels wide across the sidebar and the page
@@ -2126,7 +2080,6 @@ main .post-list-item:first-of-type { border-top: 1px solid var(--line); }
    (layout.lead_card): under the title, with the opening words after it.
    The engine puts the picture first in the card; this shows it whole
    across the column and lets the first paragraph follow. */
-.post-list-item--lead .content { max-width: none; }
 .post-list-item--lead .content > figure:first-child,
 .post-list-item--lead .content > .photo-grid:first-child { margin: 4px 0 12px; }
 .post-list-item--lead .content > figure:first-child img {
@@ -2149,7 +2102,7 @@ main .post-list-item:first-of-type { border-top: 1px solid var(--line); }
 .post-list-item .content .photo-grid img { width: 100%; max-height: 260px; }
 
 /* What the engine says about a post: how long, how many, about what. */
-.post-meta { gap: 12px; margin: 0; }
+.post-meta { gap: 12px; }
 .post-meta,
 .post-stats,
 .post-stat.reading-time,
@@ -2197,7 +2150,6 @@ main .post-list-item:first-of-type { border-top: 1px solid var(--line); }
   margin: 0 6px 6px 0;
   border: 1px solid var(--line);
   border-radius: 999px;
-  background: none;
   color: var(--muted);
   font-family: var(--mono);
   font-size: 12px;
@@ -2413,7 +2365,6 @@ blockquote { border-left: 2px solid var(--accent); }
 
 /* Each widget is a label in the engine's voice over a plate: one hairline
    card holding its rows. */
-aside > .card:first-child { margin-top: 0; }
 aside .card { margin-bottom: 22px; }
 aside h3,
 footer h3 {
@@ -2514,9 +2465,7 @@ aside .chrome-text p > img:first-child {
 footer {
   margin-top: 40px;
   padding: 24px 0 0;
-  background: none;
   border-top: 1px solid var(--line);
-  border-radius: 0;
   grid-template-columns: 1fr 2fr 1.4fr;
   gap: 28px;
   font-size: 14.5px;
@@ -2525,7 +2474,6 @@ footer {
   footer { grid-template-columns: minmax(0, 1fr); }
 }
 footer li { margin-bottom: 4px; }
-footer li::before { content: none; }
 footer p { color: var(--ink); font-size: 14.5px; margin: 0 0 8px; }
 footer .copyright {
   font-family: var(--mono);
@@ -2536,7 +2484,7 @@ footer .copyright {
   color: var(--muted);
 }
 .social-icons { gap: 6px; flex-wrap: wrap; }
-.social-icons a { border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); }
+.social-icons a { border: 1px solid var(--line); border-radius: 999px; color: var(--muted); }
 .social-icons a:hover { background: none; border-color: var(--ink); color: var(--ink); }
 
 #scroll-top {
@@ -2580,10 +2528,8 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
   justify-content: center;
   width: 30px;
   height: 30px;
-  padding: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
-  background: none;
   color: var(--ink);
   font-family: var(--mono);
   font-weight: 700;
@@ -2593,7 +2539,7 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
 .archive-month.is-empty { border-style: dashed; color: var(--muted); opacity: 0.45; }
 .archive-month.is-l1 { background: color-mix(in srgb, var(--ink) 8%, transparent); color: var(--ink); }
 .archive-month.is-l2 { background: color-mix(in srgb, var(--ink) 22%, transparent); color: var(--ink); }
-.archive-month.is-l3 { background: color-mix(in srgb, var(--ink) 48%, transparent); color: var(--paper); border-color: transparent; }
+.archive-month.is-l3 { background: color-mix(in srgb, var(--ink) 48%, transparent); color: var(--paper); }
 .archive-month.is-l4 { background: var(--ink); color: var(--on-ink); border-color: var(--ink); }
 .archive-month:hover { outline: 0; border-color: var(--accent); }
 .archive-month:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
@@ -2602,7 +2548,7 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
   .archive-year { flex-wrap: wrap; gap: 8px 12px; }
   .archive-year-name { min-width: 0; }
   .archive-year-count { min-width: 0; margin-left: auto; font-size: 12px; }
-  .archive-months { flex: 0 0 100%; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; margin-left: 0; }
+  .archive-months { flex: 0 0 100%; display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 3px; }
   .archive-month, .archive-month.is-empty { width: auto; height: auto; aspect-ratio: 1; font-size: 10px; border-radius: 6px; }
 }
 
@@ -2613,7 +2559,6 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
   margin: 0 0 8px;
   padding: 6px 2px;
   background: var(--paper);
-  border-bottom: 0;
   font-family: var(--mono);
   font-weight: 700;
   font-size: 13px;
@@ -2641,12 +2586,10 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
 
 /* ------------------------------------------------------------------ tags */
 
-.tag-index { max-width: none; margin: 0; gap: 6px; }
+.tag-index { margin: 0; gap: 6px; }
 .tag-index-letter {
   margin: 14px 0 4px;
   padding: 10px 2px 0;
-  background: none;
-  border-bottom: 0;
   border-top: 1px solid var(--line);
   font-family: var(--mono);
   font-weight: 700;
@@ -2655,11 +2598,10 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
 }
 .tag-index-letter:first-child { margin-top: 0; }
 .tag-index-count { font-size: 10px; font-weight: 700; opacity: 1; margin-left: 4px; color: var(--accent); }
-.tag-index-sort { display: flex; gap: 6px; max-width: none; margin: 0 0 14px; }
+.tag-index-sort { display: flex; gap: 6px; margin: 0 0 14px; }
 .tag-index-sort-button,
 .tag-index-sort-button:first-child,
 .tag-index-sort-button:last-child {
-  justify-self: auto;
   padding: 5px 11px;
   border: 1px solid var(--line);
   border-radius: 999px;
@@ -2760,7 +2702,6 @@ footer { border-top: 2px solid var(--accent); }
 }
 /* On the front page and its continuations nothing stands between the
    menu's rule and the first post, so that post gives up its own. */
-main .listing-heading--home ~ .post-list-item:first-of-type { border-top: 0; }
 
 /* The archive counts in the accent rather than in ink: the fuller the
    month, the more of it -- four steps mixed into the paper, the way the
@@ -2836,7 +2777,6 @@ main:has(> .not-found-sign) > .search-tagline { margin: 0 auto 40px; text-align:
   font-weight: 500;
   font-size: 22px;
   line-height: 1.1;
-  letter-spacing: 0;
   text-transform: lowercase;
   color: var(--accent);
 }
@@ -3045,7 +2985,6 @@ footer > div:nth-child(2) > .copyright {
   border-top: 1px solid var(--line);
 }
 @media (max-width: 760px) {
-  footer { grid-template-rows: none; }
   footer > div:nth-child(1) { grid-column: 1; grid-row: 1; margin-bottom: 24px; }
   footer > div:nth-child(2) > h3 { grid-column: 1; grid-row: 2; }
   footer > div:nth-child(2) > .chrome-text { grid-column: 1; grid-row: 3; margin-bottom: 24px; }
@@ -3067,7 +3006,6 @@ footer > div:nth-child(2) > .copyright { text-align: center; }
   nav ul,
   nav.nav-open ul {
     flex-wrap: nowrap;
-    width: auto;
     flex: 1 1 100%;
     margin-right: -20px;
     padding-right: 20px;
@@ -3173,14 +3111,11 @@ footer > div:nth-child(2) > .copyright { text-align: center; }
   width: 1px;
   height: 1px;
   margin: -1px;
-  padding: 0;
   overflow: hidden;
   clip: rect(0 0 0 0);
   clip-path: inset(50%);
   white-space: nowrap;
-  border: 0;
 }
-main .listing-heading--type ~ .post-list-item:first-of-type { border-top: 0; }
 
 /* A post with no title of its own -- a toot, a tweet, a photograph --
    shows its picture or film in its card on every listing: there the
@@ -3285,7 +3220,6 @@ main .listing-heading--type ~ .post-list-item:first-of-type { border-top: 0; }
     border-top: 0;
     border-bottom: 1px solid var(--line);
   }
-  .tag-index-letter:first-child { margin-top: 0; }
 }
 
 /* A page that is not a post -- the Markdown cheat sheet -- is written as
@@ -3441,7 +3375,6 @@ main:has(> .not-found-sign) > .search-tagline { font-size: 16px; line-height: 1.
 @media (min-width: 561px) and (max-width: 860px) {
   aside { display: block; column-count: 2; column-gap: 24px; }
   aside .card { break-inside: avoid; margin: 0 0 22px; }
-  aside > .card:first-child { margin-top: 0; }
 }
 
 /* A site in more than one language, on a phone. The two switches together
@@ -3559,7 +3492,6 @@ main:has(> .not-found-sign) > .search-tagline { font-size: 16px; line-height: 1.
 .card.has-hero .post-hero__meta a,
 .card.has-hero .post-hero__meta a:hover { order: -1; color: var(--accent); text-decoration: none; }
 .card.has-hero .post-hero__meta a:hover { text-decoration: underline; }
-.card.has-hero .post-body { padding: 0; }
 .card.has-hero .post-body > .post-meta { margin: 8px 0 0; }
 .card.has-hero .post-body > .series-note { margin: 10px 0 0; }
 .card.has-hero .post-body > .content { margin-top: 18px; padding-top: 4px; border-top: 1px solid var(--line); }
@@ -3786,7 +3718,6 @@ main > .not-found-links { margin-top: 16px; padding-top: 0; border-top: 0; }
   border: 1px solid var(--line);
   border-left: 1px solid var(--line);
   border-radius: var(--corner);
-  background: none;
 }
 
 /* The claim breaks into lines of a like length, so a narrow screen does not
@@ -3940,7 +3871,6 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-li
   border-radius: 14px;
   background: var(--lead-ground);
 }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) + .post-list-item { border-top: 0; }
 /* From 561px up, which is where a row stops stacking by itself: below that
    the date is above the title already. */
 @media (min-width: 561px) {
@@ -3979,7 +3909,6 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-li
 body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { display: block; overflow: visible; font-size: 16.5px; line-height: 1.6; opacity: 0.88; -webkit-line-clamp: none; }
 body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > .photo-grid { display: grid; }
 body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > table { display: table; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > blockquote { }
 body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > :is(h1, h2, h3, h4, h5, h6, hr):last-child { display: none; }
 body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .read-more {
   /* one of the row it stands in: the engine's voice, the row's size, on the
