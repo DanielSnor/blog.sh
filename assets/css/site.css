@@ -162,6 +162,9 @@ img, video { max-width: 100%; height: auto; }
 /* A search result's picture (the post's first, where it has one) is a
    skin's to show: a site of words keeps its list of words. */
 .search-result__picture { display: none; }
+/* A gallery card's further pictures (build/cards.rb, with_mosaic) are a
+   skin's to lay out as a mosaic; hidden, and so never fetched. */
+.card-mosaic { display: none; }
 
 /* ---- after the skin ---- */
 

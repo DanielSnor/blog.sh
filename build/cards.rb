@@ -77,6 +77,39 @@ module Cards
     end
   end
 
+  # A gallery's card shows its first picture; the next ones -- three at
+  # most -- ride inside the same <figure>, in `.card-mosaic`, for a skin
+  # that lays the card out as a mosaic of them (Minimal Pictorial's wall).
+  # The engine's own rules hide them, and a lazy picture that is never
+  # shown is never fetched, so every other skin pays a few lines of
+  # markup and no bytes. `data-more` is how many there are, the one fact
+  # the mosaic's shape depends on. The files are the originals: the
+  # engine makes no smaller copies, so a skin that shows them shows them
+  # whole.
+  def with_mosaic(post, prefix, content)
+    more = mosaic_media(post).drop(1).first(3)
+    return content if more.empty?
+
+    imgs = more.map do |m|
+      size = m['width'] && m['height'] ? %( width="#{m['width'].to_i}" height="#{m['height'].to_i}") : ''
+      %(<img src="#{h("#{prefix}#{media_name_encoded(m['url'])}")}"#{size} alt="" loading="lazy" decoding="async">)
+    end
+    mosaic = %(<span class="card-mosaic" data-more="#{more.size}">#{imgs.join}</span>)
+    content.sub('</figure>') { "#{mosaic}</figure>" }
+  end
+
+  # The picture of every image block worth showing, in the order the post
+  # has them: a gallery is a run of image blocks, and a block shows -- and
+  # the build publishes -- its first file, so the first file is the one a
+  # mosaic can point at.
+  def mosaic_media(post)
+    (post['content'] || []).filter_map do |b|
+      next unless b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
+
+      (b['media'] || []).find { |m| m.is_a?(Hash) && m['url'] }
+    end
+  end
+
   # Taller than wide, or square: the shapes that at a card's full width
   # take a screen to themselves. Unknown dimensions are not tall -- there
   # is nothing to cap a size nobody wrote down against.
@@ -158,6 +191,7 @@ module Cards
     # with among them, a video post's video included.
     medium = led ? nil : medium_block(post)
     content, cut = media_content(post, prefix, medium) if medium
+    content = with_mosaic(post, prefix, content) if medium && medium['type'] == 'image'
     # The lead is a PLACE -- the card that opens the front page -- and it is
     # marked whether or not its post had a picture to lead with. Marked only
     # when a picture came with it, the lead a skin had dressed was gone the

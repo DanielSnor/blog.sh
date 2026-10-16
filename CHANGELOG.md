@@ -33,6 +33,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **A gallery's card says how many pictures it has.** `data-photos="N"`, on a post with two or more.
 - **A menu item can name a series.** `series:` leads to its listing and marks every part of it as the chapter you are in.
 - **A search result can show the post's first picture.** The index carries it (`img`, only where there is one); the engine hides it and Minimal Pictorial shows a square at the end of the row.
+- **A gallery's card hands its next pictures to a skin.** Up to three, hidden, in `.card-mosaic` inside the card's figure; Minimal Pictorial lays its tiles out as a mosaic of them (originals: up to four a tile).
 
 ### Changed
 

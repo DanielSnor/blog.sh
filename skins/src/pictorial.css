@@ -348,3 +348,28 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-li
   .search-result:has(> .search-result__picture) { grid-template-columns: minmax(0, 1fr) 72px; column-gap: 14px; }
   .search-result > .search-result__picture { grid-column: 2; grid-row: 1 / span 3; width: 72px; height: 72px; }
 }
+
+/* A gallery's tile is a mosaic of its first pictures: the engine hands the
+   next three over hidden, inside the tile's own <figure> (.card-mosaic).
+   The square is kept and every cell cropped to it: four in two rows,
+   three as one tall beside two, two side by side. The lead that opens the
+   front page keeps its one picture -- it is a picture large, not a wall. */
+main > .post-list-item:not(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type)) .content > figure:first-child:has(> .card-mosaic) {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 3px;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: var(--tile);
+}
+main > .post-list-item:not(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type)) .content > figure:first-child > .card-mosaic { display: contents; }
+main > .post-list-item:not(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type)) .content > figure:first-child:has(> .card-mosaic) img {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  aspect-ratio: auto;
+  border-radius: 0;
+}
+main > .post-list-item:not(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type)) .content > figure:first-child:has(> .card-mosaic[data-more="1"]) { grid-template-rows: 1fr; }
+main > .post-list-item:not(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type)) .content > figure:first-child:has(> .card-mosaic[data-more="2"]) > img { grid-row: 1 / span 2; }

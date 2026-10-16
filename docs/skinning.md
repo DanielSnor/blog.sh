@@ -229,6 +229,15 @@ attribute.
 .post-list-item[data-photos]::after { content: attr(data-photos) " photos"; }
 ```
 
+The next pictures of a gallery -- three at most -- ride inside the card's
+first `<figure>`, after its picture, as
+`<span class="card-mosaic" data-more="N">` with an `<img>` each (decorative,
+lazy). `site.css` hides them, so a skin that does not want a mosaic pays
+a few lines of markup and no download; one that does shows them and lays
+the figure out (Minimal Pictorial: four in two rows, three as one tall
+beside two, two side by side). They are the original files -- the engine
+makes no smaller copies -- so a mosaic costs up to four originals a card.
+
 The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
 listing names itself.
