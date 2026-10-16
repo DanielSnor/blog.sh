@@ -378,8 +378,8 @@ The stylesheet is the other half, and it is not generated. It is two
 files published as one `/assets/css/site.css`: the engine's own rules
 (`assets/css/site.css` -- the fonts, the focus ring, media that keep to
 their column, the lightbox) and the skin the site wears
-(`skins/<name>.css`, `site.skin:` in `config/site.yml` -- `classic` unless
-you say otherwise, `minimal`, or one of the Minimal family's variants,
+(`skins/<name>.css`, `site.skin:` in `config/site.yml` or `./style.sh` under
+Layout -- `classic` unless you say otherwise, `minimal`, or one of the Minimal family's variants,
 `minimal-literal`, `minimal-journal`, `minimal-manual`, `minimal-pictorial`
 or `minimal-terminal`): layout and structure, plus the few colors that are
 fixed because they work against any palette -- white on accent surfaces,

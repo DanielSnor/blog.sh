@@ -18,6 +18,7 @@
 # before it is kept.
 
 require 'yaml'
+require 'json'
 require_relative '../lib/yaml_compat'
 require 'rbconfig'
 # For $CHILD_STATUS -- whether the build or the deploy left because the lock
@@ -649,14 +650,75 @@ end
 # changes nothing, which is the rule the menu section had to learn the
 # hard way.
 def section_layout
+  section_skin
+
   sidebar = Wizard.confirm(t('q_layout_sidebar'), default: at('layout', 'sidebar') != false)
   set_switch(%w[layout sidebar], sidebar, default: true)
 
   hero = Wizard.confirm(t('q_layout_hero'), default: at('layout', 'hero') == true)
   set_switch(%w[layout hero], hero, default: false)
 
+  lead = Wizard.confirm(t('q_layout_lead_card'), default: at('layout', 'lead_card') == true)
+  set_switch(%w[layout lead_card], lead, default: false)
+
+  # The two that only a site with a series has any use for, asked only
+  # there: everywhere else they would be two more Enters through a
+  # section about something the site does not have.
+  if site_has_series?
+    contents = Wizard.confirm(t('q_layout_series_contents'), default: at('layout', 'series_contents') == true)
+    set_switch(%w[layout series_contents], contents, default: false)
+    section_series_index
+  end
+
   puts
   section_extra_css
+end
+
+# site.skin: the look the site wears, one of the skins in skins/ beside
+# the engine. classic first -- what a site that says nothing wears --
+# and the rest by name; a skin a site dropped in itself is listed by its
+# file name. Absent means classic, so classic chosen on a site that
+# never named one writes nothing.
+def section_skin
+  names = Dir.glob(File.join(ROOT, 'skins', '*.css')).map { |f| File.basename(f, '.css') }
+  names = ['classic'] + (names - ['classic']).sort
+  written = at('site', 'skin').to_s.strip
+  current = names.include?(written) ? written : 'classic'
+  labels = t('skin_labels')
+  labels = {} unless labels.is_a?(Hash)
+  options = names.map { |name| [name, labels[name] || name] }
+  chosen = Wizard.choose(t('q_skin'), options, current_index: names.index(current),
+                                               note: [Tui.paint(t('h_skin'), :dim)])
+  return if chosen == current
+
+  site.set(%w[site skin], chosen)
+end
+
+# Whether any post names a series -- read off the posts themselves, since
+# nothing else keeps a list of them.
+def site_has_series?
+  Dir.glob(File.join(ROOT, 'content.nosync', 'posts', '*', '*.json')).any? do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8'))
+    post.is_a?(Hash) && !post['series'].to_s.strip.empty?
+  rescue JSON::ParserError, SystemCallError
+    false
+  end
+end
+
+# series_index: the page of every series -- its heading, what a search
+# result says of it, and which way it runs. Enter keeps each as it is,
+# and an empty heading or description is the engine's own.
+def section_series_index
+  { 'title' => 'q_series_title', 'description' => 'q_series_description' }.each do |key, question|
+    value = Wizard.ask(t(question), at('series_index', key), hint: t("h_series_#{key}"))
+    site.set(['series_index', key], value) if value && !value.to_s.empty? && value != at('series_index', key)
+  end
+  oldest = Wizard.confirm(t('q_series_oldest'), default: at('series_index', 'order') == 'oldest')
+  order = oldest ? 'oldest' : 'newest'
+  current = at('series_index', 'order')
+  return if current == order || (current.nil? && order == 'newest')
+
+  site.set(%w[series_index order], order)
 end
 
 # A switch written only when the answer changes what the site does. Enter

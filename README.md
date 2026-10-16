@@ -132,7 +132,7 @@ Each part says where it is described in full.
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
 setup.sh                 Setup wizard -- identity, address, comments network, deploy target
-style.sh                 Appearance wizard -- palette, banner, menu, about, footer, sidebar
+style.sh                 Appearance wizard -- palette, banner, skin and layout, menu, about, footer, sidebar
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
@@ -200,7 +200,7 @@ path per platform in [install.md → Quick start](docs/install.md#quick-start).
 
 ```bash
 ./setup.sh                 # title, address, timezone, comments network, deploy target
-./style.sh                 # palette, banner, bio, footer, sidebar
+./style.sh                 # palette, banner, skin, bio, footer, sidebar
 ./blog.sh doctor           # is the configuration sound?
 ./blog.sh add              # write the first post
 ./blog.sh rebuild          # build and deploy

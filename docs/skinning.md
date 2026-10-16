@@ -50,7 +50,8 @@ about that one.
 Before writing one, spend ten minutes with `./style.sh`. A surprising
 amount of what looks like skinning is a setting: the colour palette (seven
 shipped, or your own), the banner and what is written over it, the menu,
-the sidebar and its widgets, whether a post opens with a lead image. A
+the sidebar and its widgets, whether a post opens with a lead image -- and
+which of the skins the engine ships the site wears, under Layout. A
 site that only wants different colours does not want a skin at all -- it
 wants a palette, and the palette keeps working when the engine changes.
 

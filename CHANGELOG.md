@@ -34,6 +34,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Changed
 
+- **`./style.sh` knows what 1.11 can be told.** Layout asks the skin (`site.skin`) and the lead card (`layout.lead_card`); on a site with a series, also whether a part lists the whole series (`layout.series_contents`) and what the page of every series is called and which way it runs (`series_index`).
 - **A draft on a site in more than one language can be translated where it was written** (#66). The question after the editor offers `[t] translate: Deutsch` -- or asks which, where there are several -- and comes back once the words are saved.
 - **The published stylesheet leaves its comments behind.** 92 kB became 39, 29 kB over the wire became 8.
 - **The stylesheet is the engine's rules and a skin.** `site.css` + `skins/classic.css`, `site.skin:`; a site that says nothing looks as it did.
