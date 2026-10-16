@@ -1,0 +1,1629 @@
+/* minimal terminal -- a skin for blog.sh.
+
+   A page the way a terminal would print it. One ground, one ink, one accent,
+   all three the site's own (`colors:` in config/site.yml); two faces, both
+   the ones the engine ships, so the skin is this one file and nothing else.
+
+   Four rules hold it together:
+
+     - Two voices. The monospace says everything the engine says -- a name, a
+       title, a date, a count, a label, a button. The sans is the writing.
+     - No shapes. Nothing round, nothing filled, nothing boxed. A thing is set
+       apart by a rule, by its face, or by a mark from the terminal: a hash
+       before a tag, a comment mark before a label, brackets round a button,
+       inverse video for the place you are.
+     - The accent is for what can be acted on -- a link, focus, the cursor --
+       and for the edge of a block of code. Dates, labels and icons are quiet.
+     - Rules between things are dashed; rules that hold the page are solid.
+
+   Worn with `site.skin: minimal-terminal`, over classic: made by
+   skins/src/build.rb from skins/classic.css, less every declaration this
+   layer says again, and then this layer (skins/src/terminal.css) -- change
+   the layer, never the file made from it. No template is touched. Where
+   the engine reflows for a narrow screen this file says its piece again
+   under the same breakpoint, because a rule that comes later wins there
+   too. */
+
+/* ------------------------------------------------------------ the palette
+
+   The engine writes the site's colours into colors.css as --bg, --text,
+   --meta-text, --border and --accent, for the day and for the night. This
+   file sets none of the five; it names them the way it thinks of them and
+   points the engine's other names at those, so a card, the menu and the foot
+   stand on the page's own ground. Same selectors as colors.css, same weight:
+   loaded later, these win. */
+:root,
+:root[data-theme="light"] {
+  --paper: var(--bg);
+  --ink: var(--text);
+  --muted: var(--meta-text);
+  --line: var(--border);
+  --plate: color-mix(in srgb, var(--text) 4%, transparent);
+  --on-ink: var(--bg);
+  --on-accent: #ffffff;
+
+  --card-bg: var(--paper);
+  --footer-bg: var(--paper);
+  --nav-bg: var(--paper);
+  --nav-text: var(--muted);
+  --nav-border: var(--line);
+  --pill-bg: var(--plate);
+  --search-bg: transparent;
+  --hover-invert: var(--ink);
+  --badge-hover-text: var(--on-ink);
+  --lang-switch-bg: transparent;
+  --lang-switch-text: var(--on-ink);
+  --lang-switch-dim: var(--muted);
+
+  --mono: "JetBrains Mono", "SF Mono", Menlo, Consolas, monospace;
+  --sans: "Open Sans", -apple-system, "Segoe UI", Arial, sans-serif;
+  --corner: 3px;
+  --gutter: 20px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --plate: color-mix(in srgb, var(--text) 7%, transparent);
+    --card-bg: var(--paper);
+    --footer-bg: var(--paper);
+    --nav-bg: var(--paper);
+    --nav-text: var(--muted);
+    --nav-border: var(--line);
+    --pill-bg: var(--plate);
+    --search-bg: transparent;
+    --hover-invert: var(--ink);
+    --badge-hover-text: var(--on-ink);
+  }
+}
+:root[data-theme="dark"] {
+  --plate: color-mix(in srgb, var(--text) 7%, transparent);
+  --card-bg: var(--paper);
+  --footer-bg: var(--paper);
+  --nav-bg: var(--paper);
+  --nav-text: var(--muted);
+  --nav-border: var(--line);
+  --pill-bg: var(--plate);
+  --search-bg: transparent;
+  --hover-invert: var(--ink);
+  --badge-hover-text: var(--on-ink);
+}
+
+/* ------------------------------------------------------------------ base */
+
+body {
+  font-family: var(--sans);
+  font-size: 16px;
+  line-height: 1.55;
+  background: var(--paper);
+  color: var(--ink);
+}
+h1, h2, h3 { color: var(--ink); text-wrap: balance; }
+b, strong { color: inherit; }
+a { color: var(--ink); text-decoration-color: var(--accent); text-underline-offset: 3px; text-decoration-thickness: 1.5px; }
+a:hover { color: var(--ink); text-decoration-thickness: 2.5px; }
+::selection { background: var(--accent); color: var(--on-accent); }
+:focus-visible { outline-color: var(--accent); }
+
+.wrap {
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 28px var(--gutter) 56px;
+  border: 0;
+  border-radius: 0;
+}
+.card { background: none; padding: 0; border-radius: 0; }
+
+/* What the engine says, said in one voice: small, monospace, quiet. */
+.date-badge,
+.post-meta, .post-stats, .post-stat, .meta,
+.tag-pill,
+.series-note,
+.pagination,
+.last-date,
+.listing-heading__count,
+figcaption,
+.toc-heading,
+.share__heading,
+.comment-date, .comment-favs,
+.copyright,
+aside h3, footer h3 {
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+}
+
+/* A button is a word in square brackets. */
+.pagination a,
+.series-nav a,
+.comments-reply a,
+.tag-index-sort-button,
+.not-found-links .tag-pill,
+.share__ask-go {
+  display: inline-block;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  cursor: pointer;
+}
+.pagination a::before, .series-nav a::before, .comments-reply a::before,
+.tag-index-sort-button::before, .not-found-links .tag-pill::before, .share__ask-go::before {
+  /* a no-break space: the bracket never stands on a line by itself */
+  content: "[\00a0"; color: var(--muted); font-weight: 400; opacity: 1;
+}
+.pagination a::after, .series-nav a::after, .comments-reply a::after,
+.tag-index-sort-button::after, .not-found-links .tag-pill::after, .share__ask-go::after {
+  content: "\00a0]"; color: var(--muted); font-weight: 400;
+}
+.pagination a:hover, .series-nav a:hover, .comments-reply a:hover,
+.tag-index-sort-button:hover, .not-found-links a.tag-pill:hover,
+.share__ask-go:hover, .share__ask-go:focus-visible {
+  background: none; border: 0; color: var(--accent); opacity: 1; text-decoration: none;
+}
+
+/* ------------------------------------------------------------------ head */
+
+/* The site's own favicon, square as a cell, then the name with the cursor
+   after it and the claim under it; at the far end the reader's two switches.
+   The banner's picture is not shown (banner.show_image: false takes it out
+   of the markup as well); the link that carried it lies over the row. */
+.banner-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-bottom: 20px;
+}
+.banner { display: none; }
+.banner-link { position: absolute; inset: 0; z-index: 1; }
+.banner-link:focus-visible { outline-offset: 2px; }
+.banner-wrap:has(.banner-title)::before,
+.banner-wrap::before {
+  content: "";
+  position: static;
+  flex: none;
+  align-self: flex-start;
+  width: 38px;
+  height: 38px;
+  margin-top: 1px;
+  border: 0;
+  border-radius: var(--corner);
+  background: url("/assets/images/favicon.png") center / cover no-repeat;
+}
+.banner-wrap:has(.banner-claim)::after { content: none; }
+.banner-overlay { position: static; padding: 0; gap: 0; min-width: 0; }
+.banner-title,
+.banner-claim { text-shadow: none; max-width: none; }
+.banner-title {
+  font-family: var(--mono);
+  font-size: 30px;
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--ink);
+}
+.banner-title::after {
+  content: "";
+  display: inline-block;
+  width: 0.5em;
+  height: 0.92em;
+  margin-left: 0.14em;
+  background: var(--accent);
+  vertical-align: -0.1em;
+  animation: minimal-terminal-cursor 1.1s steps(1, end) infinite;
+}
+@keyframes minimal-terminal-cursor {
+  0%, 59% { opacity: 1; }
+  60%, 100% { opacity: 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .banner-title::after { animation: none; }
+}
+.banner-claim {
+  align-self: flex-start;
+  margin-top: 6px;
+  font-family: var(--mono);
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+  text-wrap: balance;
+  color: var(--muted);
+}
+
+.banner-tools {
+  position: relative;
+  top: auto;
+  right: auto;
+  margin-left: auto;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+#theme-toggle {
+  position: relative;
+  top: auto;
+  right: auto;
+  margin-left: auto;
+  flex: none;
+  min-width: 0;
+  height: 28px;
+  padding: 0 8px;
+  background: none;
+  border: 1px solid var(--line);
+  border-radius: var(--corner);
+  color: var(--muted);
+  /* the sun and the moon are not in the monospace */
+  font-family: var(--sans);
+  font-weight: 600;
+  font-size: 13px;
+}
+.banner-tools #theme-toggle { margin-left: 0; }
+#theme-toggle:hover { background: none; border-color: var(--accent); color: var(--accent); }
+.lang-switch {
+  height: 28px;
+  box-sizing: border-box;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: var(--corner);
+  background: none;
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0;
+  text-transform: lowercase;
+}
+.lang-switch__item { padding: 2px 8px; border-radius: 2px; color: var(--muted); }
+.lang-switch__item + .lang-switch__item::before { content: none; }
+.lang-switch__item.is-current,
+a.lang-switch:hover .lang-switch__item.is-current { background: var(--ink); color: var(--on-ink); font-weight: 700; }
+a.lang-switch:hover { background: none; border-color: var(--accent); }
+a.lang-switch:hover .lang-switch__item { color: var(--accent); }
+
+/* ------------------------------------------------------------------ menu */
+
+/* Words on a line. The one you are in is shown the way a terminal shows a
+   selection: inverse video. */
+.wrap > nav {
+  min-height: 0;
+  padding: 6px 0 0;
+  margin-bottom: 18px;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: var(--paper);
+  align-items: center;
+  gap: 10px 14px;
+}
+html { scroll-padding-top: 64px; }
+nav ul { gap: 0 4px; margin-left: -8px; }
+nav li {
+  margin-left: 0;
+  height: auto;
+  line-height: 1.3;
+  font-size: 13px;
+  text-transform: none;
+}
+.wrap > nav a,
+.wrap > nav li:last-child a {
+  height: auto;
+  margin: 4px 0 8px;
+  padding: 4px 8px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-family: var(--mono);
+  letter-spacing: 0;
+  color: var(--muted);
+  white-space: nowrap;
+  box-sizing: border-box;
+}
+.wrap > nav a:hover { background: var(--plate); color: var(--ink); }
+.wrap > nav a[aria-current="page"],
+.wrap > nav li:first-child a[aria-current="page"],
+.wrap > nav a[aria-current="page"]:hover {
+  margin: 4px 0 8px;
+  padding: 4px 8px;
+  background: var(--ink);
+  border: 0;
+  color: var(--on-ink);
+  font-weight: 700;
+}
+.wrap > nav a:focus-visible { outline-offset: 2px; }
+.nav-toggle { display: none; }
+
+/* The search field is a line to type on. */
+.search-form input[type="search"] {
+  width: 300px;
+  height: 32px;
+  padding: 0 30px 0 0;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  border-radius: 0;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+}
+.search-form input[type="search"]::placeholder { color: var(--muted); }
+.search-form input[type="search"]:focus { outline: none; border-color: var(--accent); }
+.search-form button,
+.search-form button:hover { top: 1px; right: -4px; width: 30px; height: 30px; color: var(--muted); }
+.search-form button:hover { color: var(--accent); }
+
+@media (min-width: 701px) {
+  /* A letter may reach a pixel past its column, and what sticks is exactly as
+     wide as that column: the ground of each sticking band is carried a little
+     way out on both sides, or the reach shows beside it while the page passes
+     underneath. */
+  .wrap > nav { box-shadow: -12px 0 0 var(--paper), 12px 0 0 var(--paper); }
+}
+@media (max-width: 700px) {
+  /* The engine folds the menu behind a button on a phone. Here it is one row
+     that slides sideways, running off the right edge to say there is more,
+     with the search line under it -- and it does not follow the reader. */
+  .wrap > nav { position: static; padding: 0; }
+  nav ul,
+  nav.nav-open ul {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    flex: 1 1 100%;
+    width: auto;
+    order: 0;
+    margin: 0 calc(-1 * var(--gutter)) 0 -8px;
+    padding-right: var(--gutter);
+    overflow-x: auto;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+  nav ul::-webkit-scrollbar { display: none; }
+  nav li { flex: none; line-height: 1.3; }
+  .wrap > nav a,
+  .wrap > nav li:last-child a,
+  .wrap > nav a[aria-current="page"],
+  .wrap > nav li:first-child a[aria-current="page"] { margin: 4px 0; padding: 7px 9px; border: 0; }
+  .search-form { flex: 1 1 100%; }
+  .search-form input[type="search"] { width: 100%; height: 38px; }
+  .search-form button { top: 4px; }
+  html { scroll-padding-top: 12px; }
+}
+@media (min-width: 701px) and (max-width: 860px) {
+  .search-form { flex: 1 1 140px; min-width: 140px; max-width: 300px; }
+  .search-form input[type="search"] { width: 100%; }
+}
+
+/* ---------------------------------------------------------------- layout */
+
+.layout, .layout main, .layout aside { background: none; }
+.layout {
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 48px;
+  padding: 0;
+  align-items: start;
+}
+.layout--no-aside { grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 861px) and (max-width: 1000px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 240px; gap: 32px; }
+  .search-form input[type="search"] { width: 240px; }
+}
+@media (max-width: 860px) {
+  .layout { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+}
+@media (max-width: 1160px) {
+  /* room under the foot for the arrow back to the top */
+  .wrap { padding-bottom: 84px; }
+}
+
+/* ------------------------------------------------------- what a page is */
+
+/* The heading of a listing reads as a line of output: the kind of page,
+   quiet; the thing itself, bold; how many, small. */
+.listing-heading {
+  margin-bottom: 14px;
+  font-family: var(--mono);
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  text-transform: none;
+  color: var(--ink);
+}
+.listing-heading__icon { display: none; }
+.listing-heading__kind,
+.listing-heading--tag .listing-heading__kind,
+.listing-heading--search.has-query .listing-heading__kind,
+.listing-heading--series .listing-heading__kind {
+  position: static;
+  width: auto;
+  height: auto;
+  margin: 0;
+  overflow: visible;
+  clip: auto;
+  clip-path: none;
+  white-space: normal;
+}
+.listing-heading .listing-heading__kind:has(~ .listing-heading__value) { margin-right: 10px; color: var(--muted); font-weight: 400; }
+.listing-heading__link { text-decoration: none; }
+.listing-heading__link:hover,
+.listing-heading__link:focus-visible { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); }
+.listing-heading--tag .listing-heading__value::before { content: "#"; color: var(--muted); font-weight: 400; }
+.listing-heading__count { margin-left: 10px; vertical-align: baseline; opacity: 1; }
+.listing-heading--type { position: static; width: auto; height: auto; margin: 0 0 14px; overflow: visible; clip: auto; clip-path: none; white-space: normal; }
+@media (max-width: 700px) {
+  .listing-heading { font-size: 20px; }
+}
+
+/* ------------------------------------------------------------ a listing */
+
+/* A post in a listing is a block of four lines: when, what it is called, how
+   it begins, and what the engine knows about it. A dashed rule under it. */
+main .post-list-item {
+  margin: 0;
+  padding: 18px 0;
+  border-bottom: 1px dashed var(--line);
+}
+main .post-list-item:first-of-type { border-top: 0; }
+main .listing-heading:not(.listing-heading--home) ~ .post-list-item:first-of-type,
+body.page-cont main:has(> .listing-heading--home) > .post-list-item:first-of-type { border-top: 1px dashed var(--line); }
+.post-header { margin: 0; gap: 2px; }
+.post-list-item .post-header { flex-direction: column; }
+
+.date-badge,
+.date-badge:hover {
+  width: auto;
+  padding: 0;
+  background: none;
+  border-radius: 0;
+  text-align: left;
+  line-height: 1.5;
+  white-space: nowrap;
+  color: var(--muted);
+}
+.date-badge a { display: inline; color: var(--muted); }
+.date-badge a:hover { color: var(--ink); }
+.date-badge svg { display: none; }
+/* The pin is written before the date and shown after it. */
+.date-badge.is-pinned { display: flex; align-items: center; }
+.date-badge .pin-mark,
+.date-badge:hover .pin-mark {
+  position: static;
+  order: 1;
+  display: inline-flex;
+  width: auto;
+  height: auto;
+  margin: 0 0 0 8px;
+  background: none;
+  border-radius: 0;
+  color: var(--accent);
+}
+.date-badge .pin-mark svg { display: block; width: 12px; height: 12px; }
+
+.post-list-item .post-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+}
+.post-list-item .post-body > * { order: 5; flex: 0 0 100%; }
+.post-list-item .post-body::after { content: none; }
+.post-list-item .post-body > h2 {
+  order: 1;
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 18.5px;
+  font-weight: 700;
+  line-height: 1.35;
+  letter-spacing: -0.02em;
+}
+.post-list-item h2 a { color: var(--ink); text-decoration: none; }
+.post-list-item h2 a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.post-list-item .series-note { order: 2; margin: 0; }
+.post-list-item .post-body > .content { order: 3; max-width: none; font-size: 16px; line-height: 1.55; }
+.post-list-item .post-body > .content > * { max-width: 65ch; }
+/* The reading time, the counts and the tags are one run of words: their two
+   boxes are dissolved, so a tag that does not fit goes to the start of the
+   next line instead of hanging under the first tag. */
+.post-list-item .post-body > .post-meta,
+.post-list-item .post-body > .tags { display: contents; }
+.post-list-item .post-meta > *,
+.post-list-item .tags > * { flex: 0 0 auto; align-self: center; }
+.post-list-item .post-meta > .reading-time { order: 6; }
+.post-list-item .post-meta > .post-stats { order: 7; }
+.post-list-item .tags > * { order: 8; }
+.post-list-item .read-more { display: none; }
+
+/* Only the first block of the teaser, and of a paragraph three lines. */
+.post-list-item .content > *:not(:first-child) { display: none; }
+.post-list-item .content > :first-child { margin: 0; }
+.post-list-item .content > p:first-child,
+.post-list-item--lead .content > p:first-of-type {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+  opacity: 0.85;
+}
+.post-list-item .content > blockquote:first-child {
+  display: -webkit-box;
+  -webkit-line-clamp: 6;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  margin: 0;
+}
+.post-list-item .content > blockquote:first-child > :first-child { margin-top: 0; }
+
+/* A card that carries its medium (a picture post, a video post, the lead
+   card of the front page): the medium, then the opening words. */
+.post-list-item--lead .content > *,
+.post-list-item--media .content > * { max-width: none; }
+.post-list-item--lead .content > figure:first-child,
+.post-list-item--lead .content > .photo-grid:first-child,
+.post-list-item--media .content > figure:first-child,
+.post-list-item--media .content > .photo-grid:first-child,
+.post-list-item--media .content > .embed-responsive:first-child { margin: 4px 0 10px; }
+.post-list-item--lead .content > figure:first-child ~ p:first-of-type,
+.post-list-item--media .content > :first-child ~ p:first-of-type { display: -webkit-box; max-width: 65ch; }
+.post-list-item--lead .content > figure:first-child img { width: 100%; max-height: 460px; object-fit: cover; }
+.post-list-item .content figure img { width: auto; max-width: 100%; max-height: 420px; }
+.post-list-item .content .photo-grid img { width: 100%; max-height: 260px; }
+.post-list-item .content figure video { display: block; width: 100%; max-height: 420px; background: #000; }
+
+/* What the engine says about a post: how long, how many, about what. */
+.post-meta { gap: 12px; margin: 0; }
+.post-stats { gap: 10px; }
+.post-stats:empty { display: none; }
+.post-stat { gap: 4px; }
+.post-stat svg { width: 12px; height: 12px; color: var(--muted); }
+.post-stat--zero { display: none; }
+.post-stats:has(.post-stat):not(:has(.post-stat:not(.post-stat--zero))) { display: none; }
+.post-meta .reading-time { order: -1; }
+/* Reading time is a figure, not a pictogram. */
+.post-stat.reading-time { display: inline-flex; align-items: center; }
+.post-stat.reading-time svg { display: none; }
+.post-stat.reading-time span::before { content: "~"; }
+
+/* A tag is a hash and a word. */
+.tag-pill,
+a.tag-pill:hover {
+  padding: 0;
+  margin: 0 12px 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  line-height: 1.5;
+}
+.tag-pill::before { content: "#"; opacity: 0.6; }
+a.tag-pill:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); }
+.post-list-item .tag-pill { margin: 0; }
+.tag-pill-own { opacity: 0.5; }
+
+.pagination { margin-top: 18px; }
+
+/* A continuation of the front page has no heading to see, so the number the
+   engine writes at the foot between "newer" and "older" is lifted to the head
+   of the list and set as one; the days the page covers follow it, quiet. */
+body.page-cont main:has(> .listing-heading--home) { position: relative; padding-top: 42px; }
+body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagination-start) {
+  position: absolute;
+  top: 0;
+  left: 0;
+  text-align: left;
+  white-space: nowrap;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+}
+body.page-cont main:has(> .listing-heading--home) > .pagination .pagination-word { color: var(--muted); font-weight: 400; }
+body.page-cont main:has(> .listing-heading--home) > .pagination .pagination-sep { display: none; }
+body.page-cont main:has(> .listing-heading--home) > .pagination .pagination-dates {
+  display: inline;
+  margin: 0 0 0 10px;
+  font-size: 12px;
+  font-weight: 400;
+  letter-spacing: 0;
+  color: var(--muted);
+}
+body.page-cont main:has(> .listing-heading--home) > .pagination > .pagination-start { position: static; margin-left: auto; }
+@media (max-width: 700px) {
+  body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagination-start) { font-size: 20px; }
+}
+
+/* On a series' own listing the heading has said the name; a card says only
+   which part it is. */
+.listing-heading--series ~ .post-list-item .series-note__name,
+.listing-heading--series ~ .post-list-item .series-note__sep { display: none; }
+
+/* ----------------------------------------------------------------- a post */
+
+/* The head of a post is the same four lines a card has, at a post's size:
+   when, what it is called, which part of what, and what the engine knows. */
+.card:not(.has-hero) > article > .post-header { display: flex; flex-direction: column; gap: 4px; }
+/* (a column of a flex box is as wide as its widest unbreakable line unless
+   told otherwise -- a long line of code made the whole post wider than a phone) */
+.card:not(.has-hero) > article > .post-header > * { min-width: 0; max-width: 100%; }
+/* ...and each is as wide as the column whatever it holds: a post of short
+   paragraphs was drawn narrower than one with a block of code in it, and its
+   rules stopped short of the column's edge. */
+.card:not(.has-hero) > article > .post-header > .post-body { width: 100%; align-self: stretch; box-sizing: border-box; }
+.card:not(.has-hero) > article > .post-header > .date-badge .pin-mark { display: none; }
+.card:not(.has-hero) > article > .post-header > .post-body > .post-meta { margin: 8px 0 0; }
+/* The rule that closes the head stands over the writing, so whatever the head
+   holds -- with a series note or without -- is above it. */
+.card:not(.has-hero) > article > .post-header > .post-body > .content { margin-top: 16px; border-top: 1px solid var(--line); }
+.card:not(.has-hero) > article > .post-header > .post-body > .content > :first-child { margin-top: 18px; }
+.post-body h1,
+.card > article > h1,
+.card.has-hero .post-hero__content h1 {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: clamp(23px, 3.6vw, 28px);
+  font-weight: 700;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+}
+.card > article > h1 { margin-bottom: 14px; }
+.series-note { margin: 6px 0 0; }
+.series-note a { color: var(--muted); text-decoration: none; }
+.series-note a:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); }
+
+/* The writing. */
+.content { font-size: 17px; line-height: 1.7; }
+.content > p,
+.content > ul,
+.content > ol,
+.content > blockquote,
+.content > dl { max-width: 65ch; }
+.content > :first-child { margin-top: 10px; }
+.content a:hover { color: var(--ink); }
+.content a.mention { color: var(--accent); text-decoration: none; }
+.content a.mention:hover { text-decoration: underline; }
+@media (max-width: 860px) {
+  /* where the side column has gone under the text, the text runs as wide as
+     the pictures do */
+  .content > p,
+  .content > ul,
+  .content > ol,
+  .content > blockquote,
+  .content > dl { max-width: none; }
+}
+@media (max-width: 700px) {
+  .content { font-size: 16px; line-height: 1.62; }
+}
+
+/* A heading inside a post is marked the way its source marks it. */
+.content h1, .content h2, .content h3, .content h4, .content h5, .content h6 {
+  font-family: var(--mono);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.content h1 { font-size: 21px; }
+.content h2 { font-size: 19px; }
+.content h3 { font-size: 17px; }
+.content h4, .content h5, .content h6 { font-size: 15px; }
+.content h2::before { content: "## "; }
+.content h3::before { content: "### "; }
+.content h4::before { content: "#### "; }
+.content h2::before, .content h3::before, .content h4::before { color: var(--muted); font-weight: 400; }
+
+/* A quotation is quoted the way mail and Markdown quote: a mark, no bar. */
+blockquote { border-left: 0; }
+.content blockquote { position: relative; padding-left: 1.6em; }
+.content blockquote::before {
+  content: ">";
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-family: var(--mono);
+  font-weight: 700;
+  color: var(--accent);
+}
+.content ul { list-style: none; padding-left: 1.6em; }
+.content ul > li { position: relative; }
+.content ul > li::before { content: "-"; position: absolute; left: -1.2em; font-family: var(--mono); color: var(--muted); }
+.content hr { border: 0; border-top: 1px dashed var(--line); }
+
+/* Code is what a terminal is for: a block is a screen a shade off the page
+   with the accent down its left edge. */
+.content pre, .chrome-text pre {
+  padding-left: 16px;
+  border: 0;
+  border-left: 2px solid var(--accent);
+  border-radius: 0;
+  background: var(--plate);
+}
+.content code, .chrome-text code { background: var(--plate); border-radius: 2px; font-family: var(--mono); font-size: 0.88em; }
+.content pre code, .chrome-text pre code { background: none; }
+.copy-code { border-radius: var(--corner); background: var(--paper); }
+.content th { background: var(--plate); font-family: var(--mono); font-size: 0.85em; }
+
+figure { margin: 1.2rem 0; }
+.content figure img,
+.content video,
+.photo-grid img { border-radius: var(--corner); border: 1px solid var(--line); }
+.photo-grid { gap: 10px; }
+article .content figure video { display: block; width: auto; max-width: 100%; max-height: min(78vh, 720px); margin: 0 auto; background: #000; }
+@media (min-width: 701px) {
+  /* a gallery runs three across where it has three pictures, or five and more */
+  article .content .photo-grid:has(> figure:nth-child(3)):not(:has(> figure:nth-child(4))),
+  article .content .photo-grid:has(> figure:nth-child(5)) { grid-template-columns: repeat(3, 1fr); }
+  article .content .photo-grid:has(> figure:nth-child(3)):not(:has(> figure:nth-child(4))) .span-2,
+  article .content .photo-grid:has(> figure:nth-child(5)) .span-2 { grid-column: auto; }
+}
+.embed-responsive, .embed-audio, .draft-banner, .lightbox-overlay img, .file-icon { border-radius: var(--corner); }
+.draft-banner strong, .draft-banner a { color: var(--on-accent); }
+.file-card { border-radius: var(--corner); border-style: dashed; background: none; }
+.file-card:hover { border-color: var(--accent); background: none; }
+
+/* By night a picture is turned down a fifth, so a white screenshot does not
+   stand on a dark page like a lamp; under the pointer it comes back. Written
+   twice, as colors.css writes its own. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.content figure img, .photo-grid img, .content video, .pixelfed-thumb, .post-hero__media img) { filter: brightness(0.82); transition: filter 0.2s ease-in-out; }
+  :root:not([data-theme="light"]) :is(.content figure img, .photo-grid img, .content video, .post-hero__media img):hover,
+  :root:not([data-theme="light"]) .last:hover .pixelfed-thumb { filter: none; }
+}
+:root[data-theme="dark"] :is(.content figure img, .photo-grid img, .content video, .pixelfed-thumb, .post-hero__media img) { filter: brightness(0.82); transition: filter 0.2s ease-in-out; }
+:root[data-theme="dark"] :is(.content figure img, .photo-grid img, .content video, .post-hero__media img):hover,
+:root[data-theme="dark"] .last:hover .pixelfed-thumb { filter: none; }
+
+/* The contents of a long post: a list beside the text, set off by a dashed
+   rule, under a label. */
+.toc {
+  margin: 14px 0 0;
+  padding: 0 0 0 16px;
+  border: 0;
+  border-left: 1px dashed var(--line);
+  border-radius: 0;
+  background: none;
+  font-size: 14px;
+}
+@media (min-width: 701px) {
+  .toc { float: right; width: 32%; margin: 30px 0 14px 28px; }
+}
+.toc-heading::before { content: "# "; opacity: 0.6; }
+.toc a { color: var(--ink); text-decoration: none; }
+.toc a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+
+/* A post that opens with its picture (layout.hero, or `hero: true`). */
+.card.has-hero .post-hero__media img { width: 100%; max-height: 460px; object-fit: cover; border-radius: var(--corner); border: 1px solid var(--line); }
+.card.has-hero .post-hero__content { padding: 16px 0 0; }
+.card.has-hero .post-hero__content h1 { margin: 0 0 8px; }
+.card.has-hero .post-hero__meta { gap: 4px 14px; align-items: baseline; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.card.has-hero .post-hero__meta a { order: -1; color: var(--muted); text-decoration: none; }
+.card.has-hero .post-body { padding: 0; }
+.card.has-hero .post-body > .post-meta { margin: 8px 0 0; }
+.card.has-hero .post-body > .content { margin-top: 16px; padding-top: 4px; border-top: 1px solid var(--line); }
+@media (max-width: 700px) {
+  .card.has-hero .post-hero__media img { max-height: 300px; }
+}
+
+/* The foot of a post is two blocks: what it belongs to and where it can be
+   sent -- the series, the tags, the sharing -- under one rule, and the
+   conversation under another. */
+.tags { margin-top: 22px; padding-top: 16px; border-top: 1px dashed var(--line); }
+.post-list-item .tags { padding-top: 0; border-top: 0; }
+article .series-nav { margin: 24px 0 0; padding-top: 14px; border-top: 1px dashed var(--line); }
+article .tags { margin-top: 12px; padding-top: 0; border-top: 0; }
+article .content + .tags { margin-top: 24px; padding-top: 16px; border-top: 1px dashed var(--line); }
+/* The parts on either side are named by their titles, and a title can run to
+   two lines: the lines are kept a like length, so neither the arrow nor a
+   bracket is left behind alone. */
+.series-nav a { max-width: 48%; text-wrap: balance; }
+.series-nav .series-next { text-align: right; }
+@media (max-width: 700px) {
+  .series-nav { flex-direction: column; gap: 4px; }
+  .series-nav a { max-width: none; }
+  .series-nav .series-next { margin-left: 0; text-align: right; }
+}
+
+.share { margin-top: 12px; padding-top: 0; border-top: 0; }
+.share__heading { opacity: 1; }
+.share__heading::before { content: "# "; opacity: 0.6; }
+.share__links { display: flex; flex-wrap: wrap; gap: 2px 12px; min-width: 0; }
+.share__ask-input { padding: 0.3rem 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; font-family: var(--mono); }
+.share__ask-input:focus,
+.share__ask-input:focus-visible { outline: none; border-color: var(--accent); }
+.share__change { font-family: var(--mono); }
+
+.comments { margin-top: 22px; padding-top: 16px; border-top: 1px dashed var(--line); }
+.comments h3 {
+  margin-bottom: 10px;
+  font-family: var(--mono);
+  font-size: 19px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  text-transform: none;
+}
+.comments h3::before { content: "## "; color: var(--muted); font-weight: 400; }
+.comments-reply { margin: 0 0 14px; display: flex; flex-wrap: wrap; gap: 8px; }
+.comments-note { font-family: var(--sans); font-size: 14.5px; line-height: 1.45; color: var(--muted); }
+#comments:not(:has(.comment)) .comments-note { display: none; }
+.comment { border-top: 1px dashed var(--line); }
+.comment-avatar { border: 1px solid var(--line); border-radius: var(--corner); }
+.comment--author .comment-avatar { border-color: var(--accent); }
+.comment-meta a { text-decoration: none; }
+.comment-meta a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.comment-meta a:first-child { font-family: var(--mono); font-size: 13px; font-weight: 700; }
+.comment-content a.mention,
+.last-content a.mention { color: var(--accent); text-decoration: none; }
+.comment-content a.mention:hover,
+.last-content a.mention:hover { text-decoration: underline; }
+.comment-media img { border-radius: var(--corner); }
+
+/* --------------------------------------------------------------- sidebar */
+
+/* Each widget is a label written as a comment, and under it rows parted by
+   dashed rules. No box. */
+aside > .card:first-child { margin-top: 0; }
+aside .card { margin-bottom: 26px; }
+aside h3,
+footer h3 { margin: 0 0 8px; }
+aside h3::before,
+footer h3::before { content: "# "; opacity: 0.6; }
+aside .card > div {
+  border: 0;
+  border-top: 1px dashed var(--line);
+  border-radius: 0;
+  background: none;
+  overflow: hidden;
+  font-size: 14.5px;
+  line-height: 1.45;
+}
+aside .card > div:empty { display: none; }
+aside .chrome-text { padding: 12px 0 0; }
+aside .chrome-text p { margin: 0 0 0.6rem; }
+aside .chrome-text p:last-child { margin-bottom: 0; }
+/* A portrait opening the about text sits beside it, small and square. */
+aside .chrome-text p > img:first-child {
+  float: right;
+  width: 52px !important;
+  height: 52px !important;
+  margin: 3px 0 4px 12px !important;
+  border: 1px solid var(--line);
+  border-radius: var(--corner) !important;
+}
+
+.last,
+.last:first-child { position: relative; padding: 10px 0; font-size: 14.5px; border-top: 1px dashed var(--line); }
+.last:first-child { border-top: 0; }
+.last-content p { margin: 2px 0 0; }
+.last-content a { position: relative; z-index: 1; text-decoration: none; }
+.last-content a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.last-content strong { font-family: var(--mono); font-size: 12px; }
+/* A row is a glimpse: cut at four lines (a commit at three), and the bare
+   address under it is not shown -- the link that carried it lies over the
+   row, so the row itself is the way to the thing. */
+#last-toots .last-content,
+#last-commits .last-content,
+#last-bluesky .last-content,
+#last-rss .last-content {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+#last-commits .last-content { -webkit-line-clamp: 3; }
+.last > a,
+.last:has(.pixelfed-thumb) > a {
+  position: absolute;
+  inset: 0;
+  grid-area: auto;
+  margin: 0;
+  font-size: 0;
+  z-index: 0;
+}
+.last > a:focus-visible { outline-offset: -3px; }
+.last:has(> a:hover) { background: var(--plate); }
+/* A toot's address is the short form Mastodon sends with it, on one line. */
+#last-toots .invisible { display: none; }
+#last-toots .ellipsis::after { content: "\2026"; }
+#last-toots .last-content a:has(> .ellipsis) { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* A picture row: the thumbnail beside its date and name. */
+.last:has(.pixelfed-thumb) {
+  display: grid;
+  grid-template-columns: 46px minmax(0, 1fr);
+  column-gap: 11px;
+  align-items: center;
+}
+.last:has(.pixelfed-thumb) .last-date { grid-column: 2; grid-row: 1; }
+.last:has(.pixelfed-thumb) .last-content { display: contents; }
+.last:has(.pixelfed-thumb) .last-content p { grid-column: 2; grid-row: 2; }
+.last:has(.pixelfed-thumb) .pixelfed-thumb {
+  grid-column: 1;
+  grid-row: 1 / span 3;
+  width: 46px;
+  height: 46px;
+  margin: 0;
+  object-fit: cover;
+  border-radius: var(--corner);
+  border: 1px solid var(--line);
+}
+
+.on-this-day-all { padding: 10px 0; border-top: 1px dashed var(--line); font-size: 14.5px; }
+.on-this-day-all summary { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.on-this-day-all summary:hover { color: var(--accent); }
+.on-this-day-all a { text-decoration: none; }
+.on-this-day-all a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.on-this-day-all ul { margin-top: 6px; }
+.on-this-day-all li { display: grid; grid-template-columns: 38px minmax(0, 1fr); column-gap: 8px; align-items: baseline; margin: 0; padding: 4px 0; }
+
+@media (min-width: 561px) and (max-width: 860px) {
+  /* two abreast under the content: left, right, left, right, each right
+     under the one above it on its side */
+  aside { display: flow-root; }
+  aside > .card { width: calc((100% - 24px) / 2); margin: 0 0 26px; }
+  aside > .card:nth-child(odd) { float: left; clear: left; }
+  aside > .card:nth-child(even) { float: right; clear: right; }
+}
+@media (max-width: 860px) {
+  /* under a post on a narrow screen the feeds step aside */
+  .layout:has(main article > .post-header) aside .card:has(:is(#last-toots, #last-pixelfeds, #last-commits, #last-bluesky, #last-rss)) { display: none; }
+}
+
+/* ------------------------------------------------------------------ foot */
+
+footer {
+  margin-top: 40px;
+  padding: 22px 0 0;
+  background: none;
+  border-top: 1px solid var(--line);
+  border-radius: 0;
+  grid-template-columns: 1fr 2fr 1.4fr;
+  grid-template-rows: min-content 1fr min-content;
+  gap: 0 28px;
+  font-size: 14.5px;
+}
+footer li { margin-bottom: 3px; }
+footer li::before { content: none; }
+footer li a { font-family: var(--mono); font-size: 12px; text-decoration: none; }
+footer li a:hover { color: var(--accent); }
+footer p { color: var(--ink); font-size: 14.5px; margin: 0 0 8px; }
+/* The copyright closes the foot on a line of its own under all three
+   columns. It is written inside the middle one, so that column's box is
+   dissolved and its children are placed in the foot's grid by hand. */
+footer > div:nth-child(1) { grid-column: 1; grid-row: 1 / span 2; }
+footer > div:nth-child(3) { grid-column: 3; grid-row: 1 / span 2; }
+footer > div:nth-child(2) { display: contents; }
+footer > div:nth-child(2) > h3 { grid-column: 2; grid-row: 1; }
+footer > div:nth-child(2) > .chrome-text { grid-column: 2; grid-row: 2; }
+footer > div:nth-child(2) > .copyright {
+  grid-column: 1 / -1;
+  grid-row: 3;
+  margin: 22px 0 0;
+  padding-top: 14px;
+  border-top: 1px dashed var(--line);
+  text-align: center;
+}
+.copyright::before { content: "# "; opacity: 0.6; }
+@media (max-width: 760px) {
+  footer { grid-template-columns: minmax(0, 1fr); grid-template-rows: none; }
+  footer > div:nth-child(1) { grid-column: 1; grid-row: 1; margin-bottom: 22px; }
+  footer > div:nth-child(2) > h3 { grid-column: 1; grid-row: 2; }
+  footer > div:nth-child(2) > .chrome-text { grid-column: 1; grid-row: 3; margin-bottom: 22px; }
+  footer > div:nth-child(3) { grid-column: 1; grid-row: 4; }
+  footer > div:nth-child(2) > .copyright { grid-column: 1; grid-row: 5; }
+}
+.social-icons { gap: 2px 12px; flex-wrap: wrap; }
+
+/* The engine's pictograms -- the ways to send a post on, and the places the
+   site can be found -- stay pictograms, and are set the way every other
+   button here is: in square brackets. No tile, no frame. */
+.share__link,
+.share__link[data-share-mastodon],
+.social-icons a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  width: auto;
+  height: auto;
+  min-width: 0;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+  text-decoration: none;
+  white-space: nowrap;
+  flex: 0 0 auto;
+  opacity: 1;
+  cursor: pointer;
+}
+.share__link[hidden] { display: none; }
+.share__link svg,
+.social-icons svg { width: 16px; height: 16px; flex: none; }
+.share__link::before,
+.social-icons a::before { content: "["; color: var(--muted); }
+.share__link::after,
+.social-icons a::after { content: "]"; color: var(--muted); }
+.share__link:hover, .share__link:focus-visible,
+.share__link[data-share-mastodon]:hover,
+.share__link[data-share-mastodon]:focus-visible,
+.social-icons a:hover,
+.share__link.is-done,
+.share__link.is-done:hover,
+.share__link.is-done:focus-visible { background: none; border: 0; color: var(--accent); opacity: 1; }
+
+#scroll-top {
+  width: 34px;
+  height: 34px;
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: var(--corner);
+  color: var(--muted);
+}
+#scroll-top:hover { background: var(--paper); border-color: var(--accent); color: var(--accent); }
+@media (max-width: 700px) {
+  #scroll-top { right: 8px; bottom: 12px; opacity: 0.72; }
+  #scroll-top:hover { opacity: 1; }
+}
+
+/* --------------------------------------------------------------- archive */
+
+/* A year is a row: its name, how many, and its twelve months set as every
+   control here is set -- between square brackets, one after another. A month
+   that holds nothing is quiet and is not a link. One that holds posts has its
+   number coloured by how much it holds: four steps from the quiet tone to the
+   accent. The same twelve stand at the top of a year's own page. */
+.archive-map { width: 100%; margin: 0; border-top: 1px dashed var(--line); }
+.archive-year { align-items: baseline; flex-wrap: wrap; gap: 4px 14px; padding: 10px 0; border-bottom: 1px dashed var(--line); }
+.archive-year-name { min-width: 64px; font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--ink); text-decoration: none; }
+a.archive-year-name:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.archive-year-count { min-width: 44px; font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.archive-months { display: flex; flex-wrap: wrap; align-items: baseline; gap: 2px 0; margin-left: auto; }
+.archive-month,
+.archive-month.is-empty,
+.archive-month.is-l1, .archive-month.is-l2, .archive-month.is-l3, .archive-month.is-l4 {
+  display: inline;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 400;
+  white-space: nowrap;
+  text-decoration: none;
+  opacity: 1;
+}
+.archive-month::before { content: "[\00a0"; color: var(--muted); font-weight: 400; }
+.archive-month::after { content: "\00a0]"; color: var(--muted); font-weight: 400; }
+.archive-month.is-empty { color: var(--muted); opacity: 0.5; }
+/* A month that holds posts is shown the way a terminal shows a selection:
+   its number in inverse video. How much it holds is the depth of the ground
+   under the number, four steps up to the accent. The brackets belong to the
+   same element, so the ground is a gradient laid only under the number: in a
+   monospace the brackets and their spaces are exactly four characters, and
+   the ground is drawn three short of the whole, half a character proud of
+   the number on each side. */
+.archive-month.is-l1, .archive-month.is-l2, .archive-month.is-l3, .archive-month.is-l4 {
+  padding: 2px 0;
+  background-image: linear-gradient(var(--sel), var(--sel));
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: calc(100% - 3ch) 100%;
+  font-weight: 700;
+}
+.archive-month.is-l1 { --sel: color-mix(in srgb, var(--accent) 22%, var(--paper)); color: var(--ink); }
+.archive-month.is-l2 { --sel: color-mix(in srgb, var(--accent) 45%, var(--paper)); color: var(--ink); }
+.archive-month.is-l3 { --sel: color-mix(in srgb, var(--accent) 72%, var(--paper)); color: var(--on-accent); }
+.archive-month.is-l4 { --sel: var(--accent); color: var(--on-accent); }
+a.archive-month:hover { border: 0; outline: 0; --sel: var(--ink); color: var(--on-ink); text-decoration: none; }
+.archive-month:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* The legend under the map is the same four steps, said the same way: four
+   empty pairs of brackets with the ground of each step between them. */
+.archive-legend { display: flex; align-items: baseline; gap: 0; padding: 8px 0 0; border: 0; }
+.archive-legend .archive-month,
+.archive-legend .archive-month.is-l1, .archive-legend .archive-month.is-l2,
+.archive-legend .archive-month.is-l3, .archive-legend .archive-month.is-l4 { width: auto; height: auto; padding: 2px 0; flex: 0 0 auto; }
+.archive-legend .archive-months, .archive-legend { flex-wrap: nowrap; }
+.archive-legend__word,
+.archive-legend__word:first-child,
+.archive-legend__word:last-child { margin: 0; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+/* an empty pair has nothing to stand its ground under, so it is given two
+   spaces each side and the ground is the middle two characters */
+.archive-legend .archive-month::before { content: "[\00a0\00a0"; }
+.archive-legend .archive-month::after { content: "\00a0\00a0]"; }
+.archive-legend .archive-month.is-l1, .archive-legend .archive-month.is-l2,
+.archive-legend .archive-month.is-l3, .archive-legend .archive-month.is-l4 { background-size: calc(100% - 4ch) 100%; }
+.archive-legend__word:first-child { margin-right: 8px; }
+.archive-legend__word:last-child { margin-left: 8px; }
+.archive-jump { gap: 2px 14px; margin: 0 0 14px; }
+.archive-jump .archive-months { margin-left: 0; }
+.archive-jump__label,
+.tag-index-jump__label { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+@media (max-width: 700px) {
+  .archive-year-name { min-width: 0; }
+  .archive-year-count { min-width: 0; margin-left: auto; }
+  /* (a row of things as wide as what they say, spread across the line -- the
+     engine's own grid of twelve equal cells would leave each number adrift
+     in its cell and its ground beside it) */
+  .archive-months { display: flex; flex-wrap: nowrap; justify-content: space-between; flex: 0 0 100%; margin-left: 0; }
+  .archive-month, .archive-month.is-empty,
+  .archive-month.is-l1, .archive-month.is-l2, .archive-month.is-l3, .archive-month.is-l4 { display: inline; width: auto; font-size: 12px; }
+  .archive-year .archive-months { flex: 0 0 100%; min-width: 0; }
+  .archive-year .archive-month,
+  .archive-year .archive-month:not(.is-empty) { flex: 0 0 auto; width: auto; border: 0; font-size: 12px; }
+  /* twelve months fit a phone's width with the brackets drawn close */
+  .archive-month::before { content: "["; }
+  .archive-month::after { content: "]"; }
+  .archive-month.is-l1, .archive-month.is-l2, .archive-month.is-l3, .archive-month.is-l4 { background-size: calc(100% - 2ch) 100%; }
+}
+
+/* A year: each month a heading that follows the reader down its list, and
+   under it one line a post. */
+.archive-section { margin: 0 0 22px; }
+.archive-section h2 {
+  top: 62px;
+  margin: 0 0 4px;
+  padding: 10px 0 8px;
+  background: var(--paper);
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  color: var(--ink);
+}
+.archive-section h2::before { content: "## "; color: var(--muted); font-weight: 400; }
+.archive-list { border: 0; border-radius: 0; background: none; overflow: hidden; }
+.archive-list li { gap: 10px; padding: 7px 0; border-top: 1px dashed var(--line); font-size: 15.5px; }
+.archive-list li:first-child { border-top: 0; }
+.archive-list time { min-width: 28px; text-align: left; font-family: var(--mono); font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.archive-list li a { flex: 1 1 auto; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; text-decoration: none; }
+.archive-list a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+@media (min-width: 701px) {
+  .archive-section h2,
+  .tag-index-letter,
+  .card > article > .content > h2[id] { box-shadow: -8px 0 0 var(--paper), 8px 0 0 var(--paper); }
+}
+@media (max-width: 700px) {
+  .archive-section h2 { position: static; }
+}
+
+/* The index of series: a name, how many parts, which years. */
+.series-index .series-index-item { border-top: 0; border-bottom: 1px dashed var(--line); }
+.series-index .series-index-item:first-child { border-top: 1px dashed var(--line); }
+.series-index a.series-index-name,
+.series-index a.series-index-name:hover { font-family: var(--mono); font-size: 17px; font-weight: 700; color: var(--ink); text-decoration: none; }
+.series-index a.series-index-name:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.series-index-count, .series-index-years { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+
+/* ------------------------------------------------------------------ tags */
+
+/* The index of tags is a wall of hashes. How much has been written under one
+   is said by its weight, not by a fill: used once it is small and quiet, a
+   handful of times plain, ten times and more ink, a hundred and more bold. A
+   stylesheet cannot compare numbers, so the rules name the counts they do NOT
+   mean and take what is left. */
+.tag-index { max-width: none; margin: 0; gap: 2px 0; }
+.tag-index-item > .tag-pill { margin: 0 14px 2px 0; font-size: 13px; }
+.tag-index-count { margin-left: 5px; font-family: var(--mono); font-size: 11px; font-weight: 400; vertical-align: baseline; opacity: 1; color: var(--muted); }
+.tag-index-item[data-count="1"] > .tag-pill { font-size: 11.5px; opacity: 0.8; }
+.tag-index-item[data-count="1"] > .tag-pill .tag-index-count { display: none; }
+.tag-index-item:not(:is(@C9@)) > .tag-pill { color: var(--ink); }
+.tag-index-item:not(:is(@C99@)) > .tag-pill { color: var(--ink); font-weight: 700; }
+.tag-index-item:not(:is(@C99@)) > .tag-pill .tag-index-count { color: var(--accent); font-weight: 700; }
+.tag-index-letter {
+  margin: 14px 0 6px;
+  padding: 10px 0 8px;
+  background: none;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  font-family: var(--mono);
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--ink);
+}
+.tag-index-letter::before { content: "## "; color: var(--muted); font-weight: 400; }
+.tag-index-letter:first-child { margin-top: 0; }
+@media (min-width: 701px) {
+  .tag-index-letter { position: sticky; top: 62px; z-index: 1; background: var(--paper); }
+}
+.tag-index-sort { display: flex; gap: 14px; max-width: none; margin: 0 0 10px; }
+.tag-index-sort-button,
+.tag-index-sort-button:first-child,
+.tag-index-sort-button:last-child { justify-self: auto; font-weight: 400; color: var(--muted); }
+.tag-index-sort-button[aria-pressed="true"],
+.tag-index-sort-button[aria-pressed="true"]:hover { background: none; border: 0; color: var(--ink); font-weight: 700; }
+.tag-index-jump { justify-content: flex-start; text-align: left; margin-left: 0; }
+.tag-index-jump a { font-family: var(--mono); text-decoration: none; }
+.tag-index-jump a:hover { color: var(--accent); }
+.tag-index-jump[hidden] { display: none; }
+
+/* ---------------------------------------------------------------- search */
+
+.search-tagline { margin: 0 0 12px; color: var(--muted); font-size: 14.5px; max-width: 58ch; }
+.search-tip {
+  margin: 0 0 16px;
+  padding: 0 0 0 16px;
+  border: 0;
+  border-left: 1px dashed var(--line);
+  border-radius: 0;
+  background: none;
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+.search-status { margin: 0 0 10px; font-family: var(--mono); font-size: 12px; color: var(--muted); }
+/* A result is a card: when, what it is called, the words that matched. */
+.search-result { display: block; padding: 16px 0; border-bottom: 1px dashed var(--line); }
+.search-result > .meta { margin: 0 0 2px; }
+.search-result h2 { margin: 0 0 6px; font-family: var(--mono); font-size: 18.5px; font-weight: 700; line-height: 1.35; letter-spacing: -0.02em; }
+.search-result h2 a { text-decoration: none; }
+.search-result h2 a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.search-result p { margin: 0; max-width: 65ch; }
+.search-result p:not(.meta) { opacity: 0.85; }
+/* What was asked for is shown where it was found, in inverse video. */
+.search-result mark { background: var(--ink); color: var(--on-ink); border-radius: 0; padding: 0 2px; }
+/* Once there are results the page is theirs: the two lines on how to search
+   step aside, and the count stands beside what was asked -- a number alone;
+   the word stays for a screen reader. */
+main:has(.search-result) > .search-tagline,
+main:has(.search-result) > .search-tip { display: none; }
+main:has(.search-result) > .listing-heading--search { display: inline-block; margin-right: 10px; }
+main:has(.search-result) > #search-results { display: contents; }
+main:has(.search-result) .search-status { display: inline; margin: 0; }
+main:has(.search-result) .search-result:first-of-type { border-top: 1px dashed var(--line); }
+.search-unit { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+
+/* Nothing here: a notice, in the middle of the column. */
+.not-found-sign, main > .not-found-sign { width: 150px; margin: 24px auto 20px; stroke-width: 2; color: var(--muted); }
+main:has(> .not-found-sign) > .listing-heading { text-align: center; margin-top: 24px; }
+main:has(> .not-found-sign) > .search-tagline { margin: 0 auto 32px; text-align: center; max-width: 52ch; font-size: 16px; line-height: 1.55; color: var(--ink); }
+main > .not-found-search { margin: 22px auto 0; }
+main > .not-found-links { margin-top: 14px; padding-top: 0; border-top: 0; text-align: center; }
+.not-found-links .tag-pill { margin: 0 8px 4px; }
+.not-found-link[hidden] { display: none; }
+
+/* ------------------------------------------------------- a page of its own */
+
+/* A page that is not a post -- the Markdown cheat sheet -- opens with the
+   list of its sections: a run of links, not a column of bullets. Each
+   section's heading follows the reader down under the menu. What a source
+   becomes is set under it in a dashed frame. */
+.card > article > .content > ul:has(> li > a[href^="#"]) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  max-width: none;
+  margin: 16px 0 8px;
+  padding: 0;
+  list-style: none;
+}
+.card > article > .content > ul:has(> li > a[href^="#"]) > li::before { content: none; }
+.card > article > .content > ul:has(> li > a[href^="#"]) > li > a { font-family: var(--mono); font-size: 13px; text-decoration: none; color: var(--muted); }
+.card > article > .content > ul:has(> li > a[href^="#"]) > li > a:hover { color: var(--accent); }
+@media (min-width: 701px) {
+  .card > article > .content > h2[id] {
+    position: sticky;
+    top: 62px;
+    z-index: 2;
+    margin: 28px 0 18px;
+    padding: 10px 0 8px;
+    background: var(--paper);
+    border-bottom: 1px solid var(--line);
+  }
+}
+.md-example { margin: 10px 0 20px; padding: 12px 16px; border: 1px dashed var(--line); border-radius: 0; background: none; }
+.md-example > :first-child { margin-top: 0; }
+.md-example > :last-child { margin-bottom: 0; }
+
+/* ------------------------------------------------------- a narrow screen */
+
+@media (max-width: 700px) {
+  /* The two switches are too wide to stand beside the name and the claim, so
+     they are pinned to the top right, level with the name, and the claim
+     runs the full width under both. */
+  .banner-wrap:has(.banner-tools) .banner-tools { position: absolute; top: 4px; right: 0; margin-left: 0; }
+}
+@media (max-width: 430px) {
+  /* ...and with a language switch there is no room for the cursor */
+  .banner-wrap:has(.lang-switch) .banner-title::after { content: none; }
+}
+@media (max-width: 360px) {
+  .banner-wrap { gap: 10px; }
+  .banner-wrap::before,
+  .banner-wrap:has(.banner-title)::before { width: 32px; height: 32px; }
+  .banner-title { font-size: 24px; }
+  .banner-claim { font-size: 12px; }
+  .banner-wrap:has(.banner-tools) .banner-tools { top: 0; gap: 4px; }
+  .banner-wrap:has(.banner-tools) .lang-switch__item { padding: 2px 6px; }
+}
+
+/* ------------------------------------------- every control is in brackets
+
+   The small controls that are pictures or signs rather than words -- the
+   glass that starts a search, the arrow back to the top, the copy mark on a
+   block of code, the two switches in the head -- are set like every other
+   button: between square brackets, with no frame and no tile of their own. */
+.search-form button,
+.search-form button:hover,
+#scroll-top,
+#scroll-top:hover,
+.copy-code,
+.copy-code:hover,
+.copy-code:focus-visible,
+#theme-toggle,
+#theme-toggle:hover,
+.lang-switch,
+a.lang-switch:hover {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  width: auto;
+  min-width: 0;
+  height: auto;
+  padding: 4px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.search-form button::before, #scroll-top::before, .copy-code::before,
+#theme-toggle::before, .lang-switch::before { content: "["; color: var(--muted); font-family: var(--mono); font-weight: 400; }
+.search-form button::after, #scroll-top::after, .copy-code::after,
+#theme-toggle::after, .lang-switch::after { content: "]"; color: var(--muted); font-family: var(--mono); font-weight: 400; }
+.search-form button svg, #scroll-top svg, .copy-code svg { width: 14px; height: 14px; flex: none; }
+
+/* the glass stands at the end of the line one types on */
+.search-form input[type="search"] { padding-right: 46px; }
+.search-form button,
+.search-form button:hover { top: 3px; right: 0; color: var(--ink); }
+.search-form button:hover { color: var(--accent); }
+@media (max-width: 700px) {
+  .search-form button, .search-form button:hover { top: 6px; }
+}
+
+/* the arrow back to the top stands on the page's own ground, so what
+   scrolls under it does not show through its brackets */
+#scroll-top,
+#scroll-top:hover { display: none; padding: 4px 6px; background: var(--paper); color: var(--ink); opacity: 1; }
+#scroll-top.visible { display: inline-flex; }
+#scroll-top:hover { color: var(--accent); }
+
+/* the copy mark keeps its corner of the block */
+.copy-code,
+.copy-code:hover,
+.copy-code:focus-visible { padding: 2px 4px; color: var(--muted); opacity: 1; }
+.copy-code:hover, .copy-code:focus-visible { color: var(--accent); }
+.copy-code--done { color: var(--accent); }
+
+/* the two switches: the sun and the moon keep their own face inside the
+   brackets, and the language you are in is still shown in inverse video */
+#theme-toggle,
+#theme-toggle:hover { color: var(--ink); }
+#theme-toggle { font-family: var(--sans); font-weight: 600; }
+#theme-toggle:hover { color: var(--accent); }
+.lang-switch,
+a.lang-switch:hover { gap: 3px; padding: 4px 0; text-transform: lowercase; }
+.lang-switch__item { padding: 0 6px; }
+.banner-tools { gap: 12px; }
+@media (max-width: 360px) {
+  .banner-wrap:has(.banner-tools) .banner-tools { gap: 6px; }
+  .banner-wrap:has(.banner-tools) .lang-switch__item { padding: 0 4px; }
+}
+#theme-toggle { white-space: nowrap; }
+@media (max-width: 700px) {
+  /* beside the name on a phone the two switches are set closer */
+  .banner-wrap:has(.banner-tools) .banner-tools { top: 2px; gap: 8px; }
+  .lang-switch, a.lang-switch:hover, #theme-toggle, #theme-toggle:hover { gap: 3px; font-size: 12px; }
+  .lang-switch__item { padding: 0 4px; }
+}
+@media (max-width: 430px) {
+  .banner-wrap:has(.lang-switch) .banner-title { font-size: 26px; }
+}
+/* The engine lays an empty box over the switch to make it easier to hit;
+   here that box holds the closing bracket, so it goes back into the line and
+   the switch gets its room from padding instead. */
+#theme-toggle::after { position: static; inset: auto; }
+#theme-toggle, #theme-toggle:hover { padding: 6px 0; }
+
+/* Between a phone and a full desk the search line gives way before the menu
+   does: nine words in Czech did not fit beside a field of fixed width, and
+   the last of them dropped to a row of its own. */
+@media (min-width: 701px) and (max-width: 1000px) {
+  .search-form { flex: 1 1 120px; min-width: 120px; max-width: 240px; }
+  .search-form input[type="search"] { width: 100%; }
+}
+/* ...and where even that is not enough, the menu stays one row and slides
+   sideways under the search line's edge, as it does on a phone: the headings
+   that stick lower down count on a bar one row tall. */
+@media (min-width: 701px) and (max-width: 860px) {
+  nav ul { flex: 1 1 0; min-width: 0; flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; }
+  nav ul::-webkit-scrollbar { display: none; }
+  nav li { flex: none; }
+}
+
+/* By night a dark favicon sinks into a dark page, so the mark in the head is
+   given a hairline to stand in. By day it has none: a light page shows its
+   edge by itself. Written twice, as colors.css writes its own. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .banner-wrap::before { box-shadow: 0 0 0 1px var(--line); }
+}
+:root[data-theme="dark"] .banner-wrap::before { box-shadow: 0 0 0 1px var(--line); }
+
+/* The sliding menu says there is more of it: the row fades out where it runs
+   on, so a word cut by the edge reads as "goes on" and not as a mistake.
+
+   Where the browser can tie an animation to the row's own scrolling, the fade
+   follows the reader: none on the left at the start, both in the middle, none
+   on the right at the end. Where it cannot, the row fades on the right only
+   and always, and is padded by a little more than the fade so its last word
+   can be brought clear of it -- a fade on the left that never lifted would
+   dim the first word on every page. */
+@property --mt-fade-l { syntax: "<length>"; inherits: false; initial-value: 0px; }
+@property --mt-fade-r { syntax: "<length>"; inherits: false; initial-value: 40px; }
+@keyframes minimal-terminal-menu {
+  0% { --mt-fade-l: 0px; --mt-fade-r: 40px; }
+  12% { --mt-fade-l: 40px; --mt-fade-r: 40px; }
+  88% { --mt-fade-l: 40px; --mt-fade-r: 40px; }
+  100% { --mt-fade-l: 40px; --mt-fade-r: 0px; }
+}
+@media (max-width: 860px) {
+  nav ul,
+  nav.nav-open ul {
+    -webkit-mask-image: linear-gradient(90deg, transparent, #000 var(--mt-fade-l), #000 calc(100% - var(--mt-fade-r)), transparent);
+    mask-image: linear-gradient(90deg, transparent, #000 var(--mt-fade-l), #000 calc(100% - var(--mt-fade-r)), transparent);
+    padding-right: 44px;
+  }
+  @supports (animation-timeline: scroll()) {
+    nav ul,
+    nav.nav-open ul {
+      animation: minimal-terminal-menu linear both;
+      animation-timeline: scroll(self inline);
+      padding-right: 0;
+    }
+  }
+}
+@media (min-width: 701px) and (max-width: 860px) {
+  .wrap > nav { gap: 10px 20px; }
+}
+@media (max-width: 700px) {
+  @supports (animation-timeline: scroll()) {
+    /* the row runs off the screen's own edge here, and ends at the gutter */
+    nav ul,
+    nav.nav-open ul { padding-right: var(--gutter); }
+  }
+}
+
+/* A post that is a link is called by a title that is the link. It is set as
+   any other title is, and says it leads away only under the pointer -- two
+   lines of heading underlined were the heaviest thing on the page. */
+.post-body h1 a,
+.card.has-hero .post-hero__content h1 a { color: var(--ink); text-decoration: none; }
+.post-body h1 a:hover,
+.card.has-hero .post-hero__content h1 a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 5px; text-decoration-thickness: 2px; }
+
+/* A file to take away: its kind in brackets, as a control is, in place of
+   the engine's filled tile. */
+.file-icon {
+  flex: none;
+  width: auto;
+  height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: lowercase;
+  white-space: nowrap;
+}
+.file-icon::before { content: "[\00a0"; color: var(--muted); font-weight: 400; }
+.file-icon::after { content: "\00a0]"; color: var(--muted); font-weight: 400; }
+.file-card:hover .file-icon { color: var(--accent); }
+.file-label { font-family: var(--mono); font-size: 14px; font-weight: 700; }
+.file-sub { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+.file-card svg { color: var(--muted); }
+.file-card:hover svg { color: var(--accent); }
+
+/* On a phone the name shares its line with the two switches. A stylesheet
+   cannot see two things overlap, but it can make the name follow the width of
+   the screen: where there is a language switch the name is set smaller as the
+   screen narrows, so a name of up to nine characters clears the switches from
+   430px down to 320. A longer name wants the switches on a row of their own. */
+@media (max-width: 700px) {
+  .banner-wrap:has(.lang-switch) .banner-title { font-size: clamp(19px, calc(18.5vw - 41px), 30px); }
+}
+
+/* ---------------------------------------------------------------- the lead
+
+   The post that opens the front page is shown the way a terminal shows a
+   selection: the whole block in inverse video on the accent, as the fullest
+   month of the archive is and as marked text is. It is the pinned post where
+   there is one and the newest where there is none, and a comment mark above
+   it says which. Its title is set larger and its opening words may run to
+   five lines.
+
+   So the rule about fills holds as it stood -- a fill is a selection -- and
+   the lead is simply the post that is selected. Everything inside takes the
+   colour that stands on the accent, the quiet marks included: on a ground
+   this loud a second tone would only be a smudge. The front page only, and
+   nothing here asks the engine for layout.lead_card. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned),
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type {
+  margin: 16px 0 6px;
+  padding: 18px 20px 20px;
+  border: 0;
+  border-radius: var(--corner);
+  background: var(--accent);
+  color: var(--on-accent);
+}
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) *,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) *::before,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) *::after,
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type *,
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type *::before,
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type *::after {
+  color: var(--on-accent);
+  opacity: 1;
+  text-decoration-color: var(--on-accent);
+  outline-color: var(--on-accent);
+}
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) .post-header::before,
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type .post-header::before {
+  content: "# pinned";
+  display: block;
+  margin: 0 0 10px;
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--on-accent);
+}
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type .post-header::before { content: "# latest"; }
+html[lang^="cs"] body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) .post-header::before { content: "# připnuto"; }
+html[lang^="cs"] body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type .post-header::before { content: "# nejnovější"; }
+/* the word says it; the pin beside the date would say it twice */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) .pin-mark { display: none; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) .post-body > h2,
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type .post-body > h2 {
+  font-size: clamp(22px, 2.5vw, 28px);
+  line-height: 1.2;
+  margin-bottom: 8px;
+  text-wrap: balance;
+}
+body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type .content > p:first-of-type {
+  -webkit-line-clamp: 5;
+  font-size: 17px;
+  line-height: 1.6;
+}
+@media (max-width: 700px) {
+  /* Ten pixels into the gutter on each side, so the words inside keep the
+     edge the rest of the page reads from. */
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:has(.date-badge.is-pinned),
+  body.page-first main:has(> .listing-heading--home):not(:has(.date-badge.is-pinned)) > .post-list-item:first-of-type { margin: 14px -10px 4px; padding: 14px 10px 16px; }
+}

@@ -380,7 +380,7 @@ files published as one `/assets/css/site.css`: the engine's own rules
 their column, the lightbox) and the skin the site wears
 (`skins/<name>.css`, `site.skin:` in `config/site.yml` -- `classic` unless
 you say otherwise, `minimal`, or one of the Minimal family's variants,
-`minimal-literal`): layout and structure, plus the few colors that are
+`minimal-literal` or `minimal-terminal`): layout and structure, plus the few colors that are
 fixed because they work against any palette -- white on accent surfaces,
 the dark scrims behind the banner overlays, the search field's grey
 placeholder. Only the skin chosen is published. Changing `colors:` or
