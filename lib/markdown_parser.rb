@@ -205,16 +205,24 @@ module MarkdownParser
         result << code
         formatting << { 'type' => 'code', 'start' => start, 'end' => result.length }
       elsif m[:ltext]
-        # A label-less link is consumed and NOTHING is put in its place.
-        # It has no reading that helps anybody: there is no text to click,
-        # a screen reader announces a link and then falls silent, and
-        # putting the address in as the label would print a github.com URL
-        # in the middle of a heading -- and into the anchor id derived from
-        # that heading, so the article's own table of contents would point
-        # at "#https-github-com-...". Dropping it costs a link nobody could
-        # follow; keeping it costs every heading it sits in.
-        unless m[:ltext].empty?
-          inner_text, inner_formatting = parse_inline(m[:ltext])
+        # A label-less link to an ANCHOR (an address with a #fragment) is
+        # consumed and nothing is put in its place: that is what converters
+        # out of WordPress left of the anchor a heading once had, and it
+        # has no reading that helps anybody -- there is no text to click,
+        # and putting the address in as the label would print a github.com
+        # URL in the middle of a heading and into the anchor id derived from
+        # it, so the article's own table of contents would point at
+        # "#https-github-com-...".
+        #
+        # Any other label-less link is one somebody wrote by hand, wanting
+        # the address to be followed (#65). Dropped, the address was lost
+        # on the first save and the writer never knew; so it keeps the
+        # address, without its scheme, as its words: "[](https://example.com)"
+        # reads "example.com", and comes back to the editor as
+        # "[example.com](https://example.com)".
+        label = m[:ltext].empty? ? label_for_address(m[:lurl]) : m[:ltext]
+        unless label.empty?
+          inner_text, inner_formatting = m[:ltext].empty? ? [label, []] : parse_inline(label)
           result << inner_text
           entry = { 'type' => 'link', 'url' => m[:lurl], 'start' => start, 'end' => result.length }
           entry['title'] = unescape_title(m[:ltitle]) if m[:ltitle] && !m[:ltitle].empty?
@@ -226,6 +234,17 @@ module MarkdownParser
     end
     result << text[pos..]
     [result, formatting]
+  end
+
+  # The words a label-less link gets (see parse_inline): its address
+  # without the scheme and the trailing slash -- "https://example.com/"
+  # reads "example.com", "mailto:a@b.cz" reads "a@b.cz", a path from the
+  # root stays the path. Empty for an anchor, which is dropped instead.
+  def label_for_address(url)
+    return '' if url.to_s.include?('#')
+
+    label = url.to_s.sub(%r{\A[a-z][a-z0-9+.-]*:(//)?}i, '').chomp('/')
+    label.empty? ? url.to_s : label
   end
 
   # Recursively parses `chunk`, appends its text to result and wraps it

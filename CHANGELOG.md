@@ -39,6 +39,10 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **A listing's later pages light up its menu item.** A series' `/page/2/` and on, as a tag's always did.
 - **`pair` on a Mac says what a blog in Documents, on the Desktop or in iCloud Drive also needs.** Full disk access for remote users -- before the code, whenever the blog is in one; the docs add `--host 127.0.0.1` for an app on the same Mac.
 
+### Fixed
+
+- **A link with no text lost its address on the first save** (#65). `[](https://example.com)` now reads `example.com`; the empty anchor a converter leaves in a heading still goes.
+
 ### Removed
 
 - **The `/write/` page and the `SendPost` shortcut.** A phone writes in the apps; `write:` is no longer read, and `doctor` says so.
