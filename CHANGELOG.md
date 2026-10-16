@@ -20,6 +20,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 - **Minimal, a second skin.** `site.skin: minimal` -- paper, ink and one colour; the base of the Minimal family.
 - **Minimal Literal, the first variant of the family.** `site.skin: minimal-literal` -- one column in the middle, a book's serif and measure; made from minimal and a layer of its own (`skins/src/`).
+- **Minimal Pictorial.** `site.skin: minimal-pictorial` -- a wall of pictures three across where the listing stood; the picture first, the words its caption.
 - **Minimal Terminal.** `site.skin: minimal-terminal` -- a page the way a terminal would print it: two faces, square brackets, inverse video for where you are.
 - **`pair --list` says when each device was last seen.** The door notes every request; `last_seen` in `--json`.
 - **`series_index:` names the page of every series and says which way it runs.** `title`, `description`, `order: oldest`.

@@ -1,0 +1,329 @@
+/* minimal pictorial -- a skin for blog.sh, one of the minimal family.
+
+   Minimal with its listing taken down and a wall of photographs hung in its
+   place: the picture is the first thing seen, and the words are the caption
+   under it. The head, the menu, the pills and keys, the cards, the hairlines
+   and the foot are minimal's own. The faces are the engine's two, so the
+   skin is this one file; the colours are the site's (`colors:` in
+   config/site.yml), and this file sets none of them.
+
+   What is different from minimal:
+
+     - A listing is a wall, three across, not rows. A cell is a square
+       picture with its caption under it; a post with no picture is a tile
+       of words half as tall.
+     - The post that opens the front page takes a row of the wall to itself.
+     - A post's page puts its picture first, whole, and under it the text on
+       the left and what the engine knows on the right.
+     - What stood beside the posts stands under them; the wall has the width.
+
+   Worn with `site.skin: minimal-pictorial`. No template is touched. Two
+   settings suit it: layout.lead_card, and a page of nine or twelve posts.
+   Made by skins/src/build.rb from skins/minimal.css, its rules for a post
+   in a listing narrowed to the one card that stays a row, and then this
+   layer (skins/src/pictorial.css) -- change the layer, never the file made
+   from it. */
+/* ====================================================== minimal pictorial
+
+   Everything above is minimal. From here down is what makes it pictorial. */
+
+:root { --gap: 28px; --tile: 4px; --measure: 700px; --side: 280px; }
+
+/* The page is as wide as minimal's: the head, the menu and the foot stand
+   where they stand in every skin of the family. The wall gets its width
+   from the sidebar instead: what stood beside the posts stands under them,
+   three cards across. */
+.layout,
+.layout--no-aside { display: block; }
+.layout > aside { margin-top: 56px; padding-top: 30px; border-top: 1px solid var(--line); columns: 3 280px; column-gap: var(--gap); }
+.layout > aside > .card { margin: 0 0 22px; break-inside: avoid; }
+/* the pictures from elsewhere are a small wall of their own: three squares */
+#last-pixelfeds { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; padding: 10px; }
+#last-pixelfeds .last,
+#last-pixelfeds .last:first-child { position: relative; margin: 0; padding: 0; border: 0; }
+#last-pixelfeds .last-date,
+#last-pixelfeds .last-content p { display: none; }
+aside #last-pixelfeds .last:has(.pixelfed-thumb) { display: block; min-height: 0; }
+aside #last-pixelfeds .last:has(.pixelfed-thumb) .last-content { display: block; }
+aside #last-pixelfeds .last .pixelfed-thumb { display: block; float: none; width: 100%; max-width: none; height: auto; margin: 0; aspect-ratio: 1; object-fit: cover; border: 0; border-radius: var(--tile); }
+#last-pixelfeds .last > a { position: absolute; inset: 0; opacity: 0; }
+
+/* -------------------------------------------------------------- the wall
+
+   A listing is a wall: three across, two under nine hundred pixels, one on
+   a phone. A cell is a square picture, and under it what it is called (or,
+   where it is called nothing, how it begins), two lines of caption, and the
+   date in the accent -- the engine's own word, as in minimal. The engine
+   nests these in three boxes; they are taken out of the way and the parts
+   set in the order a wall wants, picture first. A post whose words are only
+   a title wears its tags, so a cell is never a picture and a date alone. */
+main:has(> .post-list-item) { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 44px var(--gap); align-items: start; }
+main:has(> .post-list-item) > :not(.post-list-item) { grid-column: 1 / -1; }
+main:has(> .post-list-item) > .listing-heading { margin-bottom: -14px; }
+
+main > .post-list-item { display: flex; flex-direction: column; min-width: 0; margin: 0; padding: 0; border: 0; }
+main > .post-list-item .post-header,
+main > .post-list-item .post-body,
+main > .post-list-item .content { display: contents; }
+main > .post-list-item .content > *,
+main > .post-list-item .read-more,
+main > .post-list-item .reading-time,
+main > .post-list-item .series-note,
+main > .post-list-item figcaption,
+main > .post-list-item .date-badge svg,
+main > .post-list-item .date-badge .pin-mark { display: none; }
+
+main > .post-list-item .content > figure:first-child,
+main > .post-list-item .content > .photo-grid:first-child { display: block; order: 1; margin: 0 0 12px; }
+main > .post-list-item .content > .photo-grid:first-child > figure:not(:first-child) { display: none; }
+main > .post-list-item .content > figure:first-child img,
+main > .post-list-item .content > figure:first-child video,
+main > .post-list-item .content > .photo-grid:first-child img { display: block; width: 100%; height: auto; max-height: none; aspect-ratio: 1; object-fit: cover; border: 0; border-radius: var(--tile); }
+main > .post-list-item .content > figure:first-child video { background: #000; }
+main > .post-list-item .content > figure:first-child iframe { display: block; width: 100%; border: 0; border-radius: var(--tile); }
+
+main > .post-list-item .post-body > h2 { order: 2; margin: 0 0 4px; font-family: var(--ui); font-size: 17px; font-weight: 600; line-height: 1.3; overflow-wrap: anywhere; }
+main > .post-list-item .post-body > h2 a { color: var(--ink); text-decoration: none; }
+main > .post-list-item .post-body > h2 a:hover { text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+main > .post-list-item .content > p:first-of-type { display: -webkit-box; order: 3; margin: 0 0 6px; overflow: hidden; color: var(--ink); font-size: 14.5px; line-height: 1.45; opacity: 0.82; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+main > .post-list-item .content > p b,
+main > .post-list-item .content > p strong,
+main > .post-list-item .content > p a { color: inherit; font-weight: 600; text-decoration: none; }
+
+main > .post-list-item .date-badge,
+main > .post-list-item .date-badge:hover { display: block; order: 4; align-self: flex-start; width: auto; min-width: 0; margin: 0; padding: 0; border: 0; background: none; color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; text-align: left; white-space: nowrap; }
+main > .post-list-item .date-badge a { display: inline; padding: 0; color: inherit; text-decoration: none; }
+main > .post-list-item .date-badge a:hover { color: var(--ink); }
+/* a plus after the date of a picture says there is more behind it */
+main > .post-list-item:has(.read-more):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge a::after { content: " +"; }
+main > .post-list-item .post-meta { display: flex; order: 5; gap: 12px; margin: 3px 0 0; color: var(--muted); font-family: var(--mono); font-size: 12px; }
+main > .post-list-item .post-meta:not(:has(.post-stat:not(.reading-time):not(.post-stat--zero))) { display: none; }
+main > .post-list-item .post-meta svg { width: 13px; height: 13px; }
+
+/* tags: one line of quiet words, and only where there is no caption to read */
+main > .post-list-item .tags { display: none; order: 6; flex-wrap: wrap; gap: 0 10px; max-height: 20px; margin: 4px 0 0; padding: 0; overflow: hidden; border: 0; }
+main > .post-list-item:not(:has(.content > p)) .tags,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .tags { display: flex; }
+main > .post-list-item .tag-pill,
+main > .post-list-item a.tag-pill:hover { padding: 0; border: 0; border-radius: 0; background: none; color: var(--muted); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.04em; line-height: 20px; text-transform: lowercase; }
+main > .post-list-item a.tag-pill:hover { color: var(--accent); }
+
+/* A post with no picture is a tile of words: a card -- minimal's plate,
+   hairline and corner -- half as tall as a photograph, with what it is
+   called, two lines of how it begins and its date, set at the foot. One
+   with no title leads with its own first words; a quotation with what was
+   said. */
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) { box-sizing: border-box; aspect-ratio: 2 / 1; justify-content: flex-end; padding: 16px 18px 14px; border: 1px solid var(--line); border-radius: var(--corner); background: var(--plate); }
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .post-body > h2 { order: 1; margin: 0 0 6px; font-size: clamp(17px, 1.5vw, 20px); line-height: 1.25; }
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { order: 2; margin: 0 0 8px; }
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(:has(.post-body > h2)) .content > p:first-of-type { font-size: 16px; opacity: 1; -webkit-line-clamp: 5; }
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > blockquote:first-child { display: -webkit-box; order: 1; margin: 0 0 8px; padding: 0 0 0 14px; overflow: hidden; border: 0; border-left: 2px solid var(--accent); background: none; font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > blockquote:first-child ~ p:first-of-type { font-size: 14px; opacity: 0.82; -webkit-line-clamp: 2; }
+
+/* The wall is laid in half rows. A picture takes two of them, a tile of
+   words one, and the grid fills what would be left empty: beside a picture
+   two tiles of words stand one above the other and share its height,
+   instead of one tile and a hole. To fill a hole the grid may take a tile
+   of words a place early, so a wall that mixes the two is not strictly in
+   order of date from left to right; a wall of pictures is.
+
+   Inside a tile of words the words begin at the top -- the title and the
+   opening, or the opening alone -- and the date stays at the foot, so the
+   tiles of a row share both edges however much each one says. */
+main:has(> .post-list-item) { grid-auto-flow: row dense; row-gap: var(--gap); }
+main > .post-list-item:has(.content > figure:first-child, .content > .photo-grid:first-child) { grid-row: span 2; padding-bottom: 16px; }
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) { align-self: stretch; aspect-ratio: auto; min-height: 150px; justify-content: flex-start; }
+main > .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .date-badge { margin-top: auto; padding-top: 10px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) { grid-row: auto; padding-bottom: 22px; }
+
+/* A link post with no title of its own opens with the address it points to.
+   In a tile the address is the engine's line -- small, in its voice, on one
+   line -- and the words that follow it are what the tile says. */
+main > .post-list-item .content > p.link-block:has(> a > strong) { display: block; order: 1; margin: 0 0 8px; overflow: hidden; color: var(--muted); font-family: var(--mono); font-size: 12px; line-height: 1.4; opacity: 1; text-overflow: ellipsis; white-space: nowrap; -webkit-line-clamp: none; }
+main > .post-list-item .content > p.link-block:has(> a > strong) :is(a, strong) { color: inherit; font-weight: 700; text-decoration: none; }
+main > .post-list-item .content > p.link-block:has(> a > strong) br { display: none; }
+/* The address is said without its protocol. A stylesheet cannot cut a word
+   out of a text, but in a monospace it can count: "https://" is eight
+   characters and "http://" seven, so the line is drawn that far to the
+   left and what runs off the edge is not shown. This holds because the
+   engine writes a bare address here only when the link has no title of its
+   own -- a link with one gives it to the post, and this line is not made. */
+main > .post-list-item .content > p.link-block:has(> a > strong) > a { display: block; overflow: hidden; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
+main > .post-list-item .content > p.link-block > a[href^="https://"]:has(> strong) { text-indent: -8ch; }
+main > .post-list-item .content > p.link-block > a[href^="http://"]:has(> strong) { text-indent: -7ch; }
+main > .post-list-item .content > p.link-block:has(> a > strong) + p { display: -webkit-box; order: 2; margin: 0 0 8px; overflow: hidden; color: var(--ink); font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
+
+/* -------------------------------------------------------------- the lead
+
+   The post that opens the front page takes a row of the wall to itself:
+   its picture two cells wide, and in the third, level with the top of the
+   picture and in minimal's order, when, what it is called, how it begins,
+   and under which words.
+   If all it has is a title and a few tags, that is what stands there, and
+   it is enough. The picture is never taller than it is wide. Under nine
+   hundred pixels the words go under the picture. Below the lead there is
+   more air than between two rows, as there is under minimal's. As in
+   minimal, the lead is told by its place -- the first post of the first
+   page of the front page -- because the engine gives its class only to a
+   post with a picture. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) { grid-column: 1 / -1; margin-bottom: 20px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > figure:first-child,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > .photo-grid:first-child { margin: 0 0 16px; container-type: inline-size; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > figure:first-child img,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > figure:first-child video,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > .photo-grid:first-child img { aspect-ratio: auto; max-height: 100cqw; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .post-body > h2 { margin: 0 0 12px; font-size: clamp(24px, 2.6vw, 34px); line-height: 1.12; letter-spacing: -0.015em; text-wrap: balance; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > p:first-of-type { margin-bottom: 14px; font-size: 16.5px; line-height: 1.6; opacity: 0.88; -webkit-line-clamp: 8; }
+/* a pinned lead says so before its date, as minimal's does */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge.is-pinned,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge.is-pinned:hover { display: flex; align-items: center; gap: 6px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge.is-pinned .pin-mark { display: inline-flex; order: -1; width: 14px; height: 14px; margin: 0; border-radius: 0; background: none; color: var(--accent); }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge.is-pinned .pin-mark svg { display: block; width: 14px; height: 14px; }
+/* Under the words, minimal's row of what the engine knows, in minimal's
+   order and voice: the way on, the reading time, what the network says,
+   the tags. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .read-more { display: block; order: 6; align-self: center; margin: 0; color: var(--ink); font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; line-height: 20px; text-transform: lowercase; text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px; white-space: nowrap; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .read-more:hover { color: var(--accent); }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .post-meta,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .post-meta:not(:has(.post-stat:not(.reading-time):not(.post-stat--zero))) { display: flex; order: 7; align-items: center; align-self: center; margin: 0; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .reading-time { display: inline-flex; align-items: center; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .tags { order: 8; align-self: center; max-height: 20px; margin: 0; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge { order: 1; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .post-body > h2 { order: 2; }
+@media (min-width: 901px) {
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) {
+    display: grid;
+    grid-template-columns: calc((100% - 2 * var(--gap)) / 3 * 2 + var(--gap) - 14px) auto auto minmax(0, 1fr);
+    grid-template-rows: auto auto auto auto 1fr;
+    column-gap: 14px;
+    align-content: start;
+  }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > figure:first-child,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > .photo-grid:first-child { grid-column: 1; grid-row: 1 / -1; margin: 0 14px 0 0; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge { grid-column: 2 / -1; grid-row: 1; margin-bottom: 8px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .post-body > h2 { grid-column: 2 / -1; grid-row: 2; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > p:first-of-type { grid-column: 2 / -1; grid-row: 3; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .read-more { grid-column: 2; grid-row: 4; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .post-meta { grid-column: 3; grid-row: 4; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .tags { grid-column: 4; grid-row: 4; }
+}
+/* The lead stands on minimal's ground for a lead -- the site's accent laid
+   thin over the paper, twelve parts in a hundred by day, ten by night --
+   picture and words together. It is the one picture on the wall with
+   something round it, as minimal's lead is the one row on a card: across
+   the family a lead is the post on the warmer paper. */
+:root,
+:root[data-theme="light"] { --lead-ground: color-mix(in srgb, var(--accent) 12%, var(--paper)); }
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --lead-ground: color-mix(in srgb, var(--accent) 10%, var(--paper)); }
+}
+:root[data-theme="dark"] { --lead-ground: color-mix(in srgb, var(--accent) 10%, var(--paper)); }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) { box-sizing: border-box; padding: 22px; border: 0; border-radius: var(--corner); background: var(--lead-ground); }
+
+/* A lead with no picture is minimal's lead, whole and unchanged: its date
+   above its title, its words in whole paragraphs, its one row of what the
+   engine knows. Nothing about it is said again here. This file only gives
+   it its place on the wall: two cells of the three, about the width it has
+   in minimal, and three half rows, so the third column beside it fills with
+   the tiles that follow. Under nine hundred pixels it takes the row. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) { grid-column: 1 / -1; align-self: stretch; margin: 0 0 8px; }
+/* Its words run from edge to edge of the card, as they do in minimal, where
+   the card is as narrow as the measure. Here the card is wider, so the
+   measure minimal sets on a listing's text is lifted for this one card. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > *,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > blockquote { max-width: none; }
+@media (min-width: 901px) {
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) { grid-column: span 2; grid-row: span 3; }
+}
+
+/* ----------------------------------------------------------------- a post
+
+   The picture first and as large as the window lets it be, whole, never
+   cut. Under it two columns: on the left what it is called and what was
+   written about it, and under that where to send it and the comments; on
+   the right what the engine knows -- when, which series, under which words.
+   So a long text has a line it can be read on, and the width is still
+   used. The engine's boxes are taken out of the way and the parts placed.
+   A picture leads its post when it stands at the head of it -- first, or
+   after a line or two of words; one from the middle of a long text stays
+   where it was written. Under nine hundred pixels there is one column.
+   (The selectors carry a :not() or two for weight only: minimal's own rules
+   for a post's head are heavy, and these have to outweigh them.) */
+main > .card:not(.has-hero):not(.x) > article { display: grid; grid-template-columns: minmax(0, var(--measure)) var(--side); column-gap: 40px; justify-content: center; align-items: start; }
+main > .card:not(.has-hero):not(.x) > article::before { content: ""; grid-column: 1 / -1; grid-row: 1; }
+main > .card:not(.has-hero):not(.x) > article > .post-header,
+main > .card:not(.has-hero):not(.x) > article > .post-header > .post-body,
+main > .card:not(.has-hero):not(.x) > article > .post-header > .post-body > .content { display: contents; }
+main > .card:not(.has-hero):not(.x) > article > .post-header > .post-body > *,
+main > .card:not(.has-hero):not(.x) > article > .post-header > .post-body > .content > * { grid-column: 1; min-width: 0; }
+main > .card:not(.has-hero):not(.x) > article .post-meta:not(:has(.post-stat:not(.reading-time):not(.post-stat--zero))) { display: none; }
+
+main > .card:not(.has-hero):not(.x) > article .content > :is(figure, .photo-grid):first-child,
+main > .card:not(.has-hero):not(.x) > article .content > p:first-child + :is(figure, .photo-grid),
+main > .card:not(.has-hero):not(.x) > article .content > p:first-child + p + :is(figure, .photo-grid) { grid-column: 1 / -1; grid-row: 1; margin: 0 0 34px; }
+main > .card:not(.has-hero):not(.x) > article .content > figure img,
+main > .card:not(.has-hero):not(.x) > article .content > figure video { display: block; width: auto; max-width: 100%; height: auto; max-height: min(86vh, 900px); margin: 0 auto; border: 0; border-radius: var(--tile); }
+main > .card:not(.has-hero):not(.x) > article .content > figure video { background: #000; }
+main > .card:not(.has-hero):not(.x) > article .content > figure figcaption { text-align: center; }
+/* a gallery is a wall of its own: every photograph whole, in rows -- three
+   across for five or more, two for fewer, kept narrower so that two tall
+   pictures still fit a window */
+main > .card:not(.has-hero):not(.x) > article .content > .photo-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; align-items: center; justify-self: center; width: min(100%, 940px); }
+main > .card:not(.has-hero):not(.x) > article .content > .photo-grid:has(> figure:nth-child(5)) { grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; }
+main > .card:not(.has-hero):not(.x) > article .content > .photo-grid > figure,
+main > .card:not(.has-hero):not(.x) > article .content > .photo-grid > figure.span-2 { display: block; grid-column: auto; margin: 0; }
+main > .card:not(.has-hero):not(.x) > article .content > .photo-grid img { display: block; width: 100%; height: auto; max-height: none; aspect-ratio: auto; object-fit: contain; border: 0; border-radius: var(--tile); }
+
+/* the right-hand column: the date beside the title, then the rest under it */
+main > .card:not(.has-hero):not(.x) > article > .post-header > .date-badge,
+main > .card:not(.has-hero):not(.x) > article > .post-header > .date-badge:hover { position: static; grid-column: 2; grid-row: 2; width: auto; margin: 0; padding: 8px 0 0; text-align: left; }
+main > .card:not(.has-hero):not(.x) > article > .post-header > .post-body > .series-note { position: static; grid-column: 2; grid-row: 2; margin: 38px 0 0; }
+main > .card:not(.has-hero):not(.x) > article .post-body > .tags { grid-column: 2; grid-row: 3 / span 200; align-self: start; margin: 12px 0 0; padding: 14px 0 0; border-top: 1px solid var(--line); }
+main > .card:not(.has-hero):not(.x) > article > .post-header { padding: 0; }
+main > .card:not(.has-hero):not(.x) > article .post-body > h1 { margin-top: 0; }
+main > .card:not(.has-hero):not(.x) > article .content > p,
+main > .card:not(.has-hero):not(.x) > article .content > :is(ul, ol) { font-size: 17px; line-height: 1.7; }
+main > .card:not(.has-hero):not(.x) > article .content > * { max-width: none; }
+main > .card:not(.has-hero):not(.x) > article .toc { float: none; width: auto; max-width: none; margin: 0 0 22px; }
+.pagination.back { justify-content: center; }
+
+/* -------------------------------------------------------- narrower screens */
+@media (max-width: 900px) {
+  main:has(> .post-list-item) { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  main > .card:not(.has-hero):not(.x) > article { grid-template-columns: minmax(0, 1fr); }
+  main > .card:not(.has-hero):not(.x) > article > .post-header > .date-badge,
+  main > .card:not(.has-hero):not(.x) > article > .post-header > .date-badge:hover,
+  main > .card:not(.has-hero):not(.x) > article > .post-header > .post-body > .series-note,
+  main > .card:not(.has-hero):not(.x) > article .post-body > .tags { grid-column: 1; grid-row: auto; }
+  main > .card:not(.has-hero):not(.x) > article > .post-header > .post-body > .series-note { margin: 0 0 8px; }
+  main > .card:not(.has-hero):not(.x) > article > .post-header > .date-badge { grid-row: 2; padding: 0 0 6px; }
+}
+@media (max-width: 560px) {
+  main:has(> .post-list-item) { grid-template-columns: minmax(0, 1fr); gap: 36px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) { margin-left: -10px; margin-right: -10px; padding: 10px 10px 14px; }
+  main > .card:not(.has-hero):not(.x) > article .content > .photo-grid,
+  main > .card:not(.has-hero):not(.x) > article .content > .photo-grid:has(> figure:nth-child(5)) { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+  .layout > aside { columns: 1; }
+}
+
+/* Minimal takes the hairline off the row that follows its lead, because
+   there the air under the lead is the edge. Here what follows a lead is a
+   tile, and a tile of words is a card with all four of its edges. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type) + .post-list-item:not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) { border-top: 1px solid var(--line); }
+
+/* Under nine hundred pixels a lead with a picture has no third cell to put
+   its words in, so they go under the picture, in the order they have beside
+   it: when, what it is called, how it begins, and then minimal's one line of
+   what the engine knows -- on one line, from the left, wrapping if it must. */
+@media (max-width: 900px) {
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) { flex-flow: row wrap; align-items: center; column-gap: 14px; row-gap: 0; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > figure:first-child,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > .photo-grid:first-child { order: 0; flex: 0 0 100%; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .post-body > h2,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .content > p:first-of-type { flex: 0 0 100%; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):has(.content > figure:first-child, .content > .photo-grid:first-child) .date-badge { margin-bottom: 6px; }
+}

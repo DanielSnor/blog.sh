@@ -27,13 +27,21 @@
 # declaration can never win -- the way minimal's own part one was made.
 # And its layer spells two long lists of counts as @C99@ and @C9@, which
 # are written out here so the source stays readable.
+#
+# Pictorial hangs a wall of pictures where minimal's listing stood, and
+# keeps one card of it a row: the lead of the front page when it has no
+# picture. So minimal's own rules for a post in a listing (part two of
+# minimal.css; part one is classic's, which every tile still stands on)
+# are narrowed to that card, inside :where() so each weighs what it
+# weighed, and the layer's rules for a tile are kept off it.
 
 ROOT = File.expand_path('../..', __dir__)
 SKINS = File.join(ROOT, 'skins')
 
 VARIANTS = {
   'minimal-literal' => { base: 'minimal', layer: 'literal.css' },
-  'minimal-terminal' => { base: 'classic', layer: 'terminal.css', reduce: true, counts: true }
+  'minimal-terminal' => { base: 'classic', layer: 'terminal.css', reduce: true, counts: true },
+  'minimal-pictorial' => { base: 'minimal', layer: 'pictorial.css', rowcard: true }
 }.freeze
 
 def read(path)
@@ -134,12 +142,97 @@ def reduce(base, layer)
   unmask(text, saved).gsub(/\n{3,}/, "\n\n")
 end
 
+# The one card of a listing that stays a row in pictorial.
+ROWCARD = 'body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type)' \
+          ':not(:has(.content > figure:first-child, .content > .photo-grid:first-child))'
+
+# A stylesheet as its top-level pieces: [[kind, text]], kind :comment,
+# :rule, :at or :ws.
+def split_top(css)
+  out = []
+  i = 0
+  n = css.size
+  while i < n
+    if css[i, 2] == '/*'
+      j = css.index('*/', i) + 2
+      out << [:comment, css[i...j]]
+    elsif css[i] =~ /\s/
+      j = i
+      j += 1 while j < n && css[j] =~ /\s/
+      out << [:ws, css[i...j]]
+    else
+      j = i
+      depth = 0
+      kind = css[i] == '@' ? :at : :rule
+      while j < n
+        if css[j, 2] == '/*'
+          j = css.index('*/', j) + 2
+          next
+        end
+        c = css[j]
+        if c == '{'
+          depth += 1
+        elsif c == '}'
+          depth -= 1
+          if depth.zero?
+            j += 1
+            break
+          end
+        elsif c == ';' && depth.zero?
+          j += 1
+          break
+        end
+        j += 1
+      end
+      out << [kind, css[i...j]]
+    end
+    i = j
+  end
+  out
+end
+
+def listing_selector?(sel)
+  sel.include?('.post-list-item') && !sel.include?('search-result')
+end
+
+def to_rowcard(sel)
+  sel.sub(/\.post-list-item(?![\w-])/) { ".post-list-item:where(#{ROWCARD})" }
+end
+
+# Every selector of a rule that speaks of a post in a listing, narrowed to
+# the row card; @media and the like are gone into.
+def narrow(css)
+  split_top(css).map do |kind, text|
+    case kind
+    when :rule
+      sel, body = text.split('{', 2)
+      kept = sel.gsub(COMMENT, '').split(/,(?![^(]*\))/).map(&:strip).map { |x| listing_selector?(x) ? to_rowcard(x) : x }
+      kept.empty? ? '' : "#{kept.join(",\n")} {#{body}"
+    when :at
+      if text =~ /\A@(media|supports|container)\b/
+        pre, rest = text.split('{', 2)
+        inner = narrow(rest[0...rest.rindex('}')])
+        inner.strip.empty? ? '' : "#{pre}{#{inner}}"
+      else
+        text
+      end
+    else
+      text
+    end
+  end.join.gsub(/\n{3,}/, "\n\n")
+end
+
 def make(name, recipe)
   _, base = head_and_rest(read(File.join(SKINS, "#{recipe[:base]}.css")), "#{recipe[:base]}.css")
   head, layer = head_and_rest(read(File.join(__dir__, recipe[:layer])), recipe[:layer])
   layer = layer.gsub('@C99@') { counts(99) }.gsub('@C9@') { counts(9) } if recipe[:counts]
   abort "#{name}: a count list left unwritten" if recipe[:counts] && layer.include?('@C')
   base = reduce(base, layer) if recipe[:reduce]
+  if recipe[:rowcard]
+    two = base.index('/* ---- part two') or abort "#{name}: the base has no part two to narrow"
+    base = base[0...two] + narrow(base[two..])
+    layer = layer.gsub(/main > \.post-list-item(?![\w-])/) { "main > .post-list-item:not(:where(#{ROWCARD}))" }
+  end
   abort "#{name}: the base carries font files; a skin uses the faces the engine ships" if base.include?('@font-face')
   out = "#{head}\n\n#{base.strip}\n\n#{layer.strip}\n"
   abort "#{name}: braces do not balance" unless out.count('{') == out.count('}')
