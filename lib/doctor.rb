@@ -838,10 +838,23 @@ module Doctor
     tags = Checker.stream_tags(posts)
 
     findings = []
-    entries.each do |entry|
+    entries.each_with_index do |entry, at|
       next unless entry.is_a?(Hash)
 
       label = entry['label'].to_s.strip
+      # A group is a label over the items after it, and leads nowhere: an
+      # address written on one is never followed, and a group with no item
+      # under it is left out of the menu altogether. Neither stops a build,
+      # and either way the menu is not the one its author wrote.
+      if SiteConfig::Chrome.nav_group?(entry)
+        target = %w[tag series url].map { |key| entry[key].to_s.strip }.find { |value| !value.empty? }
+        findings << error(t('nav_group_address', label: label, target: target), t('nav_group_address_fix')) if target
+        held = entries[(at + 1)..].take_while { |e| !SiteConfig::Chrome.nav_group?(e) }
+        if !label.empty? && held.none? { |e| SiteConfig::Chrome.nav_item?(e) }
+          findings << warn(t('nav_group_empty', label: label), t('nav_group_empty_fix'))
+        end
+        next
+      end
       slug = entry['tag'].to_s.strip
       if !slug.empty?
         # Compared through Slug.slugify, because that is what the build
@@ -918,7 +931,8 @@ module Doctor
 
       findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
     end
-    findings << ok(t('nav_ok', count: entries.size)) if findings.empty? && !posts.empty?
+    items = entries.count { |e| SiteConfig::Chrome.nav_item?(e) && !SiteConfig::Chrome.nav_group?(e) }
+    findings << ok(t('nav_ok', count: items)) if findings.empty? && !posts.empty?
     findings
   end
 

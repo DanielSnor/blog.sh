@@ -312,10 +312,16 @@ colors:
 # `./style.sh` writes this for you and offers the tags and pages you
 # actually have; `./blog.sh doctor` says so when an entry stops pointing
 # at anything, which is what happens to a menu written a year ago.
+#
+# An entry with `group: true` and a label is a heading over the entries
+# after it, up to the next group -- a manual's "Basics" over its first
+# chapters. It leads nowhere, and one with nothing under it is left out.
 # nav:
 #   - { label: "Home", url: "/" }
 #   - { label: "Photography", tag: "photography" }
 #   - { label: "Syntax", url: "/markdown/" }
+#   - { label: "Basics", group: true }
+#   - { label: "Getting started", series: "Getting started" }
 # --- end of nav ---
 
 # The page that lists every series, /series/: what it is called, what a

@@ -1895,6 +1895,20 @@ nav li {
 .wrap > nav a:focus-visible,
 .wrap > nav a[aria-current="page"]:focus-visible { outline-color: var(--accent); outline-offset: 2px; }
 
+/* A group of the menu: its label in the voice the engine speaks in -- the
+   small monospace -- standing before its pills, which keep together. */
+nav .nav-group { display: flex; align-items: center; gap: 6px; }
+nav .nav-group > ul { flex-wrap: nowrap; }
+.nav-group__label {
+  margin-left: 10px;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  white-space: nowrap;
+}
+nav li:first-child > .nav-group__label { margin-left: 0; }
+
 .nav-toggle { display: none; }
 
 .search-form input[type="search"] {
@@ -3015,6 +3029,12 @@ footer > div:nth-child(2) > .copyright { text-align: center; }
   }
   nav ul::-webkit-scrollbar { display: none; }
   nav li { flex: none; }
+}
+/* The row that slides holds the groups too; the list inside a group is
+   no second row of its own, only its pills in this one. */
+@media (max-width: 700px) {
+  nav .nav-group > ul,
+  nav.nav-open .nav-group > ul { flex: none; margin: 0; padding: 0; overflow: visible; }
 }
 
 /* The cursor after the site's name blinks the way a terminal's does: on,

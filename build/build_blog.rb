@@ -3221,7 +3221,21 @@ def nav_entry_href(entry)
   nav_url(entry['url'].to_s.strip)
 end
 
-def configured_nav_items
+# The menu as the bar draws it: items, and groups of items under a label
+# of their own -- a manual's "Basics" over its first chapters. A group is
+# an entry with `group: true` and a label, and it holds the items after
+# it up to the next group; the list stays flat in config/site.yml, so
+# ./style.sh and a language's own list of labels read it as they always
+# have. A group leads nowhere (an address written on one is doctor's to
+# name, and the build does not follow it), a group with nothing in it is
+# left out, and a group with no label ends the one before it: what it
+# holds stands in the menu ungrouped rather than under somebody else's
+# heading. [:item, href, label] or [:group, label, [items]].
+def nav_group?(entry)
+  SiteConfig::Chrome.nav_group?(entry)
+end
+
+def configured_nav_tree
   return nil unless SiteConfig.key?('nav')
 
   entries = SiteConfig.get('nav', default: nil)
@@ -3229,15 +3243,23 @@ def configured_nav_items
   # key at its word rather than quietly restoring a menu nobody asked for.
   return [] unless entries.is_a?(Array)
 
-  entries.filter_map do |entry|
+  tree = []
+  group = nil
+  entries.each do |entry|
     next unless entry.is_a?(Hash)
 
     label = entry['label'].to_s.strip
+    if nav_group?(entry)
+      group = label.empty? ? nil : [:group, label, []]
+      tree << group if group
+      next
+    end
     href = nav_entry_href(entry)
     next if label.empty? || href.empty?
 
-    [href, label]
+    (group ? group[2] : tree) << [:item, href, label]
   end
+  tree.reject { |kind, _, items| kind == :group && items.empty? }
 end
 
 # The archive by the address each piece has in the language the site is
@@ -3248,13 +3270,18 @@ end
 # under a token, and a menu item pointing into a token is not a menu item.
 NAV_POSTS_BY_ADDRESS = (pages + posts + unlisted_posts)
                        .to_h { |p| [Languages.address_of(p, SITE_OWN_LANG), p] }.freeze
-NAV_ITEMS = (configured_nav_items || ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
+NAV_TREE = (configured_nav_tree ||
+            ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS).map { |href, label| [:item, href, label] }).freeze
+# Every item, whatever group it stands in, as [href, label]: what the
+# current item, a tag's feed and the cache are worked out from.
+NAV_ITEMS = NAV_TREE.flat_map { |kind, *rest| kind == :group ? rest[1] : [[kind, *rest]] }
+                    .map { |_, href, label| [href, label] }.freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
 # The items written as `series:`, by their href: the part of a series lights
 # its item up too, which an item written as a `url:` to the same listing
 # does not (docs/decisions.md, "The bar is a filter").
-NAV_SERIES_HREFS = (configured_nav_items ? Array(SiteConfig.get('nav', default: nil)) : []).filter_map { |entry|
-  next unless entry.is_a?(Hash) && entry['tag'].to_s.strip.empty? && !entry['series'].to_s.strip.empty?
+NAV_SERIES_HREFS = (configured_nav_tree ? Array(SiteConfig.get('nav', default: nil)) : []).filter_map { |entry|
+  next unless entry.is_a?(Hash) && !nav_group?(entry) && entry['tag'].to_s.strip.empty? && !entry['series'].to_s.strip.empty?
 
   nav_entry_href(entry)
 }.freeze
@@ -3328,7 +3355,7 @@ TIMEZONE_FACT = timezone_fact
 # says in its head and in its switcher whether that language has the same
 # listing, and the post that decides it need not be one this listing
 # shows.
-BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
+BuildCache.seal!(NAV_TREE, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
                  SITE_BASE_URL, TIMEZONE_FACT,
                  TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG },

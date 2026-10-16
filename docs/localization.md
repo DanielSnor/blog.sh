@@ -294,7 +294,9 @@ footer links are written out in full, the way site.yml has them, but
 every item goes where the same item goes in site.yml, in the same order;
 only the label changes. An item left without a label of its own -- or a
 footer link without a title -- is shown under the word the site's own
-list has for it, and `check` says which one. A menu that drifts apart between languages is a
+list has for it, and `check` says which one. A group of the menu
+(`group: true`) is worded like an item and stands where the site's own
+list has it. A menu that drifts apart between languages is a
 second site, and a reader who switches language would lose the item they
 were reaching for. The address is still the one the site's own language
 writes -- `/posts/2026/blog-sh/` above -- and the Czech build takes it to

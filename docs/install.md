@@ -422,6 +422,28 @@ The item of the page you are on is marked `aria-current="page"`. A
 listing -- which is what a manual's menu of chapters is for; a `tag` or a
 `url` item is not, since a post is not its tag's listing.
 
+A menu that has grown chapters can sort them. An entry with `group: true`
+and a `label` -- and nothing to lead to -- is a heading over the items
+after it, up to the next group, the way a manual stands "Basics" over its
+first chapters:
+
+```yaml
+nav:
+  - { label: "Start here", url: "/start-here/" }
+  - { label: "Basics", group: true }
+  - { label: "Installing", series: "Installing" }
+  - { label: "Writing", series: "Writing" }
+  - { label: "Running a site", group: true }
+  - { label: "Deploying", series: "Deploying" }
+```
+
+The list stays flat, so `./style.sh` writes a group as it writes an item
+and a language's own file words it the same way. The bar draws each group
+as a list of its own under its label: classic and minimal keep its items
+in the row and set the label before them as a quiet caption, the phone's
+menu as a heading over them. A group with nothing under it is left out,
+and an address written on a group is never followed; `doctor` names both.
+
 An entry missing either half is skipped rather than rendered as an empty
 link. An empty list is a decision rather than a mistake: the entries and
 the button that opens them are gone, which is also how a site turns the

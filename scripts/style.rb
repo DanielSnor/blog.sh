@@ -907,6 +907,8 @@ def section_nav
 end
 
 def nav_summary(entry)
+  return "#{entry['label']} [#{t('nav_group_mark')}]" if SiteConfig::Chrome.nav_group?(entry)
+
   target = if !entry['tag'].to_s.empty? then "/tag/#{entry['tag']}/"
            elsif !entry['series'].to_s.empty? then "/series/#{Slug.slugify(entry['series'].to_s)}/"
            else entry['url'].to_s
@@ -921,9 +923,13 @@ def ask_nav_entry
   kinds = [['home', t('nav_kind_home')], ['tag', t('nav_kind_tag')]]
   kinds << ['page', t('nav_kind_page')] if nav_pages.any?
   kinds << ['url', t('nav_kind_url')]
+  # Last, because it is the one kind that leads nowhere: a heading over the
+  # items added after it, up to the next group.
+  kinds << ['group', t('nav_kind_group')]
 
   case Wizard.choose(t('q_nav_kind'), kinds, current_index: 0)
   when 'home' then { 'label' => label.strip, 'url' => '/' }
+  when 'group' then { 'label' => label.strip, 'group' => true }
   when 'tag' then ask_nav_tag(label.strip)
   when 'page'
     path = Wizard.choose(t('q_nav_page'), nav_pages.map { |p| [p, p] }, current_index: 0)

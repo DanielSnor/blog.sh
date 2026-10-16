@@ -60,9 +60,12 @@ module LanguageFile
   # the same order with other words: a menu that drifts apart between the
   # languages is a second site, and the reader who switches language would
   # lose the item they were about to click.
+  # A group of the menu is no place, but it stands at one in the list: a
+  # translation keeps its groups where the site's own list has them.
   PLACED_LISTS = {
     %w[nav] => lambda { |entry|
-      if !entry['tag'].to_s.strip.empty? then "tag:#{entry['tag'].to_s.strip}"
+      if entry['group'] == true then 'group'
+      elsif !entry['tag'].to_s.strip.empty? then "tag:#{entry['tag'].to_s.strip}"
       elsif !entry['series'].to_s.strip.empty? then "series:#{entry['series'].to_s.strip}"
       else entry['url'].to_s.strip
       end

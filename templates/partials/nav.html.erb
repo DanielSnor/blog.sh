@@ -1,8 +1,11 @@
 <% if NAV_ITEMS.any? || search %><nav aria-label="<%= h(t('ui.site_nav_label')) %>">
-<%# The items come from NAV_ITEMS in build_blog.rb -- either the site's own
+<%# The items come from NAV_TREE in build_blog.rb -- either the site's own
     `nav:` list or, with no such key, All plus the content types the site
     has. Rendering them through one loop means the default menu comes out
-    byte for byte as it did when it was hardcoded here.
+    byte for byte as it did when it was hardcoded here. A group is a list
+    of its own inside its item, under its label: a reader of the page
+    hears "Basics, list, three items", and a menu without groups is the
+    same bytes it was before groups existed.
     An empty list takes the items and the toggle with it, which is how a
     site turns the menu off. What is left is a bar carrying nothing but
     the search field -- and since layout.html.erb passes search: true on
@@ -19,8 +22,13 @@
         <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
       <ul>
-<% NAV_ITEMS.each do |href, label| %>        <li><a href="<%= h(href) %>"<%= nav_current(href, active, part_of) %>><%= h(label) %></a></li>
-<% end %>      </ul>
+<% NAV_TREE.each do |kind, *node| %><% if kind == :group %>        <li class="nav-group"><span class="nav-group__label"><%= h(node[0]) %></span>
+          <ul>
+<% node[1].each do |_, href, label| %>            <li><a href="<%= h(href) %>"<%= nav_current(href, active, part_of) %>><%= h(label) %></a></li>
+<% end %>          </ul>
+        </li>
+<% else %>        <li><a href="<%= h(node[0]) %>"<%= nav_current(node[0], active, part_of) %>><%= h(node[1]) %></a></li>
+<% end %><% end %>      </ul>
 <% end %><% if search %>
       <form class="search-form" action="<%= loc('/search/') %>" method="get" role="search">
         <input type="search" name="q" id="search-q" placeholder="<%= h(t('nav.search_placeholder')) %>" autocomplete="off">

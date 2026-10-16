@@ -177,6 +177,16 @@ contents' rule; a skin that wants it beside the text moves it there:
 @media (max-width: 700px) { .series-contents { float: none; width: auto; margin: 0 0 1rem; } }
 ```
 
+A menu written with groups (`group: true` in `nav:`) draws each of them
+as `<li class="nav-group">`: its label in `.nav-group__label`, which is no
+link, and its items in a `<ul>` of their own after it. Classic and
+minimal keep the items in the row they always stood in, with the label a
+quiet caption before them, and on a phone a heading over them; a skin
+that wants the groups as columns, or as the sections of a menu down the
+side, has the structure to do it. Every rule written for `nav ul` or
+`nav li` reaches the inner list too -- undo what should not on
+`.nav-group > ul`, as both skins do for the row a phone slides sideways.
+
 The date badge of a card carries the hour the post went out, as
 `<time class="date-time" datetime="…" hidden>` after the date -- hidden,
 so a skin that wants it shows it and every other skin is unchanged. It is

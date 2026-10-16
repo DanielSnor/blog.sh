@@ -79,7 +79,12 @@ deliberately doesn't highlight its own type, since the menu filters
 listings and a video post is not the video listing. (One exception, since
 1.11: a menu item written as `series:` is marked `aria-current="true"`
 on every part of its series -- a manual's menu is a list of chapters, and
-the reader of a chapter is in it.) The banner still
+the reader of a chapter is in it. A group of chapters, also 1.11, is an
+entry of its own, `group: true`, rather than a list nested in the
+config: `./style.sh` edits the menu entry by entry and a language's own
+file words it item by item, and a nesting would have broken both. The
+page nests it -- a list in its item -- because that is what a reader of
+the page needs to hear.) The banner still
 links home, as it always did. *Cost:* the label lives on every page, so
 changing it rewrites the whole archive -- which is why the rename
 happened before 1.0 rather than after, along with its locale key
