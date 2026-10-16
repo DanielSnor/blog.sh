@@ -34,6 +34,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 
 ### Changed
 
+- **A draft on a site in more than one language can be translated where it was written** (#66). The question after the editor offers `[t] translate: Deutsch` -- or asks which, where there are several -- and comes back once the words are saved.
 - **The published stylesheet leaves its comments behind.** 92 kB became 39, 29 kB over the wire became 8.
 - **The stylesheet is the engine's rules and a skin.** `site.css` + `skins/classic.css`, `site.skin:`; a site that says nothing looks as it did.
 - **A listing's later pages light up its menu item.** A series' `/page/2/` and on, as a tag's always did.

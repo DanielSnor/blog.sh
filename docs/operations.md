@@ -31,7 +31,11 @@ built around drafts:
    for one instead), moves the post to its real URL and -- with a comments
    network configured (Mastodon or Bluesky, see
    [install.md](install.md#8-comments-network-optional-mastodon-or-bluesky)) --
-   sends the announcement post that replies-as-comments hang off.
+   sends the announcement post that replies-as-comments hang off. On a
+   site in more than one language (`site.locales`) it also offers
+   **translate**: the language's editor opens as `translate` opens it,
+   and once the words are saved, with their preview address, the
+   question comes back -- the post still a draft.
 3. **`edit <slug>`** round-trips the stored post back to Markdown in
    your editor. A save that would drop content markdown can't express
    (an imported embed, a link card) warns and asks before proceeding.

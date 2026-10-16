@@ -1923,7 +1923,13 @@ def draft_decision_loop(slug, path: nil, announce: true)
     end
     puts
     slot = next_publish_slot(slug)
-    prompt = slot ? t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format'))) : t('cli.what_next_prompt')
+    langs = other_languages
+    offer = translate_offer(langs)
+    prompt = if slot
+               t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format')), translate: offer)
+             else
+               t('cli.what_next_prompt', translate: offer)
+             end
     case Tui.key_choice(prompt)
     # Every action gets the path the dialog is SHOWING. Re-resolving by
     # slug here meant the screen could describe one post while the
@@ -1952,7 +1958,18 @@ def draft_decision_loop(slug, path: nil, announce: true)
 
       rebuild_and_deploy(t('cli.updating_preview'))
       return
-    else puts t('cli.unknown_choice_pde')
+    # #66: a site in more than one language offers the translation where
+    # the draft was just written, rather than leaving the author to find
+    # `./blog.sh translate` afterwards. Back here once it is saved, with
+    # the draft still a draft and the question asked again.
+    when 't'
+      if langs.empty?
+        puts t('cli.unknown_choice_pde')
+      elsif (lang = langs.size == 1 ? langs.first : pick_translation_language(langs))
+        puts
+        cmd_translate(slug, lang, path: path)
+      end
+    else puts langs.empty? ? t('cli.unknown_choice_pde') : t('cli.unknown_choice_pdet')
     end
   end
 end
@@ -5108,6 +5125,25 @@ def other_languages
   (named.reject(&:empty?) - [own]).uniq
 end
 
+# The [t] of the draft dialog (#66): naming the language where there is
+# one to translate into, asking which where there are several, and
+# nothing at all on a site in one language, whose dialog stays as it was.
+def translate_offer(langs)
+  return '' if langs.empty?
+  return t('cli.what_next_translate_one', lang: language_name(langs.first)) if langs.size == 1
+
+  t('cli.what_next_translate')
+end
+
+# Which language [t] translates into, on a site with several: a key per
+# language, in the order the site names them. Anything else is back.
+def pick_translation_language(langs)
+  choices = langs.each_with_index.map { |code, i| "[#{i + 1}] #{language_name(code)}" }.join('  ')
+  key = Tui.key_choice(t('cli.translate_which', choices: choices))
+  index = key.to_s =~ /\A[1-9]\z/ ? key.to_i - 1 : nil
+  index && langs[index]
+end
+
 # A language's name in its own language, which is the only name somebody
 # looking for it recognises -- and the code itself when the engine has no
 # file for it, rather than a blank where a name should be.
@@ -5324,8 +5360,10 @@ def translation_from_file(file, raw, meta, path, original_raw, post, json:, conf
   end
 end
 
-def cmd_translate(slug, lang)
-  path = find_post_path(slug)
+# `path:` is the draft dialog's (#66): the post it is showing, which a
+# second post sharing the slug in another year must not stand in for.
+def cmd_translate(slug, lang, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   translate_language!(lang)
