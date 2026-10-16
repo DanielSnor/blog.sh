@@ -181,3 +181,7 @@ img, video { max-width: 100%; height: auto; }
 .share__change[hidden] { display: none; }
 .share__ask-error[hidden] { display: none; }
 .tag-index-jump[hidden] { display: none; }
+/* The "On this day" card arrives hidden and the script shows it only when
+   the day has rows (#62): a reader whose script has not run yet, or whose
+   day holds nothing, never sees a heading over an empty box. */
+.card[hidden] { display: none; }
