@@ -252,19 +252,19 @@ A last line opening with an em dash (or `--`) becomes the attribution:
 A dialogue goes into a `chat` fence, one line per statement — the speaker's
 name before the colon. A line without a colon continues the previous one.
 
-```
+````
+```chat
 Watson: What does it mean?
 Holmes: Elementary.
 ```
-
-Written as:
+````
 
 ::: example
 
-    ```chat
-    Watson: What does it mean?
-    Holmes: Elementary.
-    ```
+```chat
+Watson: What does it mean?
+Holmes: Elementary.
+```
 
 ::: end
 

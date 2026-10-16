@@ -44,6 +44,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **A link with no text lost its address on the first save** (#65). `[](https://example.com)` now reads `example.com`; the empty anchor a converter leaves in a heading still goes.
 - **`on-this-day --date` said "today" about any day** (#61). Its legend and its empty day name the day asked about.
 - **The "On this day" card showed its heading over nothing** (#62) while its file loaded, and for good without the script. It is built hidden and shown only for a day with rows.
+- **The cheat sheet showed the chat as code** (#63). It shows what to type, the `chat` fence and all, and then the dialogue it becomes.
 
 ### Removed
 

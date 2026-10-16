@@ -253,19 +253,19 @@ zur Quellenangabe:
 Ein Dialog kommt in einen `chat`-Zaun, eine Zeile je Aussage — der Sprecher
 vor dem Doppelpunkt. Eine Zeile ohne Doppelpunkt setzt die vorige fort.
 
-```
+````
+```chat
 Watson: Was bedeutet das?
 Holmes: Elementar.
 ```
-
-Geschrieben als:
+````
 
 ::: example
 
-    ```chat
-    Watson: Was bedeutet das?
-    Holmes: Elementar.
-    ```
+```chat
+Watson: Was bedeutet das?
+Holmes: Elementar.
+```
 
 ::: end
 
