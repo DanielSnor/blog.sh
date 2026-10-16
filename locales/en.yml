@@ -1705,10 +1705,10 @@ on_this_day:
   no_posts: "There is nothing in the archive yet."
   heading: "On this day: %{date}"
   summary: "%{posts} post(s) from %{years} earlier year(s)"
-  nothing: "Nothing from earlier years on this day -- the widget hides itself today."
+  nothing: "Nothing from earlier years on this day -- the widget hides itself on %{date}."
   windows: "What the widget shows (%{count} window(s)):"
   all_heading: "Everything from this day"
-  legend: "● on the widget today"
+  legend: "● in the widget on %{date}"
   widget_off: "The on_this_day widget is not switched on -- write it under widgets: in config/site.yml, or switch it on in ./style.sh."
 
 export:

@@ -1674,10 +1674,10 @@ on_this_day:
   no_posts: "V archivu zatím nic není."
   heading: "V tento den: %{date}"
   summary: "příspěvků: %{posts}, z dřívějších let: %{years}"
-  nothing: "Z dřívějších let na tento den nic není — widget se dnes schová."
+  nothing: "Z dřívějších let na tento den nic není — widget se %{date} schová."
   windows: "Co ukáže widget (oken: %{count}):"
   all_heading: "Všechno z tohoto dne"
-  legend: "● dnes ve widgetu"
+  legend: "● ve widgetu %{date}"
   widget_off: "Widget on_this_day není zapnutý — zapiš ho pod widgets: v config/site.yml, nebo ho zapni v ./style.sh."
 
 export:

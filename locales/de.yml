@@ -1689,10 +1689,10 @@ on_this_day:
   no_posts: "Im Archiv ist noch nichts."
   heading: "An diesem Tag: %{date}"
   summary: "%{posts} Beitrag/Beiträge aus %{years} früheren Jahr(en)"
-  nothing: "Aus früheren Jahren gibt es an diesem Tag nichts -- das Widget blendet sich heute aus."
+  nothing: "Aus früheren Jahren gibt es an diesem Tag nichts -- das Widget blendet sich am %{date} aus."
   windows: "Was das Widget zeigt (%{count} Fenster):"
   all_heading: "Alles von diesem Tag"
-  legend: "● heute im Widget"
+  legend: "● im Widget am %{date}"
   widget_off: "Das Widget on_this_day ist nicht eingeschaltet -- trag es unter widgets: in config/site.yml ein oder schalte es in ./style.sh ein."
 
 export:

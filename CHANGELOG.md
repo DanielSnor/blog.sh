@@ -42,6 +42,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 ### Fixed
 
 - **A link with no text lost its address on the first save** (#65). `[](https://example.com)` now reads `example.com`; the empty anchor a converter leaves in a heading still goes.
+- **`on-this-day --date` said "today" about any day** (#61). Its legend and its empty day name the day asked about.
 
 ### Removed
 
