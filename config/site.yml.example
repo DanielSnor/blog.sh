@@ -129,7 +129,8 @@ site:
   # page_size: 10
   # Optional: the look the site wears, one of the skins the engine ships
   # (skins/ beside this engine): classic, the look blog.sh has always had,
-  # unless a site says otherwise; or minimal -- paper, ink and one colour.
+  # unless a site says otherwise; or minimal -- paper, ink and one colour;
+  # or minimal-literal -- minimal set as a book: one column and a serif.
   # A name the engine has no skin for is worn as classic, and the build
   # and ./blog.sh doctor say so.
   # skin: classic

@@ -15,7 +15,14 @@ A skin is one stylesheet that repaints what is already on the page. The
 engine ships its own in `skins/` and a site picks one with `site.skin:` in
 `config/site.yml` -- `classic`, the look blog.sh has always had, unless it
 says otherwise, or `minimal`: paper, ink and one colour, the base of the
-Minimal family. The build publishes `/assets/css/site.css` as the engine's
+Minimal family -- or one of its variants, `minimal-literal` (a book's
+setting: one column, a serif, a reader's measure). A variant is minimal
+whole with a layer of its own after it, and its file in `skins/` is made
+rather than written: `skins/src/build.rb` puts the two together from
+`skins/minimal.css` and `skins/src/<layer>.css`, so a change to the base
+reaches every variant, and the suite says so when one was not made
+again. Edit the layer and run `ruby skins/src/build.rb`; never edit the
+made file. The build publishes `/assets/css/site.css` as the engine's
 own rules (`assets/css/site.css`: the fonts, the focus ring, media that
 keep to their column, the lightbox), then the skin, then the engine's last
 word -- that a control arriving `hidden` stays hidden, which no skin may
