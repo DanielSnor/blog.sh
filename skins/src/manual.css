@@ -72,6 +72,22 @@
 .toc li:not(.toc-l2) { counter-increment: toc-b; padding-left: 14px; font-size: 13px; }
 .toc li:not(.toc-l2)::before { content: counter(toc-a) "." counter(toc-b); min-width: 2.8em; }
 
+/* The chapter's parts under "part N of M" (layout.series_contents) are set
+   the way the page's contents are: the chapter's name in the engine's
+   voice, each part's number in the accent, the names in ink, the part
+   being read in bold. A hairline to the left, not the accent's bar -- in
+   this skin that bar is a note's. */
+.series-contents { margin: 14px 0 22px; padding: 2px 0 2px 18px; border-left: 1px solid var(--line); }
+.series-contents__heading { margin: 0; font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.06em; text-transform: lowercase; color: var(--accent); }
+.series-contents ol { margin: 8px 0 0; padding: 0; list-style: none; counter-reset: part; }
+.series-contents li { margin: 0; padding: 4px 0; font-size: 14px; line-height: 1.35; counter-increment: part; }
+.series-contents li::before { content: counter(part); display: inline-block; min-width: 2.2em; color: var(--accent); font-family: var(--mono); font-size: 12px; font-weight: 700; }
+.series-contents a { color: var(--ink); line-height: inherit; text-decoration: none; }
+.series-contents a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
+.series-contents .series-contents__heading a { color: inherit; }
+.series-contents a[aria-current="page"],
+.series-contents a[aria-current="page"]:hover { color: var(--ink); font-weight: 700; text-decoration: none; }
+
 article .content { counter-reset: sec-a; }
 article .content > h2 { counter-increment: sec-a; counter-reset: sec-b; }
 article .content > h3 { counter-increment: sec-b; }
