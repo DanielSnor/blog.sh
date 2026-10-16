@@ -3541,13 +3541,15 @@ article .content figure video {
 
 /* A post with no title -- a toot, a tweet, a photograph -- had a gap in
    its head where the title would be. Its counts stand on the date's own
-   line instead. A part of a series keeps the old shape: that line is the
-   series' there. */
+   line instead, in the date's line height: in the meta row's own 1.55
+   they sat a pixel below the date beside them, two on a Retina screen. A
+   part of a series keeps the old shape: that line is the series' there. */
 .card:not(.has-hero) > article > .post-header:not(:has(> .post-body > h1)):not(:has(> .post-body > .series-note)) { padding-top: 0; }
 .card:not(.has-hero) > article > .post-header:not(:has(> .post-body > h1)):not(:has(> .post-body > .series-note)) > .post-body > .post-meta {
   margin-top: 0;
   padding-left: 122px;
   min-height: 17px;
+  line-height: 1.4;
 }
 
 /* ------------------------------------------------- after the engine of 6. 10.
