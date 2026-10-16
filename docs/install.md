@@ -87,14 +87,25 @@ one real step is a current Ruby via [Homebrew](https://brew.sh):
 
 ```bash
 brew install ruby
+exec zsh
+ruby -v    # 4.0.x now (3.x from an older Homebrew), not 2.6.10
+```
+
+Homebrew links its Ruby into `/opt/homebrew/bin` -- since October 2026
+the `ruby` formula is no longer keg-only -- and that is already on the
+PATH Homebrew set up, so a new shell finds it. Only if `ruby -v` still
+says 2.6.10 (an older Homebrew, or a PATH that puts `/usr/bin` first)
+put Homebrew's Ruby first by hand:
+
+```bash
 echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >> ~/.zshrc
 exec zsh
-ruby -v    # 3.x now, not 2.6.10
 ```
 
 (That PATH line is for Apple Silicon; on an Intel Mac it's
-`/usr/local/opt/ruby/bin`. `brew install ruby` prints the exact line for
-your machine at the end of its output -- trust that one.)
+`/usr/local/opt/ruby/bin`. Where it is needed, `brew install ruby`
+prints the exact line for your machine at the end of its output -- trust
+that one.)
 
 (No Homebrew yet? Install it first with the one command on
 [brew.sh](https://brew.sh). `git` is already there on any Mac with the
