@@ -8627,8 +8627,13 @@ def run_wizard_screen
       when :enter then chosen = selected
       when :escape then break
       when String
-        break if %w[q 0].include?(key)
-
+        # Esc is the only way out (#64). 0 used to leave too, as it goes back
+        # in every other menu -- but here back is out, and a 0 pressed to see
+        # what it does closed ./blog.sh without a word; q did the same, the
+        # one screen left where q was a second Esc. Both are no key here now,
+        # like a digit past the last row. A piped run keeps its "0) exit":
+        # it has no Esc.
+        #
         # Quick select keeps working, and moves the cursor as it goes, so
         # the frame under the action names the same row the digit chose.
         if key =~ /\A[1-9]\z/ && key.to_i <= WIZARD_MENU.size

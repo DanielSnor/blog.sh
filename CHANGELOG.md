@@ -52,7 +52,7 @@ goes in is still being decided; the suffix and the date both come off at the tag
 - **`on-this-day --date` said "today" about any day** (#61). Its legend and its empty day name the day asked about.
 - **The "On this day" card showed its heading over nothing** (#62) while its file loaded, and for good without the script. It is built hidden and shown only for a day with rows.
 - **The cheat sheet showed the chat as code** (#63). It shows what to type, the `chat` fence and all, and then the dialogue it becomes.
-- **The main menu did not say that 0 leaves it** (#64). Its keys read `0/Esc quit`: 0 is back in every menu, and back from the main one is out.
+- **0 in the main menu closed `./blog.sh`** (#64), as q did. Neither is a key there now; Esc leaves, as the keys say. A piped run keeps its `0) exit`.
 - **`translate` did not say where the translation of a draft can be read** (#67). It ends on its preview address, as `add` and `edit` do; a translation saved from a file answers `translation_url`.
 - **`./setup.sh` sent the reader to http://localhost:8000/ as if the site were there.** It says the preview shows it while it runs, and gives the address just answered; `./style.sh` after a build says the same.
 
