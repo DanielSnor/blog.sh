@@ -251,9 +251,16 @@ Or let `./setup.sh` do it: it seeds the file from this same example --
 comments and all -- and fills in the answers you give it, which is the
 same file you would have written by hand, minus the chance of a tab
 where a space belongs. It covers the `site` block, the comments network
-and the deploy target; `./style.sh` covers `banner`, `about`, `footer`,
-`social`, `colors`, `fonts`, `widgets` and `nav`. Both are re-runnable and
-neither takes anything away from editing the file directly.
+(and which replies a post shows, `comments.approval`), the deploy target,
+and -- behind one question Enter passes -- `media` and the request to AI
+crawlers in `seo`; `./style.sh` covers `colors`, `banner`, `fonts`,
+`layout` with the skin, `nav`, `series_index`, `about`, `widgets`,
+`footer`, `social` with `share`, `tag_icons` and `analytics`. Both are
+re-runnable and neither takes anything away from editing the file
+directly. What only the file sets is the rare and the markup:
+`site.author_name`, a second language (`site.locales`), an icon drawn as
+SVG (`icon_svg`), `mastodon.toot_length` and `link_length`,
+`publishing.allow_partial`, `seo.robots_extra` and `deploy.keep`.
 
 If you do edit it directly -- which is a first-class way to use this
 engine, not a fallback -- run **`./blog.sh doctor`** when you are done. It

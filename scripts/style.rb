@@ -27,6 +27,7 @@ require 'English'
 require_relative '../lib/run_lock'
 require_relative '../lib/social_icons'
 require_relative '../lib/icons'
+require_relative '../lib/share_targets'
 require_relative '../lib/site_config'
 require_relative '../lib/account_id'
 
@@ -468,6 +469,12 @@ def section_banner
   # the only thing that reads it.
   ask_banner_claim if show_claim
 
+  # The picture itself (banner.show_image). Off, the header is the name and
+  # the claim set as text -- what Minimal Terminal suits. On is the engine's
+  # own default, so it is written only when it is turned off, or back on.
+  image = Wizard.confirm(t('q_show_image'), default: at('banner', 'show_image') != false)
+  set_switch(%w[banner show_image], image, default: true)
+
   puts
 end
 
@@ -888,6 +895,88 @@ def section_social
 
   site.set_list(%w[social], entries)
   puts
+  section_share
+end
+
+# share: where a reader can carry a post away to -- the names in
+# lib/share_targets.rb, in the order the block draws them; none, and there
+# is no block. Here because it is the other half of a site's networks: the
+# icons above say where the author is, this where a reader may go.
+def section_share
+  names = SiteConfig::Chrome.list(current, 'share').map(&:to_s)
+  labels = t('share_labels')
+  labels = {} unless labels.is_a?(Hash)
+  touched = false
+
+  loop do
+    state = [Tui.paint(t('share_current'), :bold)]
+    state << (names.empty? ? Tui.paint("   #{t('share_none')}", :dim) : "   #{names.join(', ')}")
+    left = ShareTargets::NAMES - names
+    options = []
+    options << ['add', t('list_add')] unless left.empty?
+    options << ['remove', t('list_remove')] unless names.empty?
+    options << ['keep', t('list_keep')]
+    case Wizard.choose(t('q_share_action'), options, current_index: options.size - 1, note: state)
+    when 'add'
+      name = Wizard.choose(t('q_share_network'), left.map { |n| [n, labels[n] || n] }, current_index: 0)
+      next unless name
+
+      names << name
+      touched = true
+    when 'remove'
+      names = remove_from(names) { |n| labels[n] || n }
+      touched = true
+    else break
+    end
+  end
+
+  site.set_list(%w[share], names) if touched
+  puts
+end
+
+# tag_icons: the mark a tag wears beside its name, over its own listing and
+# on the date of every post that has it. A list, because the order is the
+# priority -- a post wears the first one it has. An icon the engine ships,
+# by name; a drawing of one's own (icon_svg) is markup and stays in the file.
+def section_tag_icons
+  entries = SiteConfig::Chrome.list(current, 'tag_icons').select { |e| e.is_a?(Hash) }
+  touched = false
+
+  loop do
+    state = [Tui.paint(t('tag_icons_current'), :bold)]
+    if entries.empty?
+      state << Tui.paint("   #{t('list_empty')}", :dim)
+    else
+      entries.each_with_index { |e, i| state << "   #{i + 1}) #{e['tag']} -> #{e['icon'] || t('tag_icon_own')}" }
+    end
+    options = [['add', t('list_add')]]
+    options << ['remove', t('list_remove')] unless entries.empty?
+    options << ['keep', t('list_keep')]
+    case Wizard.choose(t('q_tag_icons_action'), options, current_index: options.size - 1, note: state)
+    when 'add'
+      entry = ask_tag_icon
+      next unless entry
+
+      entries << entry
+      touched = true
+    when 'remove'
+      entries = remove_from(entries) { |e| "#{e['tag']} (#{e['icon'] || t('tag_icon_own')})" }
+      touched = true
+    else break
+    end
+  end
+
+  site.set_list(%w[tag_icons], entries) if touched
+  puts
+end
+
+def ask_tag_icon
+  hint = nav_tag_sample.empty? ? t('h_nav_tag_empty') : t('h_nav_tag', list: nav_tag_sample)
+  tag = Slug.slugify(Wizard.ask(t('q_tag_icon_tag'), '', hint: hint).to_s)
+  return nil if tag.empty?
+
+  icon = Wizard.choose(t('q_tag_icon_icon'), Icons::NAMES.map { |n| [n, n] }, current_index: 0)
+  icon ? { 'tag' => tag, 'icon' => icon } : nil
 end
 
 # --- the menu bar ----------------------------------------------------
@@ -1466,6 +1555,7 @@ SECTIONS = [
   ['widgets', 'section_widgets'],
   ['footer', 'section_footer'],
   ['social', 'section_social'],
+  ['tag_icons', 'section_tag_icons'],
   ['analytics', 'section_analytics']
 ].freeze
 
