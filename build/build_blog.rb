@@ -312,7 +312,15 @@ def css_href(path)
   version ? "#{path}?v=#{version}" : path
 end
 
-def css_fingerprint(bytes)
+# The same for a script: a host keeps it as long as a stylesheet, and a
+# new page beside an old script is as wrong -- after #62 the card "On
+# this day" is built hidden and only the new sidebar.js shows it.
+def js_href(path)
+  version = JS_VERSIONS[path]
+  version ? "#{path}?v=#{version}" : path
+end
+
+def asset_fingerprint(bytes)
   Digest::SHA256.hexdigest(bytes)[0, 10]
 end
 
@@ -2833,13 +2841,17 @@ Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'), COLORS_CSS_TEX
 # assets/, from the bytes that were copied. Sealed into the build cache
 # below, so a stylesheet that changed rewrites every page that asks for it.
 CSS_VERSIONS = EXTRA_CSS.each_with_object(
-  '/assets/css/colors.css' => css_fingerprint(COLORS_CSS_TEXT),
-  '/assets/css/site.css' => css_fingerprint(SITE_CSS_TEXT)
+  '/assets/css/colors.css' => asset_fingerprint(COLORS_CSS_TEXT),
+  '/assets/css/site.css' => asset_fingerprint(SITE_CSS_TEXT)
 ) do |href, versions|
   file = File.expand_path(href.delete_prefix('/'), ROOT)
   next unless file.start_with?(File.join(ROOT, 'assets', '')) && File.file?(file)
 
-  versions[href] ||= css_fingerprint(File.binread(file))
+  versions[href] ||= asset_fingerprint(File.binread(file))
+end.freeze
+# ...and every script under assets/js/, from the bytes that are copied.
+JS_VERSIONS = PathGlob.under(ROOT, 'assets', 'js', '*.js').to_h do |src|
+  ["/assets/js/#{File.basename(src)}", asset_fingerprint(File.binread(src))]
 end.freeze
 ico = build_favicon_ico
 Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:favicon]), ico) if ico
@@ -3385,7 +3397,7 @@ TIMEZONE_FACT = timezone_fact
 # says in its head and in its switcher whether that language has the same
 # listing, and the post that decides it need not be one this listing
 # shows.
-BuildCache.seal!(NAV_TREE, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL, CSS_VERSIONS,
+BuildCache.seal!(NAV_TREE, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL, CSS_VERSIONS, JS_VERSIONS,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
                  SITE_BASE_URL, TIMEZONE_FACT,
                  TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG },
@@ -4104,7 +4116,7 @@ Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:not_found]),
             path: loc('/404.html'),
             # The script is this page's alone, so only this page asks for it.
             extra_head: %(\n  <meta name="robots" content="noindex">) +
-                        %(\n  <script src="/assets/js/not-found.js" defer></script>)))
+                        %(\n  <script src="#{js_href('/assets/js/not-found.js')}" defer></script>)))
 
 if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))

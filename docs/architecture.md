@@ -585,9 +585,10 @@ A single linear pass, no framework:
    digits of the SHA-256 of what was published (since 1.11), so that a
    reader whose host kept the old stylesheet is never handed it with a new
    page; those fingerprints (`CSS_VERSIONS`: `colors.css`, `site.css` --
-   the engine's rules with the skin -- and every `extra_css` file) are
-   sealed in with the facts above, and a changed stylesheet rewrites every
-   page that asks for it. The cache is an optimisation and never an authority: anything
+   the engine's rules with the skin -- and every `extra_css` file), and
+   the scripts' the same way (`JS_VERSIONS`, every file of `assets/js/`),
+   are sealed in with the facts above, and a changed stylesheet or script
+   rewrites every page that asks for it. The cache is an optimisation and never an authority: anything
    it cannot vouch for is rendered and compared the old way, and `--full`
    believes none of it while still recording what it wrote.
 5. **Render.** Per-post pages, then listings: homepage, per-tag,
