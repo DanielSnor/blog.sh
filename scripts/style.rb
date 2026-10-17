@@ -984,6 +984,10 @@ def ask_nav_entry
 
   kinds = [['home', t('nav_kind_home')], ['tag', t('nav_kind_tag')]]
   kinds << ['page', t('nav_kind_page')] if nav_pages.any?
+  # A series names its listing and lights up on every part of it (1.11,
+  # the chapter of a manual); offered where the archive has one, as a page
+  # is. Until this the wizard showed such an item and could not add one.
+  kinds << ['series', t('nav_kind_series')] if nav_series.any?
   kinds << ['url', t('nav_kind_url')]
   # Last, because it is the one kind that leads nowhere: a heading over the
   # items added after it, up to the next group.
@@ -996,6 +1000,9 @@ def ask_nav_entry
   when 'page'
     path = Wizard.choose(t('q_nav_page'), nav_pages.map { |p| [p, p] }, current_index: 0)
     { 'label' => label.strip, 'url' => path }
+  when 'series'
+    name = Wizard.choose(t('q_nav_series'), nav_series.map { |n| [n, n] }, current_index: 0)
+    { 'label' => label.strip, 'series' => name }
   else ask_nav_url(label.strip)
   end
 end
@@ -1080,6 +1087,14 @@ def nav_pages
   # Asked of PostAddress, because "page: No" is true to Ruby and false to
   # the build: the menu offered an address the site does not answer at.
   @nav_pages ||= nav_posts.select { |p| PostAddress.page?(p) }.map { |p| "/#{p['slug']}/" }.sort
+end
+
+# The series a menu item can name: the ones a published post belongs to --
+# a draft's series has no listing yet -- by the name the posts give them,
+# which is what `series:` takes.
+def nav_series
+  @nav_series ||= nav_posts.reject { |p| p['state'] == 'draft' }
+                          .map { |p| p['series'].to_s.strip }.reject(&:empty?).uniq.sort
 end
 
 # The tags worth putting in a menu are the ones with posts behind them, so
