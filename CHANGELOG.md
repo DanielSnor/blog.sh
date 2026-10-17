@@ -13,57 +13,57 @@ prints what an installation is running.
 
 ## 1.11.pre -- 2026-10-15
 
-Opened the morning 1.10 went out, so `version` does not claim a release nobody has cut. What
-goes in is still being decided; the suffix and the date both come off at the tag.
+The release about how a site looks. The look is now the engine's rules and a skin -- `site.skin:`,
+classic unless a site says otherwise -- and the Minimal family ships beside it: Minimal and five
+variants. A series can be a chapter of the menu.
+Beside that, the wizards ask what only `site.yml` could, and `/write/` is gone. Every stylesheet
+and script link now carries a fingerprint, so the first deploy uploads every page.
 
 ### Added
 
-- **Minimal, a second skin.** `site.skin: minimal` -- paper, ink and one colour; the base of the Minimal family.
-- **Minimal Literal, the first variant of the family.** `site.skin: minimal-literal` -- one column in the middle, a book's serif and measure; made from minimal and a layer of its own (`skins/src/`).
-- **Minimal Journal.** `site.skin: minimal-journal` -- a diary, read by its days: a line of time down the left, the date the heading.
-- **Minimal Manual.** `site.skin: minimal-manual` -- a manual: a series is a chapter, the menu of chapters down the side, the sections of a page numbered, and with `layout.series_contents` the chapter's parts listed on each part the way the page's own contents are.
-- **The chapter a part belongs to shows in every menu.** A `series:` item lights up on its parts in Classic (the bar's line, in the accent), Minimal and its variants (the pill drawn, not filled) and Terminal (accent, bold), as it did only in Manual's side menu.
-- **Minimal Pictorial.** `site.skin: minimal-pictorial` -- a wall of pictures three across where the listing stood; the picture first, the words its caption.
-- **Minimal Terminal.** `site.skin: minimal-terminal` -- a page the way a terminal would print it: two faces, square brackets, inverse video for where you are.
-- **`pair --list` says when each device was last seen.** The door notes every request; `last_seen` in `--json`.
-- **`series_index:` names the page of every series and says which way it runs.** `title`, `description`, `order: oldest`.
-- **`layout.series_contents`: every part of a series on each part's page.** Under "part N of M", never cut short.
-- **Groups in the menu.** `{ label: "Basics", group: true }` in `nav:` is a heading over the items after it; the bar draws it as a list of its own, `./style.sh` writes it, `doctor` names an empty one.
-- **A card carries the hour its post went out, hidden.** For a skin that wants it; never an hour an importer made up.
-- **A gallery's card says how many pictures it has.** `data-photos="N"`, on a post with two or more.
-- **A menu item can name a series.** `series:` leads to its listing and marks every part of it as the chapter you are in.
-- **A search result can show the post's first picture.** The index carries it (`img`, only where there is one); the engine hides it and Minimal Pictorial shows a square at the end of the row.
-- **A gallery's card hands its next pictures to a skin.** Up to three, hidden, in `.card-mosaic` inside the card's figure; Minimal Pictorial lays its tiles out as a mosaic of them (originals: up to four a tile).
+- **Minimal, a second skin.** `site.skin: minimal` -- paper, ink and one colour; the base of a family.
+- **Minimal Literal.** `site.skin: minimal-literal` -- one column in the middle, a book's serif and measure.
+- **Minimal Journal.** `site.skin: minimal-journal` -- a diary: a line of time down the left, the date its heading.
+- **Minimal Manual.** `site.skin: minimal-manual` -- series as chapters down the side, a page's sections numbered.
+- **Minimal Pictorial.** `site.skin: minimal-pictorial` -- a wall of pictures three across, the words their caption.
+- **Minimal Terminal.** `site.skin: minimal-terminal` -- a page as a terminal would print it: two faces, square brackets.
+- **A menu item can name a series.** `series:` leads to its listing and lights up on every part of it, in every skin.
+- **Groups in the menu.** `{ label: "Basics", group: true }` heads the items after it; `doctor` names an empty one.
+- **`series_index:`.** The page of every series gets a title, a description and `order: oldest`.
+- **`layout.series_contents`.** Every part of a series listed on each part's page, under "part N of M".
+- **`pair --list` says when each device was last seen.** `last_seen` in `--json`.
+- **A card carries the hour its post went out, hidden.** Never an hour an importer made up.
+- **A gallery's card says how many pictures it has.** `data-photos="N"`, from two up.
+- **A gallery's card hands a skin its next pictures.** Up to three, hidden, in `.card-mosaic`; Pictorial lays out a mosaic.
+- **A search result can carry the post's first picture.** `img` in the index; hidden unless a skin shows it.
 
 ### Changed
 
-- **`docs/install.md` on macOS installs the Ruby Homebrew gives today.** 4.0.x, linked into `/opt/homebrew/bin`; the `opt/ruby/bin` PATH line is the way out for a shell still on 2.6, not a step.
-- **A stylesheet link carries a fingerprint of the file.** `site.css?v=…`, `colors.css` and every `extra_css` file the same: a new look is a new address, so a returning reader is never handed the new page with the old stylesheet (a host keeps CSS for a while -- Surfer an hour). The price: a changed stylesheet rewrites, and deploys, every page.
-- **A script link carries one too.** Every `assets/js/` file the pages ask for, the 404 page's own included: a new page never runs beside yesterday's script.
-- **`./style.sh` knows what 1.11 can be told.** Layout asks the skin (`site.skin`) and the lead card (`layout.lead_card`); on a site with a series, also whether a part lists the whole series (`layout.series_contents`) and what the page of every series is called and which way it runs (`series_index`). Its menu adds a series item (`series:`).
-- **The wizards set what only `site.yml` could.** `./style.sh`: the header picture (`banner.show_image`), the share block (`share`) and tag icons (`tag_icons`, a section of their own). `./setup.sh`: which replies a post shows (`comments.approval`), a Bluesky PDS, and -- behind one question Enter passes -- `media` and `seo.block_ai_crawlers`. docs/install.md lists the few keys left to the file.
-- **A draft on a site in more than one language can be translated where it was written** (#66). The question after the editor offers `[t] translate: Deutsch` -- or asks which, where there are several -- and comes back once the words are saved.
-- **The published stylesheet leaves its comments behind.** 92 kB became 39, 29 kB over the wire became 8.
-- **The stylesheet is the engine's rules and a skin.** `site.css` + `skins/classic.css`, `site.skin:`; a site that says nothing looks as it did.
-- **A listing's later pages light up its menu item.** A series' `/page/2/` and on, as a tag's always did.
-- **`pair` on a Mac says what a blog in Documents, on the Desktop or in iCloud Drive also needs.** Full disk access for remote users -- before the code, whenever the blog is in one; the docs add `--host 127.0.0.1` for an app on the same Mac.
+- **The stylesheet is the engine's rules and a skin.** `site.css` + `skins/classic.css`; a site that says nothing looks as it did.
+- **The published stylesheet leaves its comments behind.** 92 kB became 39; 29 kB over the wire became 8.
+- **Stylesheet and script links carry a fingerprint.** `?v=` and ten hex digits: a changed file is a new address.
+- **`./style.sh` asks the skin and the lead card.** With a series, also `series_contents` and `series_index`; its menu adds a series item.
+- **The wizards set what only `site.yml` could.** `banner.show_image`, `share`, `tag_icons`; `comments.approval`, a Bluesky PDS, `media`, `seo.block_ai_crawlers`.
+- **A draft can be translated from the question after the editor** (#66). `[t] translate: Deutsch`, or a choice of languages.
+- **A series' later pages light up its menu item**, as a tag's always did.
+- **`pair` on a Mac says when the blog needs Full Disk Access.** In Documents, on the Desktop or in iCloud Drive.
+- **`docs/install.md` installs the Ruby Homebrew gives today on macOS.** 4.0.x; the PATH line is for a shell still on 2.6.
 
 ### Fixed
 
-- **A link with no text lost its address on the first save** (#65). `[](https://example.com)` now reads `example.com`; the empty anchor a converter leaves in a heading still goes.
-- **`on-this-day --date` said "today" about any day** (#61). Its legend and its empty day name the day asked about.
-- **The "On this day" card showed its heading over nothing** (#62) while its file loaded, and for good without the script. It is built hidden and shown only for a day with rows.
-- **The cheat sheet showed the chat as code** (#63). It shows what to type, the `chat` fence and all, and then the dialogue it becomes.
-- **0 in the main menu closed `./blog.sh`** (#64), as q did. Neither is a key there now; Esc leaves, as the keys say. A piped run keeps its `0) exit`.
-- **`translate` did not say where the translation of a draft can be read** (#67). It ends on its preview address, as `add` and `edit` do; a translation saved from a file answers `translation_url`.
-- **`./setup.sh` sent the reader to http://localhost:8000/ as if the site were there.** It says the preview shows it while it runs, and gives the address just answered; `./style.sh` after a build says the same.
+- **A link with no text lost its address on the first save** (#65). It reads `example.com` now.
+- **`on-this-day --date` said "today" about any day** (#61). It names the day asked about.
+- **The "On this day" card showed its heading over nothing** (#62). It is built hidden and shown only with rows.
+- **The cheat sheet showed the chat as code** (#63). It shows the `chat` fence, then the dialogue.
+- **0 in the main menu closed `./blog.sh`** (#64), as q did. Esc leaves, as the keys say.
+- **`translate` did not say where a draft's translation can be read** (#67). It ends on the preview address; from a file, `translation_url`.
+- **`./setup.sh` sent the reader to http://localhost:8000/ as if the site were there.** It names the preview and the site's address.
 
 ### Removed
 
-- **The `/write/` page and the `SendPost` shortcut.** A phone writes in the apps; `write:` is no longer read, and `doctor` says so.
-- **What the build wrote for the page.** `/write/site.js` and the answers under `/write/r/`; the next deploy takes them off the site.
-- **`publish.txt` and `drafts.txt` stay after all.** 1.10 said they would go; `receive.sh` is unchanged, `receipt:` with it.
-
+- **The `/write/` page and the `SendPost` shortcut.** A phone writes in the apps; `doctor` names a left-over `write:`.
+- **What the build wrote for the page.** `/write/site.js` and `/write/r/`; the next deploy takes them off the site.
+- **`publish.txt` and `drafts.txt` stay after all.** 1.10 said they would go; `receive.sh` is unchanged.
 
 ## 1.10 -- 2026-10-15
 
