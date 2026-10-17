@@ -190,7 +190,7 @@ With `layout.series_contents` on, a part's page lists the whole series
 under "part N of M": `<nav class="series-contents">`, the series' name in
 `.series-contents__heading` (a link to its listing where it has one) and
 an `<ol>` of every part in reading order, the one being read carrying
-`aria-current="page"`. `site.css` sets it in the flow, with the table of
+`aria-current="page"`. Every skin sets it in the flow, with the table of
 contents' rule; a skin that wants it beside the text moves it there:
 
 ```css
@@ -207,6 +207,12 @@ that wants the groups as columns, or as the sections of a menu down the
 side, has the structure to do it. Every rule written for `nav ul` or
 `nav li` reaches the inner list too -- undo what should not on
 `.nav-group > ul`, as both skins do for the row a phone slides sideways.
+
+A `series` item of the menu is marked on every part of its series with
+`aria-current="true"` -- the chapter the reader is in -- where the item of
+the page itself has `aria-current="page"`. Every shipped skin draws the
+two apart (classic keeps the bar's line under it, in the accent); a skin
+of your own wants a rule for `nav a[aria-current="true"]` too.
 
 The date badge of a card carries the hour the post went out, as
 `<time class="date-time" datetime="…" hidden>` after the date -- hidden,
@@ -602,7 +608,8 @@ Three traps in browser tooling, all of which have cost an afternoon here:
   instant it loads can show empty frames that are fine a moment later.
 - The preview cache outlives a reload. A different origin
   (`127.0.0.1` instead of `localhost`) gets you one clean look; after
-  that, version the stylesheet's address in the built page.
+  that, a rebuild gives a changed stylesheet a new address (`?v=`) of its
+  own.
 - `:focus` and `:focus-visible` do not match in a headless browser unless
   the page is told it has focus -- a window nobody is looking at has
   none. A focus ring that "does not work" there may be fine, and one that
@@ -621,7 +628,7 @@ curl -s https://YOUR-BLOG/assets/css/skin.css | shasum -a 256
 shasum -a 256 assets/css/skin.css
 ```
 
-## Two skins that exist
+## Two skins of your own
 
 | One engine, two skins |  |
 | --- | --- |

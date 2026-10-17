@@ -252,14 +252,15 @@ comments and all -- and fills in the answers you give it, which is the
 same file you would have written by hand, minus the chance of a tab
 where a space belongs. It covers the `site` block, the comments network
 (and which replies a post shows, `comments.approval`), the deploy target,
-and -- behind one question Enter passes -- `media` and the request to AI
+`publishing.slots`, and -- behind one question Enter passes -- `media` and the request to AI
 crawlers in `seo`; `./style.sh` covers `colors`, `banner`, `fonts`,
-`layout` with the skin, `nav`, `series_index`, `about`, `widgets`,
+`layout` with the skin and `site.extra_css`, `nav`, `series_index`, `about`, `widgets`,
 `footer`, `social` with `share`, `tag_icons` and `analytics`. Both are
 re-runnable and neither takes anything away from editing the file
 directly. What only the file sets is the rare and the markup:
 `site.author_name`, a second language (`site.locales`), an icon drawn as
-SVG (`icon_svg`), `mastodon.toot_length` and `link_length`,
+SVG (`icon_svg`), the banner title's and claim's own colours
+(`colors.<mode>.banner_title`, `banner_claim`), `mastodon.toot_length` and `link_length`,
 `publishing.allow_partial`, `seo.robots_extra` and `deploy.keep`.
 
 If you do edit it directly -- which is a first-class way to use this
@@ -301,6 +302,8 @@ The example is fully commented. The short version:
   keys fall back to the built-in JetBrains Mono at 45px/20px),
   `nav` and `layout` (what the pages are made of --
   [below](#the-menu-the-regions-and-a-stylesheet-of-your-own)),
+  `series_index` (what the page of every series is called and which way
+  it runs -- [operations.md](operations.md#reading-the-archive)),
   `publishing.slots` (the times posts usually go out, so scheduling stops
   asking for a date --
   [operations.md](operations.md#publishing-slots)),
@@ -402,7 +405,8 @@ Layout -- `classic` unless you say otherwise, `minimal`, or one of the Minimal f
 or `minimal-terminal`): layout and structure, plus the few colors that are
 fixed because they work against any palette -- white on accent surfaces,
 the dark scrims behind the banner overlays, the search field's grey
-placeholder. Only the skin chosen is published. Changing `colors:` or
+placeholder. Only the skin chosen is published, and a name with no skin
+behind it is worn as classic -- the build and `doctor` say so. Changing `colors:` or
 `site.skin` is configuration; editing either file is editing an engine
 file, with the pull conflicts that implies (see
 [step 9](#9-updating-the-engine)) -- a look of your own belongs in
@@ -440,7 +444,9 @@ The item of the page you are on is marked `aria-current="page"`. A
 `series` item is marked on every part of its series as well, with
 `aria-current="true"` -- the reader is in that chapter, not on its
 listing -- which is what a manual's menu of chapters is for; a `tag` or a
-`url` item is not, since a post is not its tag's listing.
+`url` item is not, since a post is not its tag's listing. A series has a
+listing once it has two published parts; until then its item leads to a
+404, and `doctor` says so.
 
 A menu that has grown chapters can sort them. An entry with `group: true`
 and a `label` -- and nothing to lead to -- is a heading over the items
@@ -622,8 +628,8 @@ them -- and their sizes are scaled down from the configured ones (32px and
 16px with the defaults), since 45px is a size for a line laid across a
 picture. Leave `src`, `alt`, `width` and `height` as they are: `src` is
 also the picture a page with none of its own is shared with, and `alt`
-becomes the name of the link. It is a key to set by hand; `./style.sh` does
-not ask about it.
+becomes the name of the link. `./style.sh` asks it last, in the banner's
+section.
 
 ## 5. First build and local preview
 
@@ -984,12 +990,12 @@ followed by a deploy leaves the second language's pages as the previous
 version built them -- and uploads them that way.
 
 `main` is the release branch: a clone on it gets each release by `git
-pull`. A clone that was put on a release tag (`git checkout v1.9`) is on
+pull`. A clone that was put on a release tag (`git checkout v1.10`) is on
 no branch, and `git pull` refuses with "You are not currently on a
 branch"; move it to the next release by name instead:
 
 ```bash
-git fetch --tags && git checkout v1.10
+git fetch --tags && git checkout v1.11
 ```
 
 The first build after an upgrade may be a full one -- the engine's own
@@ -997,12 +1003,29 @@ fingerprint changed, so the record of the last build is thrown away --
 and it writes `.build_cache.json` in the installation directory, which
 is per-machine, gitignored and always safe to delete. Deploy the assets
 with it: a page that cannot fetch `assets/js/share.js` logs a 404 on
-every load.
+every load. From 1.10 to 1.11 that first deploy uploads every page, once:
+each link to a stylesheet or a script now carries a fingerprint of the
+file (`?v=`), so a returning reader is never handed a new page with
+yesterday's stylesheet -- and every later change to one does the same.
 
 **Going back a version** is `git checkout <tag>` and a rebuild, and what
 the newer version was given to work with is looked at first, because the
-older one does not treat all of it alike. From 1.10 back to 1.9: take
-`series:` and `language_name:` out of every `config/site.<lang>.yml`, or
+older one does not treat all of it alike. From 1.11 back to 1.10: take
+`series_index:` out of every `config/site.<lang>.yml`, or the build
+stops on it and nothing is deployed. A menu entry that names a series
+(`series:`) or heads a group (`group: true`) 1.10 leaves out of the
+menu, with a line in the build and an error in `doctor` for each -- a
+chapter can lead to its listing by `url: "/series/<slug>/"` instead.
+`site.skin`, `layout.series_contents` and `series_index:` in `site.yml`
+it passes over without a word: the site wears classic again, and
+`skins/` goes with the checkout. The pages ask for their stylesheets
+and scripts by the bare address again, so the deploy after that first
+build uploads every page. `write: true`, where it is still in
+`site.yml`, publishes `/write/` again. What 1.11 left in the
+installation folder for itself, `tmp/pairing/seen/`, is safe to delete.
+
+From 1.10 back to 1.9: take `series:` and `language_name:` out of
+every `config/site.<lang>.yml`, or
 the build stops on them and nothing is deployed -- a language's file is
 where 1.9 refuses a key it does not know. `on_this_day` under `widgets:` it does not refuse: the
 build says one line about it, `doctor` marks it, and the card is simply
@@ -1020,8 +1043,8 @@ What 1.10 left in the installation folder for itself
 door they come through, `scripts/remote.sh`, is new in 1.10 and 1.9 does
 not have it. A line `./blog.sh pair` wrote into `~/.ssh/authorized_keys`
 (it ends `blog.sh:<device>`) then points at nothing -- take it out by
-hand. The posts, the media and the rest of the configuration
-are otherwise untouched in both directions.
+hand. Either step, the posts, the media and the rest of the
+configuration are otherwise untouched in both directions.
 
 Per-deployment files (`content.nosync/`, `media.nosync/`,
 `config/site.yml`, `config/site.<lang>.yml`, `env.sh`, `incoming/`, `trash/`, `drafts/`,

@@ -1673,6 +1673,7 @@ still an article, and its card is cut as it always was.
 A tag can carry an icon, and it shows up in two places: the heading of its
 `/tag/<name>/` listing, and the date badge of every post that has the tag,
 where it **replaces** the content-type icon rather than joining it.
+`./style.sh` writes the list for you, in a section of its own.
 
 ```yaml
 tag_icons:
@@ -2091,8 +2092,8 @@ Pinterest, each with one address to send somebody to. The fediverse has no
 such address: the destination is the READER's instance, and a page has no
 way to know it.
 
-So the block is a list you write, and it holds three different kinds of
-thing:
+So the block is a list you write -- or `./style.sh` writes, after the
+social networks -- and it holds three different kinds of thing:
 
 ```yaml
 share:
@@ -2180,11 +2181,11 @@ locale or `site.yml` throws the whole cache away, since any of those can
 change every page; so does changing `SITE_BASE_URL`, and so does a change
 of timezone -- including the one that happens without you touching
 anything, when a system update rewrites the rules of the zone you publish
-in. A stylesheet is the exception worth knowing: pages link it rather than
-embed it, so editing one changes the stylesheet and nothing else -- the
-build skips every page it would have rebuilt and the deploy sends the one
-file. The palette in `site.yml` is not that case, since the stylesheet it
-generates and the theme colour in every page's head both come from it.
+in. A stylesheet or a script is no exception: every page asks for it by
+an address that carries a fingerprint of the file (`?v=`, since 1.11), so
+editing one rewrites every page and the deploy sends them all -- the price
+of a returning reader never being handed a new page with yesterday's
+stylesheet.
 
 ```bash
 ./blog.sh rebuild --full        # build every page again, then deploy
@@ -2457,7 +2458,9 @@ re-making it -- per-machine, and deleting it costs one full build),
 `.on-this-day.*.json` (the on-this-day catalogues, rewritten by every
 build), `.search_index.json` (the words `browse` and `list --search`
 search, kept between runs so a query reads only the posts that changed
--- deleting it costs one slow search), and
+-- deleting it costs one slow search), `tmp/pairing/` (codes waiting
+for an app to read them, and when each device was last seen -- without
+it a device is "not seen yet" until its next request), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still

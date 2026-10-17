@@ -607,7 +607,9 @@ A single linear pass, no framework:
    `assets/js/search.js` matches on; it scores the hits afterwards -- a
    word in the title above a word in the text, a whole word above the
    same letters inside a longer one, date as the tiebreak -- and draws at
-   most `RESULT_LIMIT` of them while reporting the true count;
+   most `RESULT_LIMIT` of them while reporting the true count; an entry
+   whose post has a picture carries the first one too (`img`), hidden
+   unless a skin shows it;
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
 7. **Assets, colors and the root favicon.** Before `assets/` is copied
@@ -623,8 +625,10 @@ A single linear pass, no framework:
    with the part no skin may undo after the skin -- contains no palette values -- its
    only color literals are palette-independent neutrals (white, two fixed
    grays, black/white alpha overlays) -- and no site-specific typography. One generated stylesheet rather than two on
-   purpose: it is already linked from the layout, so adding fonts to it
-   changes two files on a deploy instead of every page in the archive. `build_favicon_ico` wraps `assets/images/favicon.png` in
+   purpose: it is already linked from the layout, so fonts need no link of
+   their own -- though a change to it, like any stylesheet's, is a new
+   address (`?v=`) and so a change to every page. Both stylesheets are
+   published without their comments (`lib/css_text.rb`). `build_favicon_ico` wraps `assets/images/favicon.png` in
    an ICO container (a 22-byte header, then the PNG verbatim) and emits
    `/favicon.ico` -- pages link the PNG, so this exists purely for clients
    that request the root path without reading the `<link>`. No image
