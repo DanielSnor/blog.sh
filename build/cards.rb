@@ -66,15 +66,14 @@ module Cards
     end
   end
 
-  # The pictures a post carries: every file of every image block worth
-  # showing -- the degenerate ones (a tracking pixel) are not pictures, and
-  # a block with no file shows nothing.
+  # The pictures a post shows: one for every image block worth showing --
+  # the degenerate ones (a tracking pixel) are not pictures, and a block
+  # with no file shows nothing. One a block, not every file it lists: a
+  # block draws, and the build publishes, its first file, so a block of
+  # three counted three and the card said two more pictures than the post
+  # has. The same pictures the mosaic points at (mosaic_media).
   def photo_count(post)
-    (post['content'] || []).sum do |b|
-      next 0 unless b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
-
-      (b['media'] || []).count { |m| m.is_a?(Hash) && m['url'] }
-    end
+    mosaic_media(post).size
   end
 
   # A gallery's card shows its first picture; the next ones -- three at
