@@ -167,7 +167,9 @@ already carries, so each can be read as well as changed:
   answer says where the translation of a draft can be read:
   `translation_url`, its preview under the language's own root
   (`/<code>/draft/<token>/<slug>/`), `null` for a post that is out
-  already. `translate` at a desk ends on the same address.
+  already -- and for a translation with a title and no text yet, which
+  has no page, or on a site with no address. `translate` at a desk ends
+  on the same address.
 - **`toc: true` / `toc: false`** overrides the table of contents. A post
   with four headings or more gets one on its own -- that is the length at
   which a reader starts scrolling to look for something rather than

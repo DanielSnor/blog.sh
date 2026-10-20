@@ -4110,8 +4110,13 @@ end
 
 # The same for a translation of a draft -- nil when the post is not a
 # draft or has no words in the language, where there is nothing to look at.
+# Only where the build makes a page of it: a translation with words in it
+# (Translations.written?) -- a title alone is saved, and stands nowhere --
+# and on a site with an address, as url_for_json answers "" without one.
+# The address was said for both, and led to "nothing here".
 def translation_preview_url(post, lang)
-  return nil unless draft?(post) && post.dig('translations', lang).is_a?(Hash)
+  return nil unless draft?(post) && Translations.written?(post.dig('translations', lang))
+  return nil if SITE_BASE_URL.to_s.empty?
 
   site_path = translation_draft_path(post, lang)
   return "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}" if placeholder_base_url?
@@ -5424,6 +5429,10 @@ end
 # when the save took the language off the post.
 def print_translation_preview(path, lang)
   post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  if SITE_BASE_URL.to_s.empty? && draft?(post) && Translations.written?(post.dig('translations', lang))
+    warn t('cli.base_url_missing_preview')
+    return
+  end
   return unless translation_preview_url(post, lang)
 
   site_path = translation_draft_path(post, lang)
