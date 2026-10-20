@@ -12,6 +12,7 @@ require 'time'
 require 'tmpdir'
 require 'uri'
 require_relative 'atomic_write'
+require_relative 'path_glob'
 
 # lib/pairing.rb -- letting an app in by showing it a code.
 #
@@ -180,7 +181,7 @@ module Pairing
   # only, like the sweep.
   def prune_seen(root:)
     known = devices(root: root).map { |device| device['fingerprint'] }.reject(&:empty?)
-    Dir.glob(File.join(seen_dir(root), '*')).each do |file|
+    PathGlob.under(seen_dir(root), '*').each do |file|
       FileUtils.rm_f(file) unless known.any? { |print| seen_path(root, print) == file }
     end
   rescue SystemCallError

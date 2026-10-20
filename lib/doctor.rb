@@ -1409,7 +1409,10 @@ module Doctor
     return [] if name.nil? || name.to_s.strip.empty?
 
     word = name.to_s.strip
-    known = Dir.glob(File.join(root, 'skins', '*.css')).map { |f| File.basename(f, '.css') }.sort
+    # PathGlob: the root is a NAME. In an installation at `blog [1]` or
+    # `blog {old}` a bare glob read the brackets as a pattern, found no
+    # skin at all and called the one the build wears unknown.
+    known = PathGlob.under(root, 'skins', '*.css').map { |f| File.basename(f, '.css') }.sort
     return [] if word.match?(/\A[a-z0-9-]{1,64}\z/) && known.include?(word)
 
     [warn(t('skin_unknown', name: word[0, 60], known: known.join(', ')), t('skin_unknown_fix'))]

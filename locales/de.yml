@@ -1913,6 +1913,7 @@ style:
   palette_intro: "Eine Palette sind sieben Farben pro Modus. Alles Weitere -- Kartenhintergründe, Farben beim Darüberfahren, das Suchfeld -- wird beim Build von selbst daraus berechnet."
   q_palette: "Welche Palette?"
   palette_custom: "Werte von Hand eingeben (es sind vierzehn)"
+  palette_keep: "Die Farben behalten, die die Website jetzt hat"
   palette_set: "✅ %{name}."
   palettes_unreadable: "config/palettes.yml war nicht lesbar (%{message}), es bleibt also nur die Eingabe von Hand."
   palette_malformed: "⚠️  Palette '%{name}' in config/palettes.yml fehlen die Abschnitte light und dark -- übersprungen."

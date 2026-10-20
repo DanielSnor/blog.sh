@@ -1898,6 +1898,7 @@ style:
   palette_intro: "Paleta je sedm barev na režim. Všechno ostatní — pozadí karet, barvy při najetí myší, vyhledávací pole — se z nich při sestavení dopočítá samo."
   q_palette: "Kterou paletu?"
   palette_custom: "Zadat hodnoty ručně (je jich čtrnáct)"
+  palette_keep: "Ponechat barvy, které web má teď"
   palette_set: "✅ %{name}."
   palettes_unreadable: "config/palettes.yml se nepodařilo přečíst (%{message}), takže zbývá jen ruční zadání."
   palette_malformed: "⚠️  Paleta '%{name}' v config/palettes.yml nemá sekce light a dark — přeskočena."

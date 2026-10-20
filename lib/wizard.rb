@@ -323,7 +323,12 @@ module Wizard
 
   # Returns the chosen option's first element. Esc (or an unusable
   # answer when piped) keeps whatever is current, which is the same
-  # promise every other prompt here makes.
+  # promise every other prompt here makes. Where nothing is current --
+  # current_index: nil, a pick among items rather than a value: which
+  # entry to remove, which network to add -- Esc returns nil and the
+  # caller does nothing. It used to fall back to 0, so backing out of
+  # "which one to remove?" removed the first one, a tag's hand-drawn
+  # icon among them, and backing out of "which to add?" added it.
   # `note:` is what the reader needs to see WHILE choosing -- the state the
   # options act on. Same rule as the label, and for the same reason the
   # comment below already gives: this menu paints from the top of the
@@ -367,7 +372,9 @@ module Wizard
       answer = line.strip
       index = answer.to_i - 1
       puts
-      return options[current_index].first unless answer.match?(/\A\d+\z/) && index.between?(0, options.size - 1)
+      unless answer.match?(/\A\d+\z/) && index.between?(0, options.size - 1)
+        return current_index && options[current_index].first
+      end
 
       return options[index].first
     end
@@ -384,8 +391,10 @@ module Wizard
     index = Tui.menu(options.map { |(_, desc)| desc },
                      header: header + [Tui.paint(label, :bold), ''],
                      hint: t('menu_hint', count: options.size),
-                     initial: current_index)
+                     initial: current_index || 0)
     chosen = index || current_index
+    return nil if chosen.nil?
+
     record(label, options[chosen].last)
     options[chosen].first
   end

@@ -1929,6 +1929,7 @@ style:
   palette_intro: "A palette is seven colours per mode. Everything else -- card backgrounds, hover colours, the search field -- is worked out from them at build time on its own."
   q_palette: "Which palette?"
   palette_custom: "Enter the values by hand (fourteen of them)"
+  palette_keep: "Keep the colours the site has now"
   palette_set: "✅ %{name}."
   palettes_unreadable: "config/palettes.yml could not be read (%{message}), so only the by-hand route is available."
   palette_malformed: "⚠️  Palette '%{name}' in config/palettes.yml is missing its light and dark sections -- skipped."

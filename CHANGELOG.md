@@ -58,6 +58,10 @@ and script link now carries a fingerprint, so the first deploy uploads every pag
 - **0 in the main menu closed `./blog.sh`** (#64), as q did. Esc leaves, as the keys say.
 - **`translate` did not say where a draft's translation can be read** (#67). It ends on the preview address; from a file, `translation_url`.
 - **`./setup.sh` sent the reader to http://localhost:8000/ as if the site were there.** It names the preview and the site's address.
+- **Esc in a pick among items took the first one.** "Which to remove?" removed it, "which to add?" added it.
+- **Enter in the palette keeps colours that are no palette of the list.** It proposed the first palette, and a preview.
+- **Enter in the banner wrote the engine's own defaults.** `show_title` and `show_claim` are written only when they differ.
+- **`./setup.sh` rewrote env.sh lines it did not change.** A bare or double-quoted value, and its comment, stay as written.
 
 ### Removed
 

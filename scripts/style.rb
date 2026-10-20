@@ -57,6 +57,7 @@ require_relative '../lib/version'
 require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
 require_relative '../lib/slug'
+require_relative '../lib/path_glob'
 # For the menu section: what tags and pages exist, and which addresses
 # the build answers at. Shared with check and doctor rather than read
 # again here, so that all three agree about what a menu item can point
@@ -208,13 +209,21 @@ def section_palette
   now = current_palette
   options = palettes.map { |slug, data| [slug, palette_name(slug, data)] }
   options << ['custom', t('palette_custom')]
-  index = options.index { |o| o.first == now } || 0
+  # Colours that are no palette of the list -- the site's own, or none at
+  # all, the engine's built-in blue -- are kept by Enter, as every other
+  # prompt here keeps what is there. The first palette used to be the
+  # default, so Enter on such a site proposed fourteen new colours and
+  # opened a preview of them. Last in the list, so a palette keeps its
+  # number.
+  options << ['keep', t('palette_keep')] unless now
+  index = options.index { |o| o.first == (now || 'keep') }
 
   # palettes is read by the line above, so any complaint about a malformed
   # entry exists by now and travels into the frame with the intro.
   chosen = Wizard.choose(t('q_palette'), options, current_index: index,
                          note: palette_warnings + [Tui.paint(t('palette_intro'), :dim)])
   return section_colors_by_hand if chosen == 'custom'
+  return if chosen == 'keep'
 
   data = palettes[chosen]
   return unless data
@@ -456,11 +465,14 @@ def section_banner
   # Enter keeps whatever the site already does -- which for an unset key is
   # ON, the engine's own default (BANNER_SHOW_TITLE/_CLAIM in
   # build_blog.rb). Asking with a bare [y/N] meant a run through the banner
-  # section turned both overlays off for anyone who pressed Enter.
+  # section turned both overlays off for anyone who pressed Enter. And
+  # written only when it differs from that, as show_image below: Enter on
+  # a site that never set them proposed two lines of the engine's own
+  # defaults, with the template's comment above them.
   show_title = Wizard.confirm(t('q_show_title'), default: at('banner', 'show_title') != false)
-  site.set(%w[banner show_title], show_title)
+  set_switch(%w[banner show_title], show_title, default: true)
   show_claim = Wizard.confirm(t('q_show_claim'), default: at('banner', 'show_claim') != false)
-  site.set(%w[banner show_claim], show_claim)
+  set_switch(%w[banner show_claim], show_claim, default: true)
 
   # Only where it can be seen. The claim's text is site.description unless
   # this overrides it -- and it exists because site.description has to stay
@@ -687,7 +699,7 @@ end
 # file name. Absent means classic, so classic chosen on a site that
 # never named one writes nothing.
 def section_skin
-  names = Dir.glob(File.join(ROOT, 'skins', '*.css')).map { |f| File.basename(f, '.css') }
+  names = PathGlob.under(ROOT, 'skins', '*.css').map { |f| File.basename(f, '.css') }
   names = ['classic'] + (names - ['classic']).sort
   written = at('site', 'skin').to_s.strip
   current = names.include?(written) ? written : 'classic'
@@ -704,7 +716,7 @@ end
 # Whether any post names a series -- read off the posts themselves, since
 # nothing else keeps a list of them.
 def site_has_series?
-  Dir.glob(File.join(ROOT, 'content.nosync', 'posts', '*', '*.json')).any? do |file|
+  PathGlob.under(ROOT, 'content.nosync', 'posts', '*', '*.json').any? do |file|
     post = JSON.parse(File.read(file, encoding: 'utf-8'))
     post.is_a?(Hash) && !post['series'].to_s.strip.empty?
   rescue JSON::ParserError, SystemCallError
@@ -906,6 +918,7 @@ def section_share
   names = SiteConfig::Chrome.list(current, 'share').map(&:to_s)
   labels = t('share_labels')
   labels = {} unless labels.is_a?(Hash)
+  before = names.dup
   touched = false
 
   loop do
@@ -918,7 +931,7 @@ def section_share
     options << ['keep', t('list_keep')]
     case Wizard.choose(t('q_share_action'), options, current_index: options.size - 1, note: state)
     when 'add'
-      name = Wizard.choose(t('q_share_network'), left.map { |n| [n, labels[n] || n] }, current_index: 0)
+      name = Wizard.choose(t('q_share_network'), left.map { |n| [n, labels[n] || n] }, current_index: nil)
       next unless name
 
       names << name
@@ -930,7 +943,9 @@ def section_share
     end
   end
 
-  site.set_list(%w[share], names) if touched
+  # A list that came back as it was is not written: rewriting it would
+  # only turn every entry into the writer's own spelling.
+  site.set_list(%w[share], names) if touched && names != before
   puts
 end
 
@@ -940,6 +955,7 @@ end
 # by name; a drawing of one's own (icon_svg) is markup and stays in the file.
 def section_tag_icons
   entries = SiteConfig::Chrome.list(current, 'tag_icons').select { |e| e.is_a?(Hash) }
+  before = entries.map(&:dup)
   touched = false
 
   loop do
@@ -966,7 +982,9 @@ def section_tag_icons
     end
   end
 
-  site.set_list(%w[tag_icons], entries) if touched
+  # As for share: an icon_svg written by hand stays as it was written
+  # unless the list itself changed.
+  site.set_list(%w[tag_icons], entries) if touched && entries != before
   puts
 end
 
@@ -975,7 +993,7 @@ def ask_tag_icon
   tag = Slug.slugify(Wizard.ask(t('q_tag_icon_tag'), '', hint: hint).to_s)
   return nil if tag.empty?
 
-  icon = Wizard.choose(t('q_tag_icon_icon'), Icons::NAMES.map { |n| [n, n] }, current_index: 0)
+  icon = Wizard.choose(t('q_tag_icon_icon'), Icons::NAMES.map { |n| [n, n] }, current_index: nil)
   icon ? { 'tag' => tag, 'icon' => icon } : nil
 end
 
@@ -1082,16 +1100,17 @@ def ask_nav_entry
   # items added after it, up to the next group.
   kinds << ['group', t('nav_kind_group')]
 
-  case Wizard.choose(t('q_nav_kind'), kinds, current_index: 0)
+  case Wizard.choose(t('q_nav_kind'), kinds, current_index: nil)
+  when nil then nil
   when 'home' then { 'label' => label.strip, 'url' => '/' }
   when 'group' then { 'label' => label.strip, 'group' => true }
   when 'tag' then ask_nav_tag(label.strip)
   when 'page'
-    path = Wizard.choose(t('q_nav_page'), nav_pages.map { |p| [p, p] }, current_index: 0)
-    { 'label' => label.strip, 'url' => path }
+    path = Wizard.choose(t('q_nav_page'), nav_pages.map { |p| [p, p] }, current_index: nil)
+    path && { 'label' => label.strip, 'url' => path }
   when 'series'
-    name = Wizard.choose(t('q_nav_series'), nav_series.map { |n| [n, n] }, current_index: 0)
-    { 'label' => label.strip, 'series' => name }
+    name = Wizard.choose(t('q_nav_series'), nav_series.map { |n| [n, n] }, current_index: nil)
+    name && { 'label' => label.strip, 'series' => name }
   else ask_nav_url(label.strip)
   end
 end
@@ -1200,7 +1219,9 @@ def ask_social_entry
   # of every page on the site.
   return nil if name.to_s.strip.empty? || url.to_s.strip.empty?
 
-  icon = Wizard.choose(t('q_social_icon'), ICONS.map { |i| [i, i] }, current_index: 0)
+  icon = Wizard.choose(t('q_social_icon'), ICONS.map { |i| [i, i] }, current_index: nil)
+  return nil unless icon
+
   entry = { 'name' => name, 'url' => url, 'icon' => icon }
   # rel="me" is what earns the verification tick on a Mastodon profile,
   # and it is the single least discoverable thing in the whole config --
@@ -1528,12 +1549,12 @@ def remove_from(entries)
   return entries if entries.empty?
 
   options = entries.each_with_index.map { |e, i| [i, yield(e)] }
-  index = Wizard.choose(t('q_list_which'), options, current_index: 0)
-  # Esc gives nil, and nil is not an index: rejecting "the entry whose
-  # position equals nil" matched nothing, so the list came back one item
-  # shorter -- the FIRST one, which on a default site is the Mastodon link
-  # carrying rel="me". Backing out of a question must leave the answer
-  # exactly as it was.
+  index = Wizard.choose(t('q_list_which'), options, current_index: nil)
+  # Esc gives nil -- nothing is current in a pick of which entry to take
+  # out -- and the list stays as it was. With current_index: 0 the menu
+  # turned Esc into 0, and backing out removed the FIRST entry: the
+  # Mastodon link carrying rel="me", or a tag's hand-drawn icon_svg the
+  # wizard has no way to put back.
   return entries if index.nil?
 
   entries.reject.with_index { |_, i| i == index }
