@@ -1401,6 +1401,15 @@ def card_time_html(post)
   time = post_display_time(post)
   on_the_hour = ->(t, hour) { t.hour == hour && t.min.zero? && t.sec.zero? }
   return '' if on_the_hour.call(time, 0) || on_the_hour.call(time.getutc, 0)
+  # ...and midnight in the offset the record itself carries: b2evolution
+  # wrote a day as 00:00:00+01:00 the whole year round, which in summer is
+  # 01:00 in the site's zone and not midnight in UTC either.
+  stored = begin
+    Time.iso8601(post['date'].to_s)
+  rescue ArgumentError
+    nil
+  end
+  return '' if stored && on_the_hour.call(stored, 0)
   return '' if INVENTED_HOUR_PLATFORMS.include?(platform) && on_the_hour.call(time, 12)
 
   %(<time class="date-time" datetime="#{time.iso8601}" hidden>#{time.strftime(t('time_format'))}</time>)
@@ -2317,9 +2326,12 @@ end
 
 # The entire attribute, or an empty string -- see the comment in
 # templates/partials/nav.html.erb for why this isn't an <% if %> block.
-def nav_current(href, active, part_of = nil)
+# `kind` is the node's: only an item written as `series:` is the chapter a
+# part belongs to. A `url:` to the same listing stayed dark on a part only
+# while no series: item stood beside it -- the two share an href.
+def nav_current(href, active, part_of = nil, kind = :item)
   return ' aria-current="page"' if href == active
-  return ' aria-current="true"' if part_of && href == part_of
+  return ' aria-current="true"' if part_of && kind == :series && href == part_of
 
   ''
 end
@@ -2825,7 +2837,7 @@ end
 # The engine's rules come first, so a skin's rule of the same weight wins --
 # all but the part below `---- after the skin ----`, which no skin may undo
 # (that hidden means hidden), and which therefore goes last.
-ENGINE_BEFORE, ENGINE_AFTER = File.read(ENGINE_CSS, encoding: 'utf-8').split(%r{^/\* ---- after the skin ---- \*/\n}, 2)
+ENGINE_BEFORE, ENGINE_AFTER = File.read(ENGINE_CSS, encoding: 'utf-8').split(%r{^/\* ---- after the skin ---- \*/\r?\n}, 2)
 # Without the comments: they are for whoever edits the files, and they are
 # most of the bytes (lib/css_text.rb).
 SITE_CSS_TEXT = CssText.without_comments("#{ENGINE_BEFORE.rstrip}\n\n#{File.read(File.join(SKINS_DIR, "#{SITE_SKIN}.css"), encoding: 'utf-8').rstrip}\n" \
@@ -3272,7 +3284,9 @@ end
 # name, and the build does not follow it), a group with nothing in it is
 # left out, and a group with no label ends the one before it: what it
 # holds stands in the menu ungrouped rather than under somebody else's
-# heading. [:item, href, label] or [:group, label, [items]].
+# heading. [:item, href, label] or [:group, label, [items]]; an item
+# written as `series:` is [:series, href, label], so the bar can tell it
+# from a `url:` to the same listing.
 def nav_group?(entry)
   SiteConfig::Chrome.nav_group?(entry)
 end
@@ -3299,7 +3313,8 @@ def configured_nav_tree
     href = nav_entry_href(entry)
     next if label.empty? || href.empty?
 
-    (group ? group[2] : tree) << [:item, href, label]
+    kind = entry['tag'].to_s.strip.empty? && !entry['series'].to_s.strip.empty? ? :series : :item
+    (group ? group[2] : tree) << [kind, href, label]
   end
   tree.reject { |kind, _, items| kind == :group && items.empty? }
 end

@@ -19,6 +19,8 @@
 # of that language and refuses a file it cannot honour, and `check`, which
 # says the same thing about an archive without building it. One answer for
 # both, so neither can pass what the other refuses.
+require_relative 'slug'
+
 module LanguageFile
   SETTINGS = %w[fallback ui_language language_name].freeze
 
@@ -66,7 +68,9 @@ module LanguageFile
     %w[nav] => lambda { |entry|
       if entry['group'] == true then 'group'
       elsif !entry['tag'].to_s.strip.empty? then "tag:#{entry['tag'].to_s.strip}"
-      elsif !entry['series'].to_s.strip.empty? then "series:#{entry['series'].to_s.strip}"
+      # By its slug, which is where it leads: `series:` takes the name or
+      # the slug, and "Příručka" here with "prirucka" there is one place.
+      elsif !entry['series'].to_s.strip.empty? then "series:#{Slug.slugify(entry['series'].to_s.strip)}"
       else entry['url'].to_s.strip
       end
     },

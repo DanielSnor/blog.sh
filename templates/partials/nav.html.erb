@@ -24,10 +24,10 @@
       <ul>
 <% NAV_TREE.each do |kind, *node| %><% if kind == :group %>        <li class="nav-group"><span class="nav-group__label"><%= h(node[0]) %></span>
           <ul>
-<% node[1].each do |_, href, label| %>            <li><a href="<%= h(href) %>"<%= nav_current(href, active, part_of) %>><%= h(label) %></a></li>
+<% node[1].each do |item_kind, href, label| %>            <li><a href="<%= h(href) %>"<%= nav_current(href, active, part_of, item_kind) %>><%= h(label) %></a></li>
 <% end %>          </ul>
         </li>
-<% else %>        <li><a href="<%= h(node[0]) %>"<%= nav_current(node[0], active, part_of) %>><%= h(node[1]) %></a></li>
+<% else %>        <li><a href="<%= h(node[0]) %>"<%= nav_current(node[0], active, part_of, kind) %>><%= h(node[1]) %></a></li>
 <% end %><% end %>      </ul>
 <% end %><% if search %>
       <form class="search-form" action="<%= loc('/search/') %>" method="get" role="search">

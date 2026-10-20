@@ -21,10 +21,23 @@ module CssText
   # does a string. One pass of one pattern: a walk by index went through a
   # UTF-8 string from its start for every character it read, and minimal's
   # 175 kB took 1.8 s of every build where it now takes 3 ms.
-  TOKEN = %r{("(?:\\.|[^"\\])*(?:"|\z)|'(?:\\.|[^'\\])*(?:'|\z))|/\*.*?(?:\*/|\z)}m.freeze
+  #
+  # An unquoted url(...) is one piece too: `url(/img/*bg.png)` is an
+  # address, not the start of a comment that swallowed the rest of the
+  # file. And a comment between two pieces that would run together without
+  # it -- `1px/**/2px`, two lengths -- leaves `/**/` in its place, as a CSS
+  # serializer does; anywhere else it goes.
+  JOINS = '[A-Za-z0-9_\-\\\\.%]'
+  TOKEN = %r{(?<kept>"(?:\\.|[^"\\])*(?:"|\z)|'(?:\\.|[^'\\])*(?:'|\z)|(?i:url)\(\s*[^\s"')][^)]*\))|
+             (?<before>#{JOINS})?/\*.*?(?:\*/|\z)(?<after>(?=#{JOINS}))?}mx.freeze
 
   def without_comments(css)
-    out = css.gsub(TOKEN) { Regexp.last_match(1) || '' }
+    out = css.gsub(TOKEN) do
+      m = Regexp.last_match
+      next m[:kept] if m[:kept]
+
+      m[:before] && m[:after] ? "#{m[:before]}/**/" : m[:before].to_s
+    end
     "#{out.lines.map(&:rstrip).join("\n").gsub(/\n{3,}/, "\n\n").strip}\n"
   end
 end
