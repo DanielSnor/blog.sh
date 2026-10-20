@@ -1000,13 +1000,16 @@ git fetch --tags && git checkout v1.11
 
 The first build after an upgrade may be a full one -- the engine's own
 fingerprint changed, so the record of the last build is thrown away --
-and it writes `.build_cache.json` in the installation directory, which
-is per-machine, gitignored and always safe to delete. Deploy the assets
+and it writes `.build_cache.json` in the installation directory -- on a
+site of several languages one `.build_cache-<hash>.json` for each of them
+-- which is per-machine, gitignored and always safe to delete. Deploy the assets
 with it: a page that cannot fetch `assets/js/share.js` logs a 404 on
 every load. From 1.10 to 1.11 that first deploy uploads every page, once:
 each link to a stylesheet or a script now carries a fingerprint of the
 file (`?v=`), so a returning reader is never handed a new page with
 yesterday's stylesheet -- and every later change to one does the same.
+The same deploy takes `/write/` off the site, so a post that links to it
+now leads to a 404; `./blog.sh check` names each one (`link_dead`).
 
 **Going back a version** is `git checkout <tag>` and a rebuild, and what
 the newer version was given to work with is looked at first, because the

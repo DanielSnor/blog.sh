@@ -1177,8 +1177,9 @@ or its fingerprint. With nothing after it, somebody at a terminal is
 asked which one, and nothing goes without a yes.
 
 `--list` also says when each device was last seen: the door notes the
-moment on every request a device makes, a delivery included, and the
-pairing makes the first note. It is as near as a server comes to testing
+moment on every request a device makes through it, a delivery included,
+and the pairing makes the first note. (The word `receive`, which hands a
+file straight to `receive.sh` and which no app sends, goes past it.) It is as near as a server comes to testing
 the connection -- it cannot call a phone, the phone calls it -- so a
 device not seen for weeks is one whose app has stopped asking. A device
 let in before 1.11 is "not seen yet" until its next request. The notes

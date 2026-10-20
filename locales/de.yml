@@ -299,7 +299,7 @@ cli:
   # Übersetzen.
   media_name_taken: "media: %{name} war schon belegt -- die Datei, die dort lag, heißt jetzt %{moved}"
   versions_not_moved: "versions: die Bearbeitungshistorie von %{slug} ist ihm nicht ins Jahr %{year} gefolgt -- suche sie unter %{path}"
-  receipt_shape: "`receipt:` ist ein Name, den die sendende Seite für ihre Antwort wählt, und er muss aus sechzehn Hexadezimalzeichen bestehen -- daraus wird ein Dateiname auf der Website. Ohne die Zeile wird der Beitrag ohne eine geschrieben."
+  receipt_shape: "`receipt:` ist ein Name, den der Absender einmal für einen Beitrag wählt, damit eine Zustellung, die zweimal ankommt, ein Beitrag bleibt -- und er muss aus sechzehn Hexadezimalzeichen bestehen. Ohne die Zeile wird der Beitrag ohne einen geschrieben."
   link_without_url: "Ein Beitrag kann eine Linkkarte tragen, aber `link_title:` und `link_description:` sind Zeilen ÜBER eine -- dazu gehört ein `link:` mit der Adresse."
   link_not_http: "`link: %{url}` ist keine Adresse, auf die eine Karte zeigen kann. Sie will eine vollständige http://- oder https://-Adresse oder eine, die an der Wurzel dieser Website beginnt (`/posts/2026/ein-beitrag/`); auf eine Datei neben dem Beitrag verweist eine gewöhnliche Linkzeile im Text."
   video_hevc: "⚠️  %{files}: als HEVC aufgenommen -- die meisten Browser spielen das ab, aber nicht alle; die übrigen Leser bekommen statt des Videos einen leeren Player. Gespeichert wird es trotzdem. Neu kodiert läuft es überall (braucht ffmpeg -- auf dem Mac `brew install ffmpeg`):\n     %{command}"
