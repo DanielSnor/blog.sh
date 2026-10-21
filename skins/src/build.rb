@@ -197,8 +197,11 @@ def listing_selector?(sel)
   sel.include?('.post-list-item') && !sel.include?('search-result')
 end
 
+# A search result is a .post-list-item too, and stays a row as well: the
+# wall is the listing's, and narrowed to the row card alone the results lost
+# minimal's padding and hairline and ran into one block.
 def to_rowcard(sel)
-  sel.sub(/\.post-list-item(?![\w-])/) { ".post-list-item:where(#{ROWCARD})" }
+  sel.sub(/\.post-list-item(?![\w-])/) { ".post-list-item:where(#{ROWCARD}, .search-result)" }
 end
 
 # Every selector of a rule that speaks of a post in a listing, narrowed to

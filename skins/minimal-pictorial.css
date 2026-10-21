@@ -2007,11 +2007,11 @@ nav.nav-open ul { display: flex; flex-direction: row; flex-wrap: wrap; width: 10
 
 /* A post in a listing is an open row: the date in the margin, a hairline
    under it, and of the post only how it begins. */
-main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) {
+main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) {
   padding: 20px 0;
   border-bottom: 1px solid var(--line);
 }
-main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):first-of-type { border-top: 1px solid var(--line); }
+main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):first-of-type { border-top: 1px solid var(--line); }
 .post-header { gap: 18px; }
 
 .date-badge,
@@ -2044,15 +2044,15 @@ main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > 
 }
 .date-badge .pin-mark svg { display: block; }
 
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body {
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
   gap: 7px 14px;
 }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body > * { order: 5; flex: 0 0 100%; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body::after { content: none; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body > h2 {
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body > * { order: 5; flex: 0 0 100%; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body::after { content: none; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body > h2 {
   order: 1;
   margin: 0;
   font-size: 21px;
@@ -2060,40 +2060,40 @@ main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > 
   line-height: 1.25;
   letter-spacing: -0.005em;
 }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) h2 a { color: var(--ink); text-decoration: none; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) h2 a:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .series-note { order: 2; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) h2 a { color: var(--ink); text-decoration: none; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) h2 a:hover { color: var(--ink); text-decoration: underline; text-decoration-color: var(--accent); text-underline-offset: 4px; text-decoration-thickness: 2px; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .series-note { order: 2; }
 /* The text of a row runs to the right edge of its column, where its
    pictures and the row of facts under it end. It is held to no measure in
    characters: the column is the measure, here and in every skin built on
    this file, whatever width or size of type that skin gives it. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content { order: 3; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content { order: 3; }
 /* ...but not a video, a picture or a player standing straight in the row:
    those keep the engine's max-width: 100%. Released with the rest, a
    1920-pixel video drew 1920 pixels wide across the sidebar and the page
    ran sideways (found checking lead_card, 14. 10. 2026). */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > :where(:not(video, img, iframe)) { max-width: none; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > :where(:not(video, img, iframe)) { max-width: none; }
 /* A row that opens with a block of code: the code scrolls inside itself
    and the row keeps its column. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body { min-width: 0; max-width: 100%; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body > * { min-width: 0; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > pre { max-width: 100%; overflow-x: auto; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body { min-width: 0; max-width: 100%; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body > * { min-width: 0; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > pre { max-width: 100%; overflow-x: auto; }
 /* The reading time, the counts and the tags are one run of words: their
    two boxes are dissolved, so a tag that does not fit goes to the start of
    the next line instead of hanging under the first tag. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body > .post-meta,
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body > .tags { display: contents; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-meta > *,
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .tags > * { flex: 0 0 auto; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-meta > .reading-time { order: 6; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-meta > .post-stats { order: 7; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .tags > * { order: 8; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .read-more { display: none; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body > .post-meta,
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body > .tags { display: contents; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-meta > *,
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .tags > * { flex: 0 0 auto; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-meta > .reading-time { order: 6; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-meta > .post-stats { order: 7; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .tags > * { order: 8; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .read-more { display: none; }
 
 /* Only the first block of the teaser, and of a paragraph three lines. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > *:not(:first-child) { display: none; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > :first-child { margin: 0; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > p:first-child {
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > *:not(:first-child) { display: none; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > :first-child { margin: 0; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > p:first-child {
   display: -webkit-box;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -2123,8 +2123,8 @@ main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > 
 
 /* A picture that opens a post is shown, but a tall one does not get to
    push the next three posts off the screen. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content figure img { width: auto; max-width: 100%; max-height: 420px; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content .photo-grid img { width: 100%; max-height: 260px; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content figure img { width: auto; max-width: 100%; max-height: 420px; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content .photo-grid img { width: 100%; max-height: 260px; }
 
 /* What the engine says about a post: how long, how many, about what. */
 .post-meta { gap: 12px; }
@@ -2147,8 +2147,8 @@ main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > 
 .reading-time svg { margin-right: 4px; vertical-align: -0.1em; }
 .post-meta .reading-time { order: -1; }
 
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .tag-pill,
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) a.tag-pill:hover {
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .tag-pill,
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) a.tag-pill:hover {
   padding: 0;
   margin: 0;
   border: 0;
@@ -2156,14 +2156,14 @@ main .post-list-item:where(body.page-first main:has(> .listing-heading--home) > 
   border-radius: 0;
   color: var(--muted);
 }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) a.tag-pill:hover { color: var(--ink); }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) a.tag-pill:hover { color: var(--ink); }
 
 @media (max-width: 700px) {
-  .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) h2 { font-size: 20px; }
+  .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) h2 { font-size: 20px; }
   .listing-heading { font-size: 25px; }
 }
 @media (max-width: 560px) {
-  .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-header { flex-direction: column; gap: 4px; }
+  .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-header { flex-direction: column; gap: 4px; }
   .date-badge,
 .date-badge:hover { width: auto; padding: 0; }
   .date-badge .pin-mark { display: inline-flex; margin: 0 0 0 8px; vertical-align: middle; }
@@ -2281,7 +2281,7 @@ a.tag-pill:hover { background: none; border-color: var(--ink); color: var(--ink)
 /* A bare address, or any word longer than the column, is broken rather
    than let to push the page wider than a phone. */
 .content { overflow-wrap: break-word; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content { font-size: 16px; line-height: 1.55; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content { font-size: 16px; line-height: 1.55; }
 .content > p,
 .content > ul,
 .content > ol,
@@ -2344,7 +2344,7 @@ blockquote { border-left: 2px solid var(--accent); }
 .toc a:hover { text-decoration: underline; text-decoration-color: var(--accent); }
 
 .tags { margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line); }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .tags { padding-top: 0; border-top: 0; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .tags { padding-top: 0; border-top: 0; }
 
 .series-nav { margin: 16px 0 0; font-size: 12px; }
 .series-nav a,
@@ -2799,7 +2799,7 @@ a.tag-pill:hover,
 a.lang-switch:hover { border-color: var(--accent); }
 a.lang-switch:hover .lang-switch__item { color: var(--accent); }
 a.lang-switch:hover .lang-switch__item.is-current { color: var(--on-accent); }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) a.tag-pill:hover { color: var(--accent); }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) a.tag-pill:hover { color: var(--accent); }
 
 .wrap > nav a[aria-current="page"]:hover,
 .tag-index-sort-button[aria-pressed="true"]:hover,
@@ -3114,8 +3114,8 @@ nav.nav-open .nav-group > ul { flex: none; margin: 0; padding: 0; overflow: visi
 /* On a series' listing the order matters more than the day: the date
    steps back to grey and leaves the accent to the line that says which
    part this is. */
-.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .date-badge { color: var(--muted); }
-.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .date-badge:hover { color: var(--ink); }
+.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .date-badge { color: var(--muted); }
+.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .date-badge:hover { color: var(--ink); }
 
 /* The date's column is wide enough for the longest date a year has --
    two digits of day and two of month -- and a date never breaks: the
@@ -3135,27 +3135,27 @@ nav.nav-open .nav-group > ul { flex: none; margin: 0; padding: 0; overflow: visi
 
 /* A quotation that opens a card is cut like a paragraph is, a little
    later: six lines of somebody else's words, the rest on the post's page. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > blockquote:first-child {
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > blockquote:first-child {
   display: -webkit-box;
   -webkit-line-clamp: 6;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 0;
 }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > blockquote:first-child > :first-child { margin-top: 0; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > blockquote:first-child > :first-child { margin-top: 0; }
 
 /* On the listings of pictures and of video a card shows its picture or
    its film as well as its opening words -- where the engine's cut of the
    card left it in. The listing is known by the menu item that is on. */
-.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > figure:first-of-type,
-.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > .photo-grid:first-of-type,
-.wrap:has(> nav a[aria-current="page"][href$="/type/video/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > figure:first-of-type,
-.wrap:has(> nav a[aria-current="page"][href$="/type/video/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > .embed-responsive:first-of-type {
+.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > figure:first-of-type,
+.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > .photo-grid:first-of-type,
+.wrap:has(> nav a[aria-current="page"][href$="/type/video/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > figure:first-of-type,
+.wrap:has(> nav a[aria-current="page"][href$="/type/video/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > .embed-responsive:first-of-type {
   display: block;
   margin: 10px 0 0;
 }
-.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content > .photo-grid:first-of-type { display: grid; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .content figure video { display: block; width: 100%; max-height: 420px; border-radius: var(--corner); border: 1px solid var(--line); background: #000; }
+.wrap:has(> nav a[aria-current="page"][href$="/type/image/"]) .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content > .photo-grid:first-of-type { display: grid; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .content figure video { display: block; width: 100%; max-height: 420px; border-radius: var(--corner); border: 1px solid var(--line); background: #000; }
 
 /* A listing by type is named by the menu item that is on, right above
    it; the heading saying the same word again is kept for a reader who
@@ -3177,9 +3177,9 @@ nav.nav-open .nav-group > ul { flex: none; margin: 0; padding: 0; overflow: visi
    picture is half of what was said. A titled post stays words. It shows
    only what the engine's cut of the card left in, which today is not
    much; the rule waits for the day the card carries its media. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body:not(:has(> h2)) .content > figure:first-of-type,
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body:not(:has(> h2)) .content > .embed-responsive:first-of-type { display: block; margin: 10px 0 0; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body:not(:has(> h2)) .content > .photo-grid:first-of-type { display: grid; margin: 10px 0 0; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body:not(:has(> h2)) .content > figure:first-of-type,
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body:not(:has(> h2)) .content > .embed-responsive:first-of-type { display: block; margin: 10px 0 0; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body:not(:has(> h2)) .content > .photo-grid:first-of-type { display: grid; margin: 10px 0 0; }
 
 /* On black the same two tints sink into brown and towards each other, so
    the dark scheme mixes more of the accent into both. Written twice, as
@@ -3579,7 +3579,7 @@ body.page-cont main:has(> .listing-heading--home) > .pagination > span {
   left: 0;
   color: var(--accent);
 }
-body.page-cont main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):first-of-type { border-top: 1px solid var(--line); }
+body.page-cont main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):first-of-type { border-top: 1px solid var(--line); }
 
 /* A film shot upright is held to about a screen's height and stands in
    the middle of the column; across the full width it came out twelve
@@ -3654,8 +3654,8 @@ body.page-cont main:has(> .listing-heading--home) > .pagination > .pagination-st
 
 /* On a series' own listing the heading has said the name; each card says
    only which part it is. */
-.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .series-note__name,
-.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .series-note__sep { display: none; }
+.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .series-note__name,
+.listing-heading--series ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .series-note__sep { display: none; }
 
 /* On a tag's listing every card carries that tag; there it steps back. */
 .tag-pill-own { opacity: 0.45; }
@@ -3714,7 +3714,7 @@ body.page-cont main:has(> .listing-heading--home) > .pagination > .pagination-st
   clip-path: none;
   white-space: normal;
 }
-main .listing-heading--type ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):first-of-type { border-top: 1px solid var(--line); }
+main .listing-heading--type ~ .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):first-of-type { border-top: 1px solid var(--line); }
 
 /* A continuation of the front page: "page 300" is the kind of page, set
    as one, and the days it covers take the count's place and voice. */
@@ -3784,14 +3784,14 @@ main > .not-found-links { margin-top: 16px; padding-top: 0; border-top: 0; }
 /* The pin is written before the date, and is shown after it: centred under the
    date on a wide screen, so the date stays level with the title as on every other
    card, and beside it on a narrow one. */
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .date-badge.is-pinned {
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .date-badge.is-pinned {
   display: grid;
   grid-template-columns: max-content;
   justify-items: center;
 }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .date-badge.is-pinned .pin-mark { order: 1; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .date-badge.is-pinned .pin-mark { order: 1; }
 @media (max-width: 560px) {
-  .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .date-badge.is-pinned { display: flex; align-items: center; }
+  .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .date-badge.is-pinned { display: flex; align-items: center; }
 }
 
 /* The sidebar's rows, shortened. A toot's address is the short form Mastodon
@@ -3892,8 +3892,8 @@ body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagi
    own icons, so the two groups stood at two heights. Now the reading time
    centres its icon as the others do, and the row centres all of it. */
 .post-stat.reading-time { display: inline-flex; align-items: center; }
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body > .post-meta > *,
-.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))) .post-body > .tags > * { align-self: center; }
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body > .post-meta > *,
+.post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result) .post-body > .tags > * { align-self: center; }
 
 /* The lead. The post that opens the front page -- the pinned one where
    there is one, the newest where there is none -- is the one row of a
@@ -3921,7 +3921,7 @@ body.page-cont main:has(> .listing-heading--home) > .pagination > span:not(.pagi
 /* Under it, air: fifty-four pixels to the next date, against forty-one
    between two rows, and no hairline, so the listing is seen to begin below
    the lead and the lead is not read as its first row. */
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) {
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) {
   margin: 18px 0 34px;
   padding: 24px 26px 22px;
   border: 0;
@@ -3931,26 +3931,26 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.
 /* From 561px up, which is where a row stops stacking by itself: below that
    the date is above the title already. */
 @media (min-width: 561px) {
-  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .post-header { display: block; }
-  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .date-badge { margin: 0 0 10px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .post-header { display: block; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .date-badge { margin: 0 0 10px; }
 }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .post-body > h2 {
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .post-body > h2 {
   font-size: clamp(26px, 3.3vw, 36px);
   line-height: 1.1;
   letter-spacing: -0.015em;
   margin: 0 0 10px;
   text-wrap: balance;
 }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .content > figure:first-child { margin: 12px 0 16px; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .content > figure:first-child figcaption { display: none; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .content > p:first-of-type { -webkit-line-clamp: 5; font-size: 17px; line-height: 1.6; opacity: 0.88; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .content > figure:first-child { margin: 12px 0 16px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .content > figure:first-child figcaption { display: none; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .content > p:first-of-type { -webkit-line-clamp: 5; font-size: 17px; line-height: 1.6; opacity: 0.88; }
 @media (max-width: 700px) {
   /* Ten pixels into the gutter on each side, so the words inside keep the
      edge the rest of the page reads from. */
-  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) { margin: 16px -10px 28px; padding: 16px 10px 14px; }
-  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .post-body > h2 { margin-bottom: 8px; }
-  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .content > figure:first-child { margin: 4px 0 12px; }
-  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .content > p:first-of-type { font-size: 16px; line-height: 1.55; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) { margin: 16px -10px 28px; padding: 16px 10px 14px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .post-body > h2 { margin-bottom: 8px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .content > figure:first-child { margin: 4px 0 12px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .content > p:first-of-type { font-size: 16px; line-height: 1.55; }
 }
 
 /* A lead with no picture has room, and takes it: it shows everything the
@@ -3960,34 +3960,34 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.
    the author's to say, not a count in this file. A heading the cut happened
    to end on is left out, since nothing follows it; and because whole
    paragraphs do not trail off, the way on to the rest is said in words. */
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > * { display: block; margin: 0 0 12px; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > :last-child { margin-bottom: 0; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p,
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { display: block; overflow: visible; font-size: 16.5px; line-height: 1.6; opacity: 0.88; -webkit-line-clamp: none; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > .photo-grid { display: grid; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > table { display: table; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > :is(h1, h2, h3, h4, h5, h6, hr):last-child { display: none; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .read-more {
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > * { display: block; margin: 0 0 12px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > :last-child { margin-bottom: 0; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { display: block; overflow: visible; font-size: 16.5px; line-height: 1.6; opacity: 0.88; -webkit-line-clamp: none; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > .photo-grid { display: grid; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > table { display: table; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > :is(h1, h2, h3, h4, h5, h6, hr):last-child { display: none; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .read-more {
   /* one of the row it stands in: the engine's voice, the row's size, on the
      row's own axis */
   display: inline-block; order: 5; flex: 0 0 auto; align-self: center; margin: 0; color: var(--ink);
   font-family: var(--mono); font-size: 12px; font-weight: 700; letter-spacing: 0.05em; line-height: 1.2; text-transform: lowercase;
   text-decoration: underline; text-decoration-color: var(--accent); text-decoration-thickness: 1.5px; text-underline-offset: 3px;
 }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .read-more:hover { color: var(--accent); }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .read-more:hover { color: var(--accent); }
 @media (max-width: 700px) {
-  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p,
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { font-size: 16px; line-height: 1.55; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { font-size: 16px; line-height: 1.55; }
 }
 
 /* A pinned lead says so before its date: the pin, plain and in the accent,
    the size of the date it stands beside. It is the answer to the question a
    reader would otherwise have -- why a post months old is the first thing on
    the page -- and a lead that is simply the newest post has none. */
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned { display: flex; align-items: center; justify-items: start; gap: 6px; }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned .pin-mark,
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned:hover .pin-mark { display: inline-flex; order: -1; width: 14px; height: 14px; margin: 0; border-radius: 0; background: none; color: var(--accent); }
-body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child))):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned .pin-mark svg { display: block; width: 14px; height: 14px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned { display: flex; align-items: center; justify-items: start; gap: 6px; }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned .pin-mark,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned:hover .pin-mark { display: inline-flex; order: -1; width: 14px; height: 14px; margin: 0; border-radius: 0; background: none; color: var(--accent); }
+body.page-first main:has(> .listing-heading--home) > .post-list-item:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)), .search-result):is(.post-list-item--lead, :first-of-type) .date-badge.is-pinned .pin-mark svg { display: block; width: 14px; height: 14px; }
 
 /* ====================================================== minimal pictorial
 

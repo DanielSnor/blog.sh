@@ -87,6 +87,11 @@
 /* A wide table scrolls within itself instead of stretching the page. */
 .table-wrap { overflow-x: auto; margin: 1rem 0; }
 img, video { max-width: 100%; height: auto; }
+/* Words too: a bare address or a run of inline code longer than its column
+   is broken rather than let push the page wider than a phone -- in a
+   post's words and in a search result's, whatever the skin. Classic never
+   had this, and a link in a card made /type/video/ 548px wide at 390. */
+.content, .search-result { overflow-wrap: break-word; }
 
 /* The lightbox: a picture opened over the page (assets/js/lightbox.js). */
 .content figure img, .photo-grid img { cursor: zoom-in; }

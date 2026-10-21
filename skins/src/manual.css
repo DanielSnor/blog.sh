@@ -243,6 +243,7 @@ main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--h
   .wrap > nav a:hover { background: var(--plate); color: var(--accent); }
   .wrap > nav a[aria-current="page"],
   .wrap > nav li:first-child a[aria-current="page"],
+  .wrap > nav li:last-child a[aria-current="page"],
   .wrap > nav a[aria-current="page"]:hover { padding: 7px 10px; margin: 0; background: var(--accent); color: var(--on-accent); font-weight: 600; }
   /* A group of chapters (`group: true` in nav:) is a heading over them,
      in the voice the family labels things in -- small, bold, monospace,
@@ -265,5 +266,8 @@ main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--h
   /* On a part of a chapter its row says so -- the reader is in it, not on
      its listing (aria-current="true", where the listing's own is "page"):
      in the accent and bold, the fill left to the listing. */
-  .wrap > nav a[aria-current="true"] { color: var(--accent); font-weight: 600; }
+  /* The last chapter as well: `li:last-child a` above outweighs a bare
+     a[aria-current], and Releasing never lit up. */
+  .wrap > nav a[aria-current="true"],
+  .wrap > nav li:last-child a[aria-current="true"] { color: var(--accent); font-weight: 600; }
 }

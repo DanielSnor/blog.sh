@@ -2089,9 +2089,13 @@ nav li {
 /* The chapter the reader is in (aria-current="true", a part of a series
    the menu names): in the accent and bold -- inverse video stays where
    the reader is, on the chapter's own listing. */
-.wrap > nav a[aria-current="true"] { color: var(--accent); font-weight: 700; }
+/* The last item too: `li:last-child a` above outweighs a bare
+   a[aria-current], so the last item of the bar lost both. */
+.wrap > nav a[aria-current="true"],
+.wrap > nav li:last-child a[aria-current="true"] { color: var(--accent); font-weight: 700; }
 .wrap > nav a[aria-current="page"],
 .wrap > nav li:first-child a[aria-current="page"],
+.wrap > nav li:last-child a[aria-current="page"],
 .wrap > nav a[aria-current="page"]:hover {
   margin: 4px 0 8px;
   padding: 4px 8px;
@@ -2153,7 +2157,8 @@ nav li {
   .wrap > nav a,
   .wrap > nav li:last-child a,
   .wrap > nav a[aria-current="page"],
-  .wrap > nav li:first-child a[aria-current="page"] { margin: 4px 0; padding: 7px 9px; border: 0; }
+  .wrap > nav li:first-child a[aria-current="page"],
+  .wrap > nav li:last-child a[aria-current="page"] { margin: 4px 0; padding: 7px 9px; border: 0; }
   .search-form { flex: 1 1 100%; }
   .search-form input[type="search"] { width: 100%; height: 38px; }
   .search-form button { top: 4px; }
