@@ -63,6 +63,7 @@ and script link now carries a fingerprint, so the first deploy uploads every pag
 - **Enter in the banner wrote the engine's own defaults.** `show_title` and `show_claim` are written only when they differ.
 - **`./setup.sh` rewrote env.sh lines it did not change.** A bare or double-quoted value, and its comment, stay as written.
 - **A long address or a run of inline code pushed a page sideways on a phone.** A post's words and a search result's break.
+- **A menu changed in `./style.sh` left a language's menu as it was,** and the build refused it. Each is reshaped with the site's.
 
 ### Removed
 

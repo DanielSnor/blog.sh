@@ -29,6 +29,7 @@ require_relative '../lib/social_icons'
 require_relative '../lib/icons'
 require_relative '../lib/share_targets'
 require_relative '../lib/site_config'
+require_relative '../lib/language_file'
 require_relative '../lib/account_id'
 
 ROOT = File.expand_path('..', __dir__)
@@ -121,6 +122,16 @@ end
 
 def site
   @site ||= ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
+end
+
+# The language files this run changes, by path: config/site.<lang>.yml,
+# reviewed and written with site.yml.
+def language_writers
+  @language_writers ||= {}
+end
+
+def language_writer(path)
+  language_writers[path] ||= ConfigWriter::YamlFile.new(path)
 end
 
 # Same arrangement as setup.rb: a value still equal to the template's
@@ -1019,6 +1030,7 @@ def section_nav
   # the author the opposite of what their own site was doing.
   derived = !SiteConfig::Chrome.written?(current, 'nav')
   entries = SiteConfig::Chrome.list(current, 'nav')
+  before = entries.dup
   touched = false
 
   loop do
@@ -1071,8 +1083,59 @@ def section_nav
     end
   end
 
-  site.set_list(%w[nav], entries) if touched
+  if touched
+    site.set_list(%w[nav], entries)
+    reshape_language_menus(before, entries)
+  end
   puts
+end
+
+# A menu worded in another language (config/site.<lang>.yml) goes to the
+# same places as the site's own, item by item -- the build refuses one that
+# does not. Changing the menu here used to leave those lists as they were,
+# and blogsh.app then built in no language at all. So each is reshaped with
+# the site's: an item that stayed keeps the word that language gave it, a
+# new one comes without a word (the site's own stands in, and check says
+# so, until somebody writes one), and one taken out goes.
+def reshape_language_menus(before, after)
+  own = at('site', 'lang').to_s.strip
+  codes = Array(at('site', 'locales')).map { |code| code.to_s.strip }.reject { |code| code.empty? || code == own }.uniq
+  codes.each do |code|
+    path = File.join(File.dirname(SITE_YML), "site.#{code}.yml")
+    next unless File.file?(path)
+
+    theirs = begin
+      YAML.safe_load(File.read(path, encoding: 'utf-8'), aliases: true)
+    rescue Psych::Exception
+      nil
+    end
+    theirs = theirs['nav'] if theirs.is_a?(Hash)
+    next unless theirs.is_a?(Array)
+
+    reshaped = reshaped_menu(before, after, theirs)
+    language_writer(path).set_list(%w[nav], reshaped) unless reshaped == theirs
+  end
+end
+
+# Each item of the new menu, in that language's words. Where the language's
+# list went to the same places as the menu before this run, an item is
+# matched by being the same item -- a group keeps its word when another
+# group goes. Otherwise, or for an item that is new, by the place it leads
+# to, the first of that language's items to lead there.
+def reshaped_menu(before, after, theirs)
+  place = LanguageFile::PLACED_LISTS[%w[nav]]
+  place_of = ->(entry) { entry.is_a?(Hash) ? place.call(entry) : nil }
+  aligned = before.size == theirs.size && before.zip(theirs).all? { |mine, word| place_of.(mine) && place_of.(mine) == place_of.(word) }
+  unused = theirs.each_index.to_a
+  after.map do |entry|
+    at_index = aligned ? before.index { |was| was.equal?(entry) } : nil
+    at_index = unused.find { |i| place_of.(theirs[i]) == place_of.(entry) } unless at_index && unused.include?(at_index)
+    unused.delete(at_index) if at_index
+    word = at_index ? theirs[at_index] : nil
+    keys = entry.is_a?(Hash) ? entry.slice('group', 'tag', 'series', 'url') : {}
+    label = word.is_a?(Hash) ? word['label'].to_s.strip : ''
+    label.empty? ? keys : { 'label' => word['label'] }.merge(keys)
+  end
 end
 
 def nav_summary(entry)
@@ -1609,7 +1672,8 @@ def run
   # the run's whole verdict arrived glued to the bottom edge of the menu:
   # "…· Esc dokončit" and under it, touching, "Nic se nezměnilo".
   puts
-  outcome = Wizard.review_and_write([[relative(SITE_YML), site]], also: pending_review)
+  outcome = Wizard.review_and_write([[relative(SITE_YML), site]] + language_writers.map { |path, writer| [relative(path), writer] },
+                                    also: pending_review)
   # A refused or rolled-back write is exit 1 (a cancel at the diff stays 0
   # -- that is the user's choice, not a fault).
   exit 1 if outcome == :failed

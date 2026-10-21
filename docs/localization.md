@@ -301,7 +301,11 @@ second site, and a reader who switches language would lose the item they
 were reaching for. The address is still the one the site's own language
 writes -- `/posts/2026/blog-sh/` above -- and the Czech build takes it to
 the Czech copy of that post, as it does for the site's own menu. A footer
-link goes the same way.
+link goes the same way. A menu changed in `./style.sh` is changed in every
+language file that words it: an item that stayed keeps that language's
+word, a new one is written without a word -- the site's own stands in
+until you write one -- and one taken out goes; the review shows each file
+before anything is written.
 
 The rules, which the build and `check` both enforce: the site's own
 language has no file (site.yml is it); a file for a language
