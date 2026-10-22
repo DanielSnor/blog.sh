@@ -1105,7 +1105,7 @@ def reshape_language_menus(before, after)
     next unless File.file?(path)
 
     theirs = begin
-      YAML.safe_load(File.read(path, encoding: 'utf-8'), aliases: true)
+      YamlCompat.load(File.read(path, encoding: 'utf-8'))
     rescue Psych::Exception
       nil
     end
