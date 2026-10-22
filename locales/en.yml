@@ -307,7 +307,7 @@ cli:
   # destroy. The "media:" prefix is the directory, not a word to translate.
   media_name_taken: "media: %{name} was already taken -- the file that was there is now %{moved}"
   versions_not_moved: "versions: the edit history of %{slug} did not follow it to %{year} -- look for it under %{path}"
-  receipt_shape: "`receipt:` is a name the sender makes up once for a post, so that a delivery arriving twice is one post -- and it has to be sixteen hexadecimal characters. Leave the line out and the post is written without one."
+  receipt_shape: "`receipt:` is a name the sender makes up once for a post, so that a delivery arriving twice is one post -- and it has to be sixteen lowercase hexadecimal characters (0-9, a-f). Leave the line out and the post is written without one."
   link_without_url: "A post can carry a link card, but `link_title:` and `link_description:` are lines ABOUT one -- there has to be a `link:` with the address."
   link_not_http: "`link: %{url}` is not an address a card can point at. It wants a whole http:// or https:// address, or one rooted at this site (`/posts/2026/some-post/`); for a file next to the post, write it as an ordinary link line in the text."
   video_hevc: "⚠️  %{files}: recorded as HEVC, which most browsers play but not all -- readers on the rest get an empty player instead of the video. Saved either way. Re-encoding it plays everywhere (needs ffmpeg -- `brew install ffmpeg` on a Mac):\n     %{command}"

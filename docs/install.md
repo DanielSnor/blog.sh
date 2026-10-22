@@ -259,7 +259,10 @@ crawlers in `seo`; `./style.sh` covers `colors`, `banner`, `fonts`,
 re-runnable and neither takes anything away from editing the file
 directly: in a list they change, every item they did not touch stays as
 you wrote it -- its quotes, an item on one line, a comment between items
--- and the review before the write shows only what changes. What only
+-- and the review before the write shows only what changes. (A list
+written whole on one line, `share: [mastodon, email]`, or given by an
+alias is written out again, as before; one they did not change is not
+written at all.) What only
 the file sets is the rare and the markup:
 `site.author_name`, a second language (`site.locales`), an icon drawn as
 SVG (`icon_svg`), the banner title's and claim's own colours

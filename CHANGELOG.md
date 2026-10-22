@@ -59,12 +59,15 @@ and script link now carries a fingerprint, so the first deploy uploads every pag
 - **`translate` did not say where a draft's translation can be read** (#67). It ends on the preview address; from a file, `translation_url`.
 - **`./setup.sh` sent the reader to http://localhost:8000/ as if the site were there.** It names the preview and the site's address.
 - **Esc in a pick among items took the first one.** "Which to remove?" removed it, "which to add?" added it.
-- **Enter in the palette keeps colours that are no palette of the list.** It proposed the first palette, and a preview.
+- **Enter in the palette proposed a palette, and a preview.** Colours that are no palette of the list are kept; the palette a site wears opens nothing.
 - **Enter in the banner wrote the engine's own defaults.** `show_title` and `show_claim` are written only when they differ.
 - **`./setup.sh` rewrote env.sh lines it did not change.** A bare or double-quoted value, and its comment, stay as written.
+- **`./setup.sh` lost a second name on an env.sh line, or wrote over the wrong line.** A line assigning two names keeps both; `X=` without `export` below counts.
 - **A long address or a run of inline code pushed a page sideways on a phone.** A post's words and a search result's break.
 - **A menu changed in `./style.sh` left a language's menu as it was,** and the build refused it. Each is reshaped with the site's.
-- **A wizard changing one item of a list rewrote them all,** a hand-drawn `icon_svg` among them. The rest stay as written.
+- **A wizard changing one item of a list rewrote them all,** a hand-drawn `icon_svg` among them. The rest stay as written; a list on one line is written whole.
+- **In an install whose folder has brackets in its name (`blog [1]`), `check` and `doctor` missed the language files.** They read them now.
+- **A language menu the build refused was said in two languages at once.** It is said in the site's.
 
 ### Removed
 

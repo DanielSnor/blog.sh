@@ -1118,10 +1118,11 @@ the engine that was. What a second send does:
   That refusal is the news that the first one arrived.
 - A new post delivered twice is two posts -- unless its file carries
   `receipt:`, a name the sender makes up once for the post (sixteen
-  hexadecimal characters), and then the second delivery is the first one
-  arriving again and updates the post it wrote ([A delivery that arrives
-  twice is one post](#a-post-sent-from-the-phone-itself)). The apps write
-  it on every post they send.
+  lowercase hexadecimal characters, 0-9 and a-f), and then the second
+  delivery is the first one arriving again and updates the post it wrote
+  ([A delivery that arrives twice is one
+  post](#a-post-sent-from-the-phone-itself)). The apps write it on every
+  post they send.
 - An edit or a translation -- a file saying `edits:` and `base:` --
   delivered twice is `changed` the second time: `base:` is the digest of
   the post's file, and the first delivery changed it. The answer to a
