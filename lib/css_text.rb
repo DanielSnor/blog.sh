@@ -27,9 +27,17 @@ module CssText
   # file. And a comment between two pieces that would run together without
   # it -- `1px/**/2px`, two lengths -- leaves `/**/` in its place, as a CSS
   # serializer does; anywhere else it goes.
-  JOINS = '[A-Za-z0-9_\-\\\\.%]'
-  TOKEN = %r{(?<kept>"(?:\\.|[^"\\])*(?:"|\z)|'(?:\\.|[^'\\])*(?:'|\z)|(?i:url)\(\s*[^\s"')][^)]*\))|
-             (?<before>#{JOINS})?/\*.*?(?:\*/|\z)(?<after>(?=#{JOINS}))?}mx.freeze
+  #
+  # As a browser reads them, which the first version of both did not
+  # (fleet over the 1.11 fixes, 22. 10. 2026): comments in a row are one
+  # gap (`1px/*a*//*b*/2px` is still two lengths); an escaped `\)` does not
+  # end an address; `url(` after a name is that name's (`#url(`, `.5url(`
+  # are no address, and reading one there took a `}` away); a name runs on
+  # in letters past ASCII, and a name before `(` would become a function.
+  JOINS = '[A-Za-z0-9_\-\\\\.%\u0080-\u{10FFFF}]'
+  NAMED = '[A-Za-z0-9_\-\\\\\#@\u0080-\u{10FFFF}]'
+  TOKEN = %r{(?<kept>"(?:\\.|[^"\\])*(?:"|\z)|'(?:\\.|[^'\\])*(?:'|\z)|(?<!#{NAMED})(?i:url)\(\s*(?=[^\s"'])(?:\\.|[^)\\])*\))|
+             (?<before>#{JOINS})?(?:/\*.*?(?:\*/|\z))+(?<after>(?=#{JOINS}|\())?}mx.freeze
 
   def without_comments(css)
     out = css.gsub(TOKEN) do

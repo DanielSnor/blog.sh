@@ -1410,6 +1410,15 @@ def card_time_html(post)
     nil
   end
   return '' if stored && on_the_hour.call(stored, 0)
+  # ...and, for a post an importer brought, midnight in the zone's standard
+  # offset. The archive does not keep b2evolution's 00:00+01:00 as written:
+  # in summer it lies there as 01:00+02:00, the same instant said in the
+  # site's zone, and 16 posts of sean.cz kept a made-up 1:00 past the rule
+  # above. Not for the engine's own posts, where 1:00 is an hour somebody had.
+  unless platform.empty? || platform == 'manual'
+    standard = [Time.local(time.year, 1, 1), Time.local(time.year, 7, 1)].map(&:utc_offset).min
+    return '' if on_the_hour.call(time.getlocal(standard), 0)
+  end
   return '' if INVENTED_HOUR_PLATFORMS.include?(platform) && on_the_hour.call(time, 12)
 
   %(<time class="date-time" datetime="#{time.iso8601}" hidden>#{time.strftime(t('time_format'))}</time>)
