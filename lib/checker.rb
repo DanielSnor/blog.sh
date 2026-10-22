@@ -1493,7 +1493,7 @@ module Checker
 
     published = ([site_own_language(root)] + published_languages(root)).reject(&:empty?)
     findings = []
-    Dir.glob(File.join(root, 'config', 'site.*.yml')).sort.each do |path|
+    PathGlob.under(root, 'config', 'site.*.yml').sort.each do |path|
       code = File.basename(path).sub(/\Asite\./, '').sub(/\.yml\z/, '')
       name = File.basename(path)
       if code == site_own_language(root)

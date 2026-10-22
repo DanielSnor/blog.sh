@@ -15,6 +15,7 @@
 # without depending on each other.
 require 'time'
 require_relative 'path_safety'
+require_relative 'path_glob'
 
 module PostAddress
   module_function
@@ -201,7 +202,7 @@ module PostAddress
   # language is data and not code (docs/localization.md), and a list kept
   # by hand is exactly how `archive` and `write` went missing from the one
   # above.
-  LOCALE_ROOTS = Dir.glob(File.join(__dir__, '..', 'locales', '*.yml'))
+  LOCALE_ROOTS = PathGlob.under(File.expand_path('../locales', __dir__), '*.yml')
                     .map { |path| File.basename(path, '.yml') }.sort.freeze
   RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + LOCALE_ROOTS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
   # The longest a single segment of a redirect origin may be. POSIX NAME_MAX

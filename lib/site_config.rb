@@ -2,6 +2,7 @@
 
 require 'yaml'
 require_relative 'language_file'
+require_relative 'path_glob'
 
 # Every entry point requires this file, so the two process-wide
 # prerequisites live here, next to the timezone handling below.
@@ -79,7 +80,8 @@ module SiteConfig
   # a file nobody reads is worse than a missing one, because it looks like
   # the work is done.
   def language_files
-    Dir.glob(File.join(File.dirname(PATH), 'site.*.yml')).to_h do |path|
+    # PathGlob: an install called "blog [1]" is a name, not a pattern.
+    PathGlob.under(File.dirname(PATH), 'site.*.yml').to_h do |path|
       [File.basename(path).sub(/\Asite\./, '').sub(/\.yml\z/, ''), path]
     end
   end

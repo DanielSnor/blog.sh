@@ -784,7 +784,7 @@ module Pairing
     end
     # A record outlives its code only as long as the terminal that asked
     # might still be reading it: gone once the code has run out.
-    Dir.glob(File.join(records_dir(root), '*.json')).each do |file|
+    PathGlob.under(records_dir(root), '*.json').each do |file|
       known = record(root, File.basename(file, '.json'))
       over = begin
         known.nil? || Time.parse(known['expires'].to_s) <= now

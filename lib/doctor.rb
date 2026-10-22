@@ -284,7 +284,7 @@ module Doctor
   # from the example and never rewritten put the example's German on the
   # Czech pages, with nobody saying so.
   def check_language_yml(root, data)
-    files = Dir.glob(File.join(root, 'config', 'site.*.yml')).sort
+    files = PathGlob.under(root, 'config', 'site.*.yml').sort
     parsed = {}
     findings = files.filter_map do |path|
       parsed[path] = YAML.load_file(path)
