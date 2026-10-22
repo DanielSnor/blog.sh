@@ -1948,9 +1948,14 @@ nav.nav-open ul { display: flex; flex-direction: row; flex-wrap: wrap; width: 10
   nav li { line-height: 1.3; }
   .wrap > nav a,
 .wrap > nav li:last-child a { padding: 7px 12px; border: 1px solid var(--line); }
-  .wrap > nav a:hover { border-color: var(--ink); }
+  /* The last pill by name wherever the pills do something, or the rule
+     above (which names it) outweighs them: its border stayed grey, lit up
+     or hovered, on every variant. */
+  .wrap > nav a:hover,
+.wrap > nav li:last-child a:hover { border-color: var(--ink); }
   .wrap > nav a[aria-current="page"],
-.wrap > nav li:first-child a[aria-current="page"] { padding: 7px 12px; margin: 0; border-color: var(--ink); }
+.wrap > nav li:first-child a[aria-current="page"],
+.wrap > nav li:last-child a[aria-current="page"] { padding: 7px 12px; margin: 0; border-color: var(--ink); }
   .search-form { flex: 1 1 100%; }
   .search-form input[type="search"] { width: 100%; height: 40px; }
   .search-form button { top: 5px; width: 30px; height: 30px; }
@@ -2695,6 +2700,7 @@ a.archive-year-name:hover { text-decoration: underline; text-decoration-color: v
    back. */
 .wrap > nav a[aria-current="page"],
 .wrap > nav li:first-child a[aria-current="page"],
+.wrap > nav li:last-child a[aria-current="page"],
 .wrap > nav a[aria-current="page"]:hover,
 .tag-index-sort-button[aria-pressed="true"] {
   background: var(--accent);
