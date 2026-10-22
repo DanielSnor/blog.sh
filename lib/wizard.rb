@@ -624,19 +624,39 @@ module Wizard
       return :failed
     end
 
+    # The same for what each file will read back as: every one is proved
+    # on its text first, and one that fails after another was saved puts
+    # that one back. Two files written one by one -- site.yml and a
+    # language's menu -- left the first new and the second refused, the
+    # build stopping in that language, under "nothing was changed".
+    saved = []
     begin
-      changed.each { |(_, writer)| writer.save! }
+      changed.each do |(label, writer)|
+        next unless writer.respond_to?(:check!)
+
+        begin
+          writer.check!
+        rescue ConfigWriter::VerificationFailed => e
+          raise ConfigWriter::VerificationFailed, "#{label}: #{e.message}"
+        end
+      end
+      changed.each do |(_, writer)|
+        writer.save!
+        saved << writer
+      end
     rescue ConfigWriter::NotWritable => e
       # The pre-flight above catches the ordinary permission refusal before
       # any file is touched; this remains for the race where a mode changes
       # between the check and the write. Rare enough that naming the file
       # (the Errno does) is enough.
+      saved.each { |writer| writer.restore! if writer.respond_to?(:restore!) }
       puts Tui.paint("❌ #{t('write_denied', message: e.message)}", :red)
       puts
       return :failed
     rescue ConfigWriter::VerificationFailed => e
       # The writer has already put the file back; all that is left is to
       # say so in a way that does not read as "your config is ruined".
+      saved.each { |writer| writer.restore! if writer.respond_to?(:restore!) }
       puts Tui.paint("❌ #{t('write_failed', message: e.message)}", :red)
       # Both wizards stop here, so this is the last thing either of them
       # says -- and a command that stops on a failure owes the same single
@@ -671,7 +691,10 @@ module Wizard
   # no active one exists, so the "-" side of a diff replacing a
   # commented-out credential carries the old token too -- and used to
   # print it in the clear, in the one place this promises it will not.
-  MASKED = /\A([-+]\s*(?:#\s*)?(?:export\s+)?(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*$/.freeze
+  # Anywhere on the line, not only first: `export SITE_BASE_URL=...
+  # MASTODON_ACCESS_TOKEN=...` printed the token because the first name
+  # on it was not a secret.
+  MASKED = /\A([-+].*?\b(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*$/.freeze
 
   def mask(line)
     line.sub(MASKED) { "#{Regexp.last_match(1)}••••••••" }

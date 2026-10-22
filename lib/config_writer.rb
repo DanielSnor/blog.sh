@@ -627,7 +627,29 @@ module ConfigWriter
         raise VerificationFailed, e.message
       end
 
+      @written = had_file ? :replaced : :created
       true
+    end
+
+    # The proof save! makes, made on the text before anything is written.
+    # A run that writes several files asks each first: the second one
+    # failing after the first was saved left site.yml new and the
+    # language's menu old -- the build refusing every language but one --
+    # under a sentence saying nothing had changed.
+    def check!
+      verify!(current)
+    rescue StandardError => e
+      raise VerificationFailed, e.message
+    end
+
+    # The file as it was before this run, for the caller that saved it and
+    # then failed to save the next one.
+    def restore!
+      case @written
+      when :replaced then AtomicWrite.write(@path, @original)
+      when :created then File.delete(@path) if File.exist?(@path)
+      end
+      @written = nil
     end
 
     private
@@ -1042,7 +1064,14 @@ module ConfigWriter
         end
       end
       chunks.each_index { |i| body.concat(chunks[i][:lead]) unless led[i] }
-      [body.concat(parts[:tail]), values]
+      body.concat(parts[:tail])
+      # The last line of a file may have no newline, and a list can be the
+      # last thing in it. Copied as it was and then followed by a new item
+      # or a moved one, it took the next line onto its own: `- email  -
+      # "bluesky"`, which verify! refused, or a new item inside a comment
+      # whose icon then became the previous item's.
+      body = body.each_with_index.map { |line, i| i < body.size - 1 && !line.end_with?("\n") ? "#{line}\n" : line }
+      [body, values]
     end
 
     # Substitutes the value on a `key: value` line, keeping the key, the
@@ -1106,9 +1135,9 @@ module ConfigWriter
 
     # Reparses the written file and checks every value we set is actually
     # there. Lists compare on the keys we wrote (string keys, since that
-    # is what YAML gives back).
-    def verify!
-      data = YamlCompat.load_file(@path) || {}
+    # is what YAML gives back). Given a text, that text instead (check!).
+    def verify!(text = nil)
+      data = (text ? YamlCompat.load(text) : YamlCompat.load_file(@path)) || {}
       @switched_on.each do |key_path|
         parent = key_path[0..-2].reduce(data) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
         next if parent.is_a?(Hash) && parent.key?(key_path.last)
@@ -1193,6 +1222,11 @@ module ConfigWriter
     # bare, double-quoted, with a comment after it -- as docs/install.md and
     # env.sh.example write them. Rewriting it in the writer's own quoting
     # proposed a change for every such line on a run that changed nothing.
+    #
+    # A line that assigns more than this one name is not this writer's to
+    # rewrite: `export SITE_BASE_URL=... MASTODON_ACCESS_TOKEN=...` lost the
+    # token to a new address. It stays, and the new value goes below it all,
+    # which is where the shell reads it last.
     def set(name, value)
       quoted = "'#{value.to_s.gsub("'") { "'\\''" }}'"
       line_no = find_line(name)
@@ -1200,7 +1234,7 @@ module ConfigWriter
         @intended[name] = value.to_s
         return self
       end
-      if line_no
+      if line_no && alone?(@lines[line_no])
         @lines[line_no] = "export #{name}=#{quoted}\n"
       else
         @lines << "\n" unless @lines.empty? || @lines.last.end_with?("\n")
@@ -1217,16 +1251,24 @@ module ConfigWriter
     # name OFF by commenting one line out of two just promotes the other:
     # "no deploy target" left the site deploying, with the diff on screen
     # showing a line duly commented out.
+    # A line that assigns other names as well is left for them, and the
+    # shell is told to forget this one below it all.
     def unset(name)
-      hit = false
+      shared = false
       @lines.each_index do |i|
-        next unless @lines[i].match?(/\A\s*export\s+#{Regexp.escape(name)}=/)
+        next unless @lines[i].match?(assignment(name))
 
-        @lines[i] = "# #{@lines[i]}"
-        hit = true
+        if alone?(@lines[i])
+          @lines[i] = "# #{@lines[i]}"
+        else
+          shared = true
+        end
+      end
+      if shared
+        @lines << "\n" unless @lines.empty? || @lines.last.end_with?("\n")
+        @lines << "unset #{name}\n"
       end
       @intended.delete(name)
-      hit
       self
     end
 
@@ -1259,7 +1301,21 @@ module ConfigWriter
       rescue SystemCallError => e
         raise NotWritable, e.message
       end
+      @written = previous ? :replaced : :created
       true
+    end
+
+    # As YamlFile#restore!, keeping the mode save! gave the file.
+    def restore!
+      case @written
+      when :replaced
+        mode = File.stat(@path).mode & 0o7777
+        AtomicWrite.write(@path, @original)
+        File.chmod(mode, @path)
+      when :created
+        File.delete(@path) if File.exist?(@path)
+      end
+      @written = nil
     end
 
     private
@@ -1284,7 +1340,18 @@ module ConfigWriter
     # it -- or nil when the line says anything this cannot be sure of (an
     # expansion, a backtick, an escape outside quotes), which then gets
     # rewritten as before.
+    #
+    # Sure means what bash reads, not what the line looks like. A tilde
+    # that starts the value or follows a colon is the home directory
+    # (`me@server:~/www` is the LOCAL $HOME/www); ; & | < > ( ) end the
+    # command or start another; { } * ? [ ] ! are expansions in some shell
+    # or other; a CR stays in the value. Each of these was taken for the
+    # value as typed, and a value entered again was then never written.
+    UNSURE = ['$', '`', '\\', '#', ';', '&', '|', '<', '>', '(', ')', '{', '}', '*', '?', '[', ']', '!'].freeze
+
     def assigned(line)
+      return nil if line.include?("\r")
+
       m = line.chomp.match(/\A\s*export\s+[A-Za-z_][A-Za-z0-9_]*=(.*)\z/) or return nil
       rest = m[1]
       out = +''
@@ -1311,7 +1378,7 @@ module ConfigWriter
           return nil unless tail.empty? || tail.start_with?('#')
 
           break
-        elsif ['$', '`', '\\', '#'].include?(c)
+        elsif UNSURE.include?(c) || (c == '~' && (out.empty? || out.end_with?(':')))
           return nil
         else
           out << c
@@ -1330,11 +1397,48 @@ module ConfigWriter
     # the bottom -- while the wizard rewrote the top one, reported success,
     # and left the old value in force. A file with one assignment (all of
     # them, in practice) is unaffected.
+    # With or without `export`: `X=w` under `export X=v` is the value the
+    # shell ends with, and the one written over the export above it was
+    # never read.
     def find_line(name)
-      active = @lines.rindex { |l| l.match?(/\A\s*export\s+#{Regexp.escape(name)}=/) }
+      active = @lines.rindex { |l| l.match?(assignment(name)) }
       return active if active
 
       @lines.index { |l| l.match?(/\A\s*#\s*export\s+#{Regexp.escape(name)}=/) }
+    end
+
+    def assignment(name)
+      /\A\s*(?:export\s+)?#{Regexp.escape(name)}=/
+    end
+
+    # Whether the line assigns this one name and nothing else: what follows
+    # the value is nothing or a comment. A commented line is the template's
+    # (find_line activates it in place); a quote that never closes, or
+    # anything else past reading, keeps the old answer and is rewritten.
+    def alone?(line)
+      return true if line.match?(/\A\s*#/)
+
+      rest = line.chomp.sub(/\A\s*(?:export\s+)?[A-Za-z_][A-Za-z0-9_]*=/, '')
+      i = 0
+      while i < rest.size
+        case rest[i]
+        when "'"
+          i = rest.index("'", i + 1) or return true
+        when '"'
+          j = i + 1
+          j += rest[j] == '\\' ? 2 : 1 while j < rest.size && rest[j] != '"'
+          return true if j >= rest.size
+
+          i = j
+        when '\\'
+          i += 1
+        when ' ', "\t"
+          tail = rest[i..].lstrip
+          return tail.empty? || tail.start_with?('#')
+        end
+        i += 1
+      end
+      true
     end
   end
 end
