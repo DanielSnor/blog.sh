@@ -1081,19 +1081,19 @@ module ConfigWriter
     # string \' means "everything after the match", so the string form of
     # this exact escape silently pastes the rest of the token back into
     # itself. A block is taken literally.
-#
-# A line that already gives the value is left as it was written --
-# bare, double-quoted, with a comment after it -- as docs/install.md and
-# env.sh.example write them. Rewriting it in the writer's own quoting
-# proposed a change for every such line on a run that changed nothing.
-def set(name, value)
-  quoted = "'#{value.to_s.gsub("'") { "'\\''" }}'"
-  line_no = find_line(name)
-  if line_no && assigned(@lines[line_no]) == value.to_s
-    @intended[name] = value.to_s
-    return self
-  end
-  if line_no
+    #
+    # A line that already gives the value is left as it was written --
+    # bare, double-quoted, with a comment after it -- as docs/install.md and
+    # env.sh.example write them. Rewriting it in the writer's own quoting
+    # proposed a change for every such line on a run that changed nothing.
+    def set(name, value)
+      quoted = "'#{value.to_s.gsub("'") { "'\\''" }}'"
+      line_no = find_line(name)
+      if line_no && assigned(@lines[line_no]) == value.to_s
+        @intended[name] = value.to_s
+        return self
+      end
+      if line_no
         @lines[line_no] = "export #{name}=#{quoted}\n"
       else
         @lines << "\n" unless @lines.empty? || @lines.last.end_with?("\n")
@@ -1173,6 +1173,47 @@ def set(name, value)
       File.read(@template, encoding: 'utf-8')
     end
 
+    # The value an active `export NAME=...` line gives, as the shell reads
+    # it -- or nil when the line says anything this cannot be sure of (an
+    # expansion, a backtick, an escape outside quotes), which then gets
+    # rewritten as before.
+    def assigned(line)
+      m = line.chomp.match(/\A\s*export\s+[A-Za-z_][A-Za-z0-9_]*=(.*)\z/) or return nil
+      rest = m[1]
+      out = +''
+      i = 0
+      while i < rest.size
+        c = rest[i]
+        if c == "'"
+          j = rest.index("'", i + 1) or return nil
+          out << rest[(i + 1)...j]
+          i = j + 1
+        elsif c == '"'
+          j = i + 1
+          while j < rest.size && rest[j] != '"'
+            return nil if ['$', '`', '\\'].include?(rest[j])
+
+            out << rest[j]
+            j += 1
+          end
+          return nil if j >= rest.size
+
+          i = j + 1
+        elsif [' ', "\t"].include?(c)
+          tail = rest[i..].lstrip
+          return nil unless tail.empty? || tail.start_with?('#')
+
+          break
+        elsif ['$', '`', '\\', '#'].include?(c)
+          return nil
+        else
+          out << c
+          i += 1
+        end
+      end
+      out
+    end
+
     # Prefers an active line, falls back to a commented one (which is how
     # every optional backend ships -- "# export RSYNC_TARGET=..."), so
     # setting one activates the documented line in place instead of
@@ -1182,48 +1223,7 @@ def set(name, value)
     # the bottom -- while the wizard rewrote the top one, reported success,
     # and left the old value in force. A file with one assignment (all of
     # them, in practice) is unaffected.
-# The value an active `export NAME=...` line gives, as the shell reads
-# it -- or nil when the line says anything this cannot be sure of (an
-# expansion, a backtick, an escape outside quotes), which then gets
-# rewritten as before.
-def assigned(line)
-  m = line.chomp.match(/\A\s*export\s+[A-Za-z_][A-Za-z0-9_]*=(.*)\z/) or return nil
-  rest = m[1]
-  out = +''
-  i = 0
-  while i < rest.size
-    c = rest[i]
-    if c == "'"
-      j = rest.index("'", i + 1) or return nil
-      out << rest[(i + 1)...j]
-      i = j + 1
-    elsif c == '"'
-      j = i + 1
-      while j < rest.size && rest[j] != '"'
-        return nil if ['$', '`', '\\'].include?(rest[j])
-
-        out << rest[j]
-        j += 1
-      end
-      return nil if j >= rest.size
-
-      i = j + 1
-    elsif [' ', "\t"].include?(c)
-      tail = rest[i..].lstrip
-      return nil unless tail.empty? || tail.start_with?('#')
-
-      break
-    elsif ['$', '`', '\\', '#'].include?(c)
-      return nil
-    else
-      out << c
-      i += 1
-    end
-  end
-  out
-end
-
-def find_line(name)
+    def find_line(name)
       active = @lines.rindex { |l| l.match?(/\A\s*export\s+#{Regexp.escape(name)}=/) }
       return active if active
 
