@@ -257,7 +257,10 @@ crawlers in `seo`; `./style.sh` covers `colors`, `banner`, `fonts`,
 `layout` with the skin and `site.extra_css`, `nav`, `series_index`, `about`, `widgets`,
 `footer`, `social` with `share`, `tag_icons` and `analytics`. Both are
 re-runnable and neither takes anything away from editing the file
-directly. What only the file sets is the rare and the markup:
+directly: in a list they change, every item they did not touch stays as
+you wrote it -- its quotes, an item on one line, a comment between items
+-- and the review before the write shows only what changes. What only
+the file sets is the rare and the markup:
 `site.author_name`, a second language (`site.locales`), an icon drawn as
 SVG (`icon_svg`), the banner title's and claim's own colours
 (`colors.<mode>.banner_title`, `banner_claim`), `mastodon.toot_length` and `link_length`,

@@ -26,6 +26,14 @@ module YamlCompat
     YAML.load_file(path)
   end
 
+  # The same for a string: what lib/config_writer.rb reads a piece of a
+  # file with, so the piece and the file are read by one set of rules.
+  def load(text)
+    YAML.load(text, aliases: true)
+  rescue ArgumentError
+    YAML.load(text)
+  end
+
   # The line whose quoted value never closes, for a file that has already
   # failed to parse. Psych names where it gave up -- for a quote left open
   # that is the START of the mapping around it, or the line where a later

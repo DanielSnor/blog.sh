@@ -64,6 +64,7 @@ and script link now carries a fingerprint, so the first deploy uploads every pag
 - **`./setup.sh` rewrote env.sh lines it did not change.** A bare or double-quoted value, and its comment, stay as written.
 - **A long address or a run of inline code pushed a page sideways on a phone.** A post's words and a search result's break.
 - **A menu changed in `./style.sh` left a language's menu as it was,** and the build refused it. Each is reshaped with the site's.
+- **A wizard changing one item of a list rewrote them all,** a hand-drawn `icon_svg` among them. The rest stay as written.
 
 ### Removed
 

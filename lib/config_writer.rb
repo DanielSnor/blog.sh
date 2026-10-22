@@ -522,26 +522,32 @@ module ConfigWriter
     # Replaces a sequence of mappings (social:, footer.links:). The
     # comment block that documents these sits ABOVE the key, so it is
     # never inside the extent being replaced and survives untouched.
+    # An item the list already holds keeps its lines as they stand in the
+    # file -- its quoting, a flow mapping on one line, a comment inside it --
+    # and only an item that is new or changed is written out here. The
+    # comments and blank lines between items stay where they are; one that
+    # stood above an item taken out stays above the next one. Writing every
+    # item afresh turned each hand-written icon_svg of blogsh.app from
+    # '<svg viewBox="0 0 24 24" ...' into "<svg viewBox=\"0 0 24 24\" ..."
+    # whenever one tag icon was added, and the review showed twelve changed
+    # lines for one new item (the fleet over 1.11, C-4). A list this cannot
+    # take apart for sure -- written inline, built on an alias, or not
+    # reading back as the list the file holds -- is written whole, as before.
     def set_list(key_path, items)
       line_no = resolve!(key_path)
       indent = ConfigWriter.indent_of(@lines[line_no])
       key = key_path.last
-      item_indent = indent + ConfigWriter::INDENT
-
-      body = items.flat_map do |item|
-        # A plain sequence of scalars -- site.extra_css is one -- as well as
-        # the sequence of mappings this was written for (social, footer
-        # links, nav). Told apart by the item, not by a second method: the
-        # caller knows what it is holding and should not have to say so.
-        next ["#{' ' * item_indent}- #{ConfigWriter.scalar(item)}\n"] unless item.is_a?(Hash)
-
-        pairs = item.reject { |_, v| v.nil? }
-        pairs.each_with_index.map do |(k, v), i|
-          marker = i.zero? ? '- ' : '  '
-          "#{' ' * item_indent}#{marker}#{k}: #{ConfigWriter.scalar(v)}\n"
-        end
-      end
       extent = value_extent(line_no)
+
+      parts = items.empty? ? nil : list_parts(key_path, line_no, extent)
+      if parts
+        body, values = kept_items(items, parts)
+        @lines[(line_no + 1)..extent] = body
+        @intended[key_path] = values
+        return self
+      end
+
+      body = items.flat_map { |item| item_lines(item, indent + ConfigWriter::INDENT) }
       # An empty list is written inline. `key:` followed by an indented
       # `[]` parses the same, but it reads as a key someone forgot to
       # finish -- and for `nav:` the difference between 'no items' and
@@ -936,6 +942,107 @@ module ConfigWriter
         saw_shallow_comment = false
       end
       last
+    end
+
+    # One item as this writer spells it. A plain sequence of scalars --
+    # site.extra_css is one -- as well as the sequence of mappings this was
+    # written for (social, footer links, nav). Told apart by the item, not by
+    # a second method: the caller knows what it is holding and should not
+    # have to say so.
+    def item_lines(item, indent)
+      return ["#{' ' * indent}- #{ConfigWriter.scalar(item)}\n"] unless item.is_a?(Hash)
+
+      item.reject { |_, v| v.nil? }.each_with_index.map do |(k, v), i|
+        marker = i.zero? ? '- ' : '  '
+        "#{' ' * indent}#{marker}#{k}: #{ConfigWriter.scalar(v)}\n"
+      end
+    end
+
+    # The block sequence under a key as it stands in the file: each item's
+    # own lines (its `- ` line and what is indented under it) with the
+    # comments and blank lines before it, what follows the last item, and
+    # the column the items stand at. nil when there is nothing to keep: no
+    # items, a value written inline on the key's line, an alias, or pieces
+    # that do not read back, one by one, as the list the whole file holds.
+    def list_parts(key_path, line_no, extent)
+      return nil if extent <= line_no
+      return nil unless @lines[line_no].match?(/\A\s*[A-Za-z_][A-Za-z0-9_-]*:\s*(#.*)?\n?\z/)
+
+      body = @lines[(line_no + 1)..extent]
+      first = body.find { |l| !ConfigWriter.blank?(l) && !ConfigWriter.comment?(l) }
+      return nil unless first&.lstrip&.match?(/\A-(\s|\z)/)
+
+      column = first[/\A */].length
+      chunks = []
+      glue = []
+      blanks = []
+      body.each do |line|
+        if ConfigWriter.blank?(line)
+          blanks << line
+          next
+        end
+        depth = line[/\A */].length
+        comment = ConfigWriter.comment?(line)
+        if !comment && depth == column && line.lstrip.match?(/\A-(\s|\z)/)
+          chunks << { lead: glue + blanks, lines: [line] }
+          glue = []
+        elsif chunks.any? && depth > column
+          # Under the item: it is part of it, and so is whatever stood
+          # between (a comment at the item's own column does not end it).
+          chunks.last[:lines].concat(glue, blanks) << line
+          glue = []
+        elsif comment
+          glue.concat(blanks) << line
+        else
+          return nil
+        end
+        blanks = []
+      end
+      return nil if chunks.empty?
+
+      chunks.each do |chunk|
+        text = chunk[:lines].map { |l| ConfigWriter.blank?(l) ? "\n" : l.sub(/\A {0,#{column}}/, '') }.join
+        parsed = YamlCompat.load(text)
+        return nil unless parsed.is_a?(Array) && parsed.size == 1
+
+        chunk[:value] = parsed.first
+      end
+      whole = key_path.reduce(YamlCompat.load(current)) { |acc, k| acc.is_a?(Hash) ? acc[k] : nil }
+      return nil unless whole == chunks.map { |c| c[:value] }
+
+      { column: column, chunks: chunks, tail: glue + blanks }
+    rescue Psych::Exception
+      nil
+    end
+
+    # The new list's lines, and what each item reads back as. An item equal
+    # to one the file holds takes that one's lines, each held item used once;
+    # the comments before held items come along in the file's order, those
+    # of an item taken out before the next one kept.
+    def kept_items(items, parts)
+      chunks = parts[:chunks]
+      used = Array.new(chunks.size, false)
+      led = Array.new(chunks.size, false)
+      body = []
+      values = []
+      items.each do |item|
+        wanted = item.is_a?(Hash) ? item.transform_keys(&:to_s) : item
+        k = chunks.each_index.find { |i| !used[i] && chunks[i][:value] == wanted }
+        if k
+          (0..k).each do |i|
+            body.concat(chunks[i][:lead]) unless led[i]
+            led[i] = true
+          end
+          body.concat(chunks[k][:lines])
+          used[k] = true
+          values << chunks[k][:value]
+        else
+          body.concat(item_lines(item, parts[:column]))
+          values << (item.is_a?(Hash) ? item.reject { |_, v| v.nil? } : item)
+        end
+      end
+      chunks.each_index { |i| body.concat(chunks[i][:lead]) unless led[i] }
+      [body.concat(parts[:tail]), values]
     end
 
     # Substitutes the value on a `key: value` line, keeping the key, the
