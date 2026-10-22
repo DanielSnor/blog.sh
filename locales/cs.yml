@@ -2060,6 +2060,7 @@ style:
   nav_current: "Menu teď:"
   nav_turn_off: "Žádné menu"
   nav_off_note: "Pruh je pryč. Nic jiného se nehnulo — výpisy štítků a typů se pořád sestavují a pořád se na ně dá dostat."
+  nav_language_unreadable: "%{file} nejde přečíst, a tak jeho menu zůstalo, jak bylo. Až soubor zase půjde přečíst, sestavení se na jeho menu zastaví, dokud nepovede na stejná místa jako tohle."
   nav_replaces_derived: "Pozor: první přidaná položka se k odvozenému menu nepřidá, nahradí ho. Přidej i ty, které chceš zachovat."
   q_nav_action: "Přidat položku, odebrat, nebo menu nechat být?"
   q_nav_label: "Co má být v položce napsáno?"

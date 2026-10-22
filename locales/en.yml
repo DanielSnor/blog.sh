@@ -2091,6 +2091,7 @@ style:
   nav_current: "The menu now:"
   nav_turn_off: "No menu bar at all"
   nav_off_note: "The bar is gone. Nothing else moves -- the tag and type listings are still built and still reachable."
+  nav_language_unreadable: "%{file} could not be read, so its menu was left as it was. Once the file reads again, the build stops on that menu until it goes to the same places as this one."
   nav_replaces_derived: "Careful: the first item you add does not join the derived menu, it replaces it. Add the ones you want to keep too."
   q_nav_action: "Add an item, remove one, or leave the menu alone?"
   q_nav_label: "What should the item say?"

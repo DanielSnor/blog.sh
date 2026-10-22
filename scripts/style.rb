@@ -234,7 +234,10 @@ def section_palette
   chosen = Wizard.choose(t('q_palette'), options, current_index: index,
                          note: palette_warnings + [Tui.paint(t('palette_intro'), :dim)])
   return section_colors_by_hand if chosen == 'custom'
-  return if chosen == 'keep'
+  # The palette the site already wears is Enter's answer, and there is
+  # nothing to apply: on blogsh.app Enter, Enter wrote nothing and opened a
+  # preview of the colours it already had.
+  return if chosen == 'keep' || chosen == now
 
   data = palettes[chosen]
   return unless data
@@ -795,7 +798,11 @@ def section_extra_css
       entries << entry if entry
       touched = true
     when 'remove'
-      entries = remove_from(entries) { |e| e }
+      # As in section_nav: Esc took nothing out.
+      kept = remove_from(entries) { |e| e }
+      next if kept.equal?(entries)
+
+      entries = kept
       touched = true
     else
       break
@@ -883,6 +890,7 @@ end
 def section_social
   entries = SiteConfig::Chrome.list(current, 'social')
   entries = [] unless entries.is_a?(Array)
+  before = entries.dup
 
   loop do
     # `note:` for the reason section_nav's state rows ride there -- see
@@ -916,7 +924,9 @@ def section_social
     end
   end
 
-  site.set_list(%w[social], entries)
+  # As for share: a list that came back as it was is not written -- Enter
+  # through the section proposed a `social:` written on one line anew.
+  site.set_list(%w[social], entries) unless entries == before
   puts
   section_share
 end
@@ -1069,7 +1079,13 @@ def section_nav
       derived = false
       touched = true
     when 'remove'
-      entries = remove_from(entries) { |e| nav_summary(e) }
+      # Esc gives the list back as it was: nothing to write. Marked all the
+      # same, it proposed the menu written anew (or a language's list
+      # reshaped) on a run that had taken nothing out.
+      kept = remove_from(entries) { |e| nav_summary(e) }
+      next if kept.equal?(entries)
+
+      entries = kept
       derived = false
       touched = true
     when 'off'
@@ -1104,9 +1120,17 @@ def reshape_language_menus(before, after)
     path = File.join(File.dirname(SITE_YML), "site.#{code}.yml")
     next unless File.file?(path)
 
+    # What an earlier visit to this section made of the file, not the file
+    # as it lies: a second visit held the menu it had left against the
+    # language's list as it was, the two no longer went to the same places,
+    # and a group that stayed took the word of the one taken out.
+    text = language_writers.key?(path) ? language_writers[path].current : File.read(path, encoding: 'utf-8')
     theirs = begin
-      YamlCompat.load(File.read(path, encoding: 'utf-8'))
+      YamlCompat.load(text)
     rescue Psych::Exception
+      # Said rather than skipped: the site's menu is written all the same,
+      # and once the file reads again the build stops on its menu.
+      Wizard.say("⚠️  #{t('nav_language_unreadable', file: relative(path))}", :yellow)
       nil
     end
     theirs = theirs['nav'] if theirs.is_a?(Hash)
@@ -1122,19 +1146,30 @@ end
 # matched by being the same item -- a group keeps its word when another
 # group goes. Otherwise, or for an item that is new, by the place it leads
 # to, the first of that language's items to lead there.
+#
+# The items that stayed are matched first, so a new one cannot take a word
+# one of them still has. A new group is matched by nothing: every group's
+# place is the same, and Extras took "Projekty" from the group taken out.
+# A matched item is the language's own, as it wrote it -- a series by its
+# name where the site has the slug -- so set_list copies it as it stands.
 def reshaped_menu(before, after, theirs)
   place = LanguageFile::PLACED_LISTS[%w[nav]]
   place_of = ->(entry) { entry.is_a?(Hash) ? place.call(entry) : nil }
   aligned = before.size == theirs.size && before.zip(theirs).all? { |mine, word| place_of.(mine) && place_of.(mine) == place_of.(word) }
-  unused = theirs.each_index.to_a
-  after.map do |entry|
-    at_index = aligned ? before.index { |was| was.equal?(entry) } : nil
-    at_index = unused.find { |i| place_of.(theirs[i]) == place_of.(entry) } unless at_index && unused.include?(at_index)
-    unused.delete(at_index) if at_index
-    word = at_index ? theirs[at_index] : nil
-    keys = entry.is_a?(Hash) ? entry.slice('group', 'tag', 'series', 'url') : {}
-    label = word.is_a?(Hash) ? word['label'].to_s.strip : ''
-    label.empty? ? keys : { 'label' => word['label'] }.merge(keys)
+  found = after.map { |entry| aligned ? before.index { |was| was.equal?(entry) } : nil }
+  unused = theirs.each_index.to_a - found.compact
+  found = after.each_with_index.map do |entry, n|
+    next found[n] if found[n]
+    next nil if aligned && SiteConfig::Chrome.nav_group?(entry)
+
+    at = unused.find { |i| place_of.(theirs[i]) == place_of.(entry) }
+    unused.delete(at)
+    at
+  end
+  after.zip(found).map do |entry, at|
+    next theirs[at] if at
+
+    entry.is_a?(Hash) ? entry.slice('group', 'tag', 'series', 'url') : {}
   end
 end
 
@@ -1510,7 +1545,11 @@ def section_font_faces
       entries << entry
       touched = true
     when 'remove'
-      entries = remove_from(entries) { |e| "#{e['family']} -- #{e['file']}" }
+      # As in section_nav: Esc took nothing out.
+      kept = remove_from(entries) { |e| "#{e['family']} -- #{e['file']}" }
+      next if kept.equal?(entries)
+
+      entries = kept
       touched = true
     else
       break

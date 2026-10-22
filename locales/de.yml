@@ -2075,6 +2075,7 @@ style:
   nav_current: "Das Menü jetzt:"
   nav_turn_off: "Gar keine Menüleiste"
   nav_off_note: "Die Leiste ist weg. Sonst ändert sich nichts -- die Schlagwort- und Typlisten werden weiter gebaut und bleiben erreichbar."
+  nav_language_unreadable: "%{file} ließ sich nicht lesen, sein Menü blieb also, wie es war. Sobald sich die Datei wieder lesen lässt, hält der Build bei diesem Menü an, bis es auf dieselben Ziele führt wie dieses."
   nav_replaces_derived: "Achtung: Der erste Eintrag kommt nicht zum abgeleiteten Menü dazu, er ersetzt es. Füge auch die hinzu, die bleiben sollen."
   q_nav_action: "Eintrag hinzufügen, entfernen oder das Menü so lassen?"
   q_nav_label: "Was soll im Eintrag stehen?"
