@@ -1037,7 +1037,11 @@ module Tui
           end
           :resize
         else
-          Tui.read_key
+          # A letter is the same key either way round: with Caps Lock on, P
+          # in the properties of a scheduled post was "Not understood" (#70),
+          # while the line-based key_choice had always taken it.
+          key = Tui.read_key
+          key.is_a?(String) ? key.downcase : key
         end
       ensure
         print "\e[?25h"
