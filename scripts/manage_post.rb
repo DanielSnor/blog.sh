@@ -1928,7 +1928,13 @@ def draft_decision_loop(slug, path: nil, announce: true)
     slot = next_publish_slot(slug)
     langs = other_languages
     offer = translate_offer(langs)
-    prompt = if slot
+    # A post already scheduled is asked about as one (#71): "keep as draft"
+    # and "schedule (the next free slot)" read as if it were a plain draft,
+    # while Enter leaves its date as it is and [s] moves it.
+    scheduled_for = post['scheduled'] && (Time.parse(post['date'].to_s).getlocal rescue nil)
+    prompt = if scheduled_for
+               t('cli.what_next_prompt_scheduled', date: scheduled_for.strftime(t('date_time_format')), translate: offer)
+             elsif slot
                t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format')), translate: offer)
              else
                t('cli.what_next_prompt', translate: offer)
@@ -1953,7 +1959,8 @@ def draft_decision_loop(slug, path: nil, announce: true)
       return if prompt_and_schedule(path, post, raw: raw) == true
     when 'd', ''
       puts
-      puts t('cli.left_as_draft', slug: slug)
+      puts(scheduled_for ? t('cli.left_scheduled', date: scheduled_for.strftime(t('date_time_format')))
+                         : t('cli.left_as_draft', slug: slug))
       puts
       return
     when 'x'
@@ -2094,7 +2101,10 @@ def prompt_and_schedule(path, post, raw: nil)
   date = nil
   loop do
     if slot
-      puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
+      # The time on the key itself (#74): the line above it ends on carrying
+      # the post to the front of the queue, and "[Enter] accept" read as
+      # accepting THAT, when it takes the slot offered.
+      puts t('cli.schedule_slot_keys', slot: slot.strftime(t('date_time_format')), cancel_word: t('cli.cancel_word'))
       print '> '
     else
       print t('cli.schedule_date_prompt')
