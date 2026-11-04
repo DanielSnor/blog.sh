@@ -274,6 +274,13 @@ module Blocks
     children['type'] ? children : children.merge('type' => 'list')
   end
 
+  # ` start="5"` on a numbered list that does not begin at 1 (#72) -- the
+  # number the markdown or the imported <ol> began with.
+  def list_start(block)
+    start = block['start']
+    block['style'] == 'ol' && start.is_a?(Integer) && start != 1 ? %( start="#{start}") : ''
+  end
+
   # 🪤 Every call that hands `seen` over names the keyword as well. Ruby
   # 2.7 reads a hash in the last place of a call as the KEYWORDS of a
   # method that takes any: an empty `seen` then never arrives, and with
@@ -317,7 +324,7 @@ module Blocks
           "<li>#{apply_formatting(it['text'], it['formatting'])}#{nested}</li>"
         end
       end.join
-      "<#{tag}>#{items}</#{tag}>"
+      "<#{tag}#{list_start(block)}>#{items}</#{tag}>"
     when 'table'
       render_table(block)
     when 'hr'

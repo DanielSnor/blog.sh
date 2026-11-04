@@ -428,7 +428,13 @@ module Import
       def emit_list(node)
         lis = node.children.select { |c| c.name == 'li' }
         items = lis.filter_map { |li| list_item(li) }
-        @blocks << { 'type' => 'list', 'style' => node.name, 'items' => items } unless items.empty?
+        unless items.empty?
+          block = { 'type' => 'list', 'style' => node.name, 'items' => items }
+          # <ol start="5">, kept as the markdown parser keeps "5." (#72).
+          start = node.name == 'ol' && node.attrs['start'].to_s[/\A\d+\z/] && node.attrs['start'].to_i
+          block['start'] = start if start && start != 1
+          @blocks << block
+        end
 
         # The pictures inside the items. A list has no place to put one, so
         # each becomes its own block after the list -- which is what

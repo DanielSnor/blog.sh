@@ -604,6 +604,7 @@ module MarkdownParser
             end
     return nil unless style
 
+    first = style == 'ol' && line.strip[/\A(\d+)[.)]/, 1].to_i
     item_re = style == 'ul' ? UL_ITEM_RE : OL_ITEM_RE
     items = []
 
@@ -712,7 +713,13 @@ module MarkdownParser
       items << item
     end
 
-    [{ 'type' => 'list', 'style' => style, 'items' => items }, idx]
+    block = { 'type' => 'list', 'style' => style, 'items' => items }
+    # The number a numbered list starts at, when it is not 1: a list carried
+    # on after a paragraph ("5. the next step") came back from the next edit
+    # numbered from 1, and saved so (#72). Only the first item counts, as in
+    # HTML and CommonMark; a 1 is the default and is not written.
+    block['start'] = first if first && first != 1
+    [block, idx]
   end
 
   # A paragraph is a list block when its first line is a list item; nested
