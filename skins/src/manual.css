@@ -58,8 +58,11 @@
 }
 
 /* The text of a page runs to the right edge of its column, where its
-   pictures, its tables and its code end; the column is the measure. */
-.card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body:has(> .toc) > .content > * { max-width: none; }
+   pictures, its tables and its code end; the column is the measure. A page
+   too short for contents is no exception: minimal holds a post to 65
+   characters, and a manual page without sections kept that measure in a
+   column 812px wide (4. 11. 2026). */
+.card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body > .content > * { max-width: none; }
 
 /* The contents and the sections are numbered alike, by the stylesheet: the
    first section is 1 in the list and 1 over its text, and a section inside
@@ -138,7 +141,10 @@ article .series-nav { display: grid; grid-template-columns: repeat(2, minmax(0, 
 article .series-nav a,
 article .series-nav a:hover { display: block; max-width: none; padding: 14px 16px; border: 1px solid var(--line); border-radius: var(--corner); background: var(--plate); color: var(--ink); font-family: var(--ui); font-size: 15px; font-weight: 600; line-height: 1.35; letter-spacing: 0; text-transform: none; white-space: normal; }
 article .series-nav a:hover { border-color: var(--accent); color: var(--accent); }
-article .series-nav .series-next { grid-column: 2; text-align: right; }
+/* minimal pushes the next part right with margin-left: auto, which in a
+   grid also shrinks the card to its title: the next page stood narrower
+   than the one before it (4. 11. 2026). */
+article .series-nav .series-next { grid-column: 2; margin-left: 0; text-align: right; }
 article .series-nav .series-prev { grid-column: 1; }
 
 /* The date of a page says when it was written, not what it is: muted. */
