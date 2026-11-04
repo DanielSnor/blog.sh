@@ -794,7 +794,10 @@ def editor_round_trip(initial_content, hint_comment)
   Dir.mktmpdir do |dir|
     path = File.join(dir, 'post.md')
     File.write(path, "#{hint_comment}#{initial_content}")
-    editor = ENV['EDITOR'] || ENV['VISUAL'] || 'nano --breaklonglines --softwrap'
+    # --trimblanks: nano otherwise leaves the blank at the end of a line it
+    # wraps, and on a double space that is two -- a hard break in the
+    # middle of a sentence once the text is read back (#73).
+    editor = ENV['EDITOR'] || ENV['VISUAL'] || 'nano --breaklonglines --softwrap --trimblanks'
     ok = system(*Shellwords.split(editor), path)
     # The default nano flags postdate the 2007-vintage nano Apple still
     # ships -- when the *default* editor rejects them, retry bare nano

@@ -373,9 +373,14 @@ module MarkdownParser
     # whose own last character is a backslash. "\\\\" there is an escaped
     # backslash and there is no marker left over, so the break was lost
     # and the text gained a space instead.
+    # A soft break is one space, whatever whitespace stood round it, as in
+    # CommonMark: an editor that hard-wraps leaves the blank at the end of
+    # the line it broke, an indented continuation brings its own, and the
+    # extra space was stored, then sent out in the feed and the crossposts
+    # as plain text (#73).
     para.gsub(/ *(?<!\\)\\\n/, BREAK_SENTINEL)
         .gsub(/  +\n/, BREAK_SENTINEL)
-        .tr("\n", ' ')
+        .gsub(/[ \t]*\n[ \t]*/, ' ')
   end
   YOUTUBE_RE = %r{\Ahttps?://(?:www\.)?(?:youtube\.com/watch\?(?:[^\s]*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})}
 
