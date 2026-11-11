@@ -1932,8 +1932,17 @@ def draft_decision_loop(slug, path: nil, announce: true)
     # and "schedule (the next free slot)" read as if it were a plain draft,
     # while Enter leaves its date as it is and [s] moves it.
     scheduled_for = post['scheduled'] && (Time.parse(post['date'].to_s).getlocal rescue nil)
+    # A date already past is said to be, as the queue says it: "keep it
+    # scheduled for" a day gone by promised what had not happened, while
+    # the queue in the same run said nothing publishes it here (fleet
+    # over 1.11.1).
+    scheduled_label = scheduled_for && begin
+      date = scheduled_for.strftime(t('date_time_format'))
+      overdue = scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler'
+      scheduled_for <= Time.now ? "#{date} #{t(overdue)}" : date
+    end
     prompt = if scheduled_for
-               t('cli.what_next_prompt_scheduled', date: scheduled_for.strftime(t('date_time_format')), translate: offer)
+               t('cli.what_next_prompt_scheduled', date: scheduled_label, translate: offer)
              elsif slot
                t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format')), translate: offer)
              else
@@ -1959,7 +1968,7 @@ def draft_decision_loop(slug, path: nil, announce: true)
       return if prompt_and_schedule(path, post, raw: raw) == true
     when 'd', ''
       puts
-      puts(scheduled_for ? t('cli.left_scheduled', date: scheduled_for.strftime(t('date_time_format')))
+      puts(scheduled_for ? t('cli.left_scheduled', date: scheduled_label)
                          : t('cli.left_as_draft', slug: slug))
       puts
       return
