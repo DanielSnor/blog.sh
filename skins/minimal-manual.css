@@ -4013,8 +4013,12 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-li
    pictures, its tables and its code end; the column is the measure. A page
    too short for contents is no exception: minimal holds a post to 65
    characters, and a manual page without sections kept that measure in a
-   column 812px wide (4. 11. 2026). */
-.card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body > .content > * { max-width: none; }
+   column 812px wide (4. 11. 2026). A video, a picture or a player standing
+   straight in the text is no part of it: those keep the engine's
+   max-width: 100%, as in minimal's listing. Released with the rest, a video
+   with no caption drew 1920 pixels wide and the page ran sideways (found by
+   the fleet over 1.11.1, 11. 11. 2026). */
+.card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body > .content > :where(:not(video, img, iframe)) { max-width: none; }
 
 /* The contents and the sections are numbered alike, by the stylesheet: the
    first section is 1 in the list and 1 over its text, and a section inside
