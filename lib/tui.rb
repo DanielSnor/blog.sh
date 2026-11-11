@@ -361,7 +361,7 @@ module Tui
       escape
     when String
       puts key
-      key.downcase
+      key.scrub.downcase
     else
       puts
       ''
@@ -901,8 +901,11 @@ module Tui
           state[:selected] = 0
           state[:offset] = 0
           rows, status = yield(query, true)
-        elsif hot_keys.include?(key)
-          return [:key, key, rows.empty? ? nil : state[:selected]]
+        elsif hot_keys.include?(hot = key.valid_encoding? ? key.downcase : key)
+          # T with Caps Lock on is t, as in every screen that reads single
+          # keys (#70) -- the browser was the one that ignored it. Only the
+          # keys: what is typed into a search keeps its case.
+          return [:key, hot, rows.empty? ? nil : state[:selected]]
         elsif key == ' '
           # Space pages when nobody has claimed it -- which is what it does
           # in `less`, and what the preview screen wants.
@@ -1040,8 +1043,13 @@ module Tui
           # A letter is the same key either way round: with Caps Lock on, P
           # in the properties of a scheduled post was "Not understood" (#70),
           # while the line-based key_choice had always taken it.
+          # A byte that is no UTF-8 -- a terminal set to Latin-2 or CP1250
+          # sends "č" as one -- has no case to fold, and folding it raised:
+          # props, the queue and the main menu ended in a backtrace. It is
+          # scrubbed to a key no screen knows, which each says it did not
+          # understand (fleet over 1.11.1).
           key = Tui.read_key
-          key.is_a?(String) ? key.downcase : key
+          key.is_a?(String) ? key.scrub.downcase : key
         end
       ensure
         print "\e[?25h"
