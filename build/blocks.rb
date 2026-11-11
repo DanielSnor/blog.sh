@@ -278,7 +278,9 @@ module Blocks
   # number the markdown or the imported <ol> began with.
   def list_start(block)
     start = block['start']
-    block['style'] == 'ol' && start.is_a?(Integer) && start != 1 ? %( start="#{start}") : ''
+    # Not below 0: the editor cannot write such a list, so neither does the
+    # page (see MarkdownWriter).
+    block['style'] == 'ol' && start.is_a?(Integer) && start >= 0 && start != 1 ? %( start="#{start}") : ''
   end
 
   # 🪤 Every call that hands `seen` over names the keyword as well. Ruby

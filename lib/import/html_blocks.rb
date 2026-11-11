@@ -430,9 +430,8 @@ module Import
         items = lis.filter_map { |li| list_item(li) }
         unless items.empty?
           block = { 'type' => 'list', 'style' => node.name, 'items' => items }
-          # <ol start="5">, kept as the markdown parser keeps "5." (#72).
-          start = node.name == 'ol' && node.attrs['start'].to_s[/\A\d+\z/] && node.attrs['start'].to_i
-          block['start'] = start if start && start != 1
+          start = ol_start(node)
+          block['start'] = start if start
           @blocks << block
         end
 
@@ -450,6 +449,15 @@ module Import
         walk(prune(node, lis)) if node.children.any? { |c| !lis.include?(c) }
       end
 
+      # <ol start="5">, kept as the markdown parser keeps "5." (#72): the
+      # number, when it is a plain one and not the 1 every list begins at.
+      def ol_start(node)
+        return nil unless node.name == 'ol' && node.attrs['start'].to_s[/\A\d+\z/]
+
+        start = node.attrs['start'].to_i
+        start == 1 ? nil : start
+      end
+
       def list_item(li)
         nested = li.children.find { |c| %w[ul ol].include?(c.name) }
         text, formatting = Inline.render(li, skip: %w[ul ol])
@@ -465,6 +473,11 @@ module Import
           # imported from HTML printed as raw JSON in a <pre> on the page.
           unless children.empty?
             item['children'] = { 'type' => 'list', 'style' => nested.name, 'items' => children }
+            # ...and a list inside a list keeps its number too: only the
+            # outer one did, and a nested <ol start="3"> came in as 1, 2
+            # (fleet over 1.11.1).
+            start = ol_start(nested)
+            item['children']['start'] = start if start
           end
         end
         item
