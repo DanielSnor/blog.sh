@@ -794,10 +794,17 @@ def editor_round_trip(initial_content, hint_comment)
   Dir.mktmpdir do |dir|
     path = File.join(dir, 'post.md')
     File.write(path, "#{hint_comment}#{initial_content}")
-    # --trimblanks: nano otherwise leaves the blank at the end of a line it
-    # wraps, and on a double space that is two -- a hard break in the
-    # middle of a sentence once the text is read back (#73).
-    editor = ENV['EDITOR'] || ENV['VISUAL'] || 'nano --breaklonglines --softwrap --trimblanks'
+    # The default nano wraps on the screen only (--softwrap --atblanks) and
+    # writes a paragraph as the one line it is. A line break nano puts in
+    # has to guess at what the blanks around it meant: kept, a double space
+    # it broke at is two blanks at the end of a line, markdown's hard break
+    # in the middle of a sentence (#73); trimmed, a word ending in a
+    # backslash ("d8-\") ends the line with the other hard break and loses
+    # the backslash; and a long list item or quote line goes on unmarked,
+    # into the prose. Not breaking the line leaves nothing to guess.
+    # --trimblanks stays for ^J, which still breaks lines when asked to,
+    # where the double space is the likelier of the two (fleet over 1.11.1).
+    editor = ENV['EDITOR'] || ENV['VISUAL'] || 'nano --softwrap --atblanks --trimblanks'
     ok = system(*Shellwords.split(editor), path)
     # The default nano flags postdate the 2007-vintage nano Apple still
     # ships -- when the *default* editor rejects them, retry bare nano
