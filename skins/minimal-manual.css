@@ -4017,8 +4017,11 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-li
    straight in the text is no part of it: those keep the engine's
    max-width: 100%, as in minimal's listing. Released with the rest, a video
    with no caption drew 1920 pixels wide and the page ran sideways (found by
-   the fleet over 1.11.1, 11. 11. 2026). */
-.card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body > .content > :where(:not(video, img, iframe)) { max-width: none; }
+   the fleet over 1.11.1, 11. 11. 2026). The Markdown cheat sheet is a page
+   too, its title an h1 straight over the text with no post header; it kept
+   the 65 characters (same fleet). */
+.card:is(.has-hero, :not(.has-hero)) > article > .post-header > .post-body > .content > :where(:not(video, img, iframe)),
+.card > article > h1 + .content > :where(:not(video, img, iframe)) { max-width: none; }
 
 /* The contents and the sections are numbered alike, by the stylesheet: the
    first section is 1 in the list and 1 over its text, and a section inside
