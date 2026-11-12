@@ -804,12 +804,16 @@ def editor_round_trip(initial_content, hint_comment)
     # into the prose. Not breaking the line leaves nothing to guess.
     # --trimblanks stays for ^J, which still breaks lines when asked to,
     # where the double space is the likelier of the two (fleet over 1.11.1).
-    editor = ENV['EDITOR'] || ENV['VISUAL'] || 'nano --softwrap --atblanks --trimblanks'
+    # An $EDITOR set to nothing is not set: taken as an editor, it split to
+    # no words and the post's own file was run as the command (fleet over
+    # 1.11.1).
+    own = [ENV['EDITOR'], ENV['VISUAL']].map { |e| e.to_s.strip }.find { |e| !e.empty? }
+    editor = own || 'nano --softwrap --atblanks --trimblanks'
     ok = system(*Shellwords.split(editor), path)
     # The default nano flags postdate the 2007-vintage nano Apple still
     # ships -- when the *default* editor rejects them, retry bare nano
     # before giving up. A user's own $EDITOR gets no second-guessing.
-    ok ||= ENV['EDITOR'].nil? && ENV['VISUAL'].nil? && system('nano', path)
+    ok ||= own.nil? && system('nano', path)
     unless ok
       abort(t('cli.editor_failed', editor: editor))
     end

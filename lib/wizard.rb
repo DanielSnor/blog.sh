@@ -308,7 +308,9 @@ module Wizard
   def edit_in_editor(body, comment)
     require 'tmpdir'
     require 'shellwords'
-    editor = ENV['VISUAL'] || ENV['EDITOR'] || 'nano'
+    # Set to nothing is not set: an empty $VISUAL ran the value's own file
+    # as the command (fleet over 1.11.1).
+    editor = [ENV['VISUAL'], ENV['EDITOR']].map { |e| e.to_s.strip }.find { |e| !e.empty? } || 'nano'
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'value.txt')
       header = comment ? comment.lines.map { |l| "// #{l.chomp}\n" }.join : ''

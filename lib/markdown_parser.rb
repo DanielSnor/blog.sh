@@ -378,8 +378,12 @@ module MarkdownParser
     # the line it broke, an indented continuation brings its own, and the
     # extra space was stored, then sent out in the feed and the crossposts
     # as plain text (#73).
-    para.gsub(/ *(?<!\\)\\\n/, BREAK_SENTINEL)
-        .gsub(/  +\n/, BREAK_SENTINEL)
+    # The blanks that open the line after a hard break are no part of the
+    # text either, as in CommonMark: an indented line after a break was
+    # stored with its indent, and the feed and crossposts sent it (fleet
+    # over 1.11.1).
+    para.gsub(/ *(?<!\\)\\\n[ \t]*/, BREAK_SENTINEL)
+        .gsub(/  +\n[ \t]*/, BREAK_SENTINEL)
         .gsub(/[ \t]*\n[ \t]*/, ' ')
   end
   YOUTUBE_RE = %r{\Ahttps?://(?:www\.)?(?:youtube\.com/watch\?(?:[^\s]*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})}
@@ -1097,6 +1101,11 @@ module MarkdownParser
       # and reading it back raw left the backslashes where the reader could
       # see them -- and put them into the alt attribute on the page.
       alt, path, caption = unescape_title(m[:alt]), m[:target], unescape_title(m[:title])
+      # A caption wrapped over lines is one line, as a paragraph is (#73):
+      # kept, the newline was stored, and the next edit -- the writer puts a
+      # caption on one line -- changed it to a space, so a post differed
+      # from itself after an edit nobody made to it (fleet over 1.11.1).
+      caption = caption&.gsub(/[\t\n\r\f\v ]+/, ' ')&.strip
       # A single exclamation mark is for images only. A video with just one
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.
