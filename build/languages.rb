@@ -136,8 +136,11 @@ module Languages
           [I18n.t('build.language_label_not_text', file: file, keys: found.map { |_, key, value| "#{key} (#{value.inspect})" }.join(', '))]
         else
           found.map do |_, key, detail|
+            # The detail is check's sentence, borrowed: said in the language
+            # the build speaks, as the sentence around it is -- an English
+            # run on a Czech site said half of it in each.
             I18n.t('build.language_list_mismatch', file: file, key: key,
-                                                   detail: LanguageFile.describe(detail, file) { |k, **v| I18n.t(k, **v) })
+                                                   detail: LanguageFile.describe(detail, file) { |k, **v| I18n.narrate(k, **v) })
           end
         end
       end

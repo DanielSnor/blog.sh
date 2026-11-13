@@ -53,7 +53,7 @@ when 'version', '--version', '-v'
     max_mb = ENV.fetch('BLOGSH_MAX_MB', '24').to_i
     # The accent the site wears, per scheme, resolved the way colors.css
     # resolves it -- a palette the site never set answers with the shipped
-    # one -- so an app can wear the blog's colour, as /write/ does.
+    # one -- so an app can wear the blog's colour.
     require_relative '../lib/colors_css'
     colors = data.is_a?(Hash) ? data['colors'] : nil
     accent = %w[light dark].to_h { |mode| [mode, ColorsCss.color_for(colors, mode, 'accent')] }

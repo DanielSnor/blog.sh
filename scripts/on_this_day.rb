@@ -123,11 +123,15 @@ if posts.empty?
   exit 0
 end
 
-puts Tui.paint(t('heading', date: date.strftime(I18n.t('date_format'))), :bold)
+# The day asked about, in the words the heading and the two lines naming it
+# below share: the legend and the empty day used to say "today" about any
+# day at all (#61).
+day = date.strftime(I18n.t('date_format'))
+puts Tui.paint(t('heading', date: day), :bold)
 puts "  #{t('no_leap_day')}" if no_leap_day
 years = plan['all'].map { |e| e['year'] }.uniq.size
 if plan['all'].empty?
-  puts "  #{t('nothing')}"
+  puts "  #{t('nothing', date: day)}"
 else
   puts "  #{t('summary', posts: plan['all'].size, years: years)}"
 end
@@ -162,7 +166,7 @@ unless plan['windows'].empty?
     puts "  #{row['year']} #{mark} #{short(row['title'], 56)}  #{Tui.paint(row['path'], :dim)}"
   end
   puts
-  puts Tui.paint("  #{t('legend')}", :dim)
+  puts Tui.paint("  #{t('legend', date: day)}", :dim)
 end
 
 unless SiteConfig::Chrome.widgets(SiteConfig.data).key?('on_this_day')

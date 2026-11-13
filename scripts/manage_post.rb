@@ -111,6 +111,13 @@ def draft_path(post)
   "/draft/#{post['draft_token']}/#{post['slug']}/"
 end
 
+# A translation's draft is the post's own, under the root of its language:
+# every language but the site's own is built under /<code>/
+# (build/languages.rb), the draft's token and slug with it.
+def translation_draft_path(post, lang)
+  "/#{lang}#{draft_path(post)}"
+end
+
 # A page is served at the root, without a year -- so every message built
 # from a year told the author about an address the site never answered at,
 # and a rename recorded a redirect from one.
@@ -1010,8 +1017,8 @@ def tags_from_frontmatter(value)
   # only the second strip, the first spelling kept the opening bracket on
   # the first tag and the closing one on the last -- `tags: [release, foto]`
   # filed a post under "[release" and "foto]". The writer page has done both
-  # since it existed (write/app.js), and this is the line that had been
-  # missing on this side.
+  # for as long as it existed (write/app.js, gone in 1.11), and this is the
+  # line that had been missing on this side.
   text = value.to_s.strip.gsub(/\A\[|\]\z/, '')
   tags = []
   current = +''
@@ -1212,20 +1219,17 @@ def compose_post(raw, suggested, interactive:, also_consume: [], confined: false
     refuse('missing_images', t('cli.add_file_missing_images',
                                files: missing.map { |m| File.basename(m) }.join(', '), dir: INCOMING_DIR))
   end
-  # A RECEIPT is a name the sender chose for the answer, so it can come
-  # back and read it. The page at /write/ writes one into the markdown it
-  # sends; the build then leaves a small JSON file at an address computed
-  # from it, and the page asks for that address until it appears.
+  # A RECEIPT is a name the sender mints for one send and writes into the
+  # markdown: the apps do, and so did the /write/ page until 1.11. It is
+  # how a delivery that reached this machine twice -- the pipe broke after
+  # the bytes and before the answer, and the app tried again -- is one
+  # post and not two (PostWriter.receipts). The page also read its answer
+  # back from a file the build wrote under that name; that file went with
+  # the page.
   #
-  # Why the sender names it rather than the engine: the answer travels
-  # back through a shortcut and an address bar, and on a phone that road
-  # is broken in one specific way -- a page added to the home screen has
-  # its own storage, so the reply opens in the browser and never reaches
-  # the draft. A name the page knew BEFORE it sent anything is a road that
-  # does not depend on anything coming back.
-  #
-  # Sixteen hex characters, checked: it becomes a filename on the site, and
-  # a name from outside that is not checked is a path from outside.
+  # Sixteen hex characters, checked: it came from outside and is kept in
+  # the post, and until 1.11 it was also a filename on the site -- a name
+  # from outside that is not checked is a path from outside.
   receipt = meta['receipt'].to_s.strip
   refuse('bad_receipt', t('cli.receipt_shape')) unless receipt.empty? || PathSafety.hex_token?(receipt)
 
@@ -1489,34 +1493,11 @@ def add_from_file(source, json: false, confined: false)
   # reads the status must not read that as success.
   refuse('empty', t('cli.add_file_empty', file: file)) if path.nil?
 
-  # What the save had to say about the post, written INTO the post so that
-  # the receipt can carry it. These sentences are said on a terminal, and
-  # the one road that uses a receipt is a phone, which has no terminal to
-  # say them on: a post that arrived with a video whose index sits at the
-  # end, a picture whose dimensions could not be read, an embed whose
-  # player was not found, looked on the page exactly like one that arrived
-  # with nothing wrong. The build writes the receipt out of the post file
-  # a moment from now, and this list is gone by then, so the file is the
-  # only place it can wait.
-  #
-  # Only what COMPOSING the post said, which is the part that is about
-  # this post. Everything report_added adds below -- the missing base_url,
-  # and whatever the rebuild itself warned about -- is about the SITE, and
-  # public/write/r/ is a world-readable directory: the receipt must not
-  # become a window onto the rest of the blog. (It could not reach it in
-  # any case; the build that writes the receipt is the run that produces
-  # those.)
-  #
-  # Only for a post carrying a receipt, because nothing else will ever
-  # read them back, and only when there is something to say, so an
-  # ordinary post gains no key. Without --json nothing was captured at all
-  # and the author is reading the warnings on their own screen, which is
-  # the situation this exists to make up for.
-  if warnings.any?
-    saved = JSON.parse(File.read(path, encoding: 'utf-8'))
-    AtomicWrite.write_json(path, saved.merge('receipt_warnings' => warnings)) if saved['receipt']
-  end
-
+  # Until 1.11 these warnings were also written INTO a post that carried
+  # a receipt, for the /write/ page to read back from public/write/r/.
+  # The page is gone and an app reads them from the answer below, so the
+  # post gains no key; edit and a re-import still drop one that an older
+  # post carries (EDIT_DECIDES, PostWriter::IMPORT_DECIDES).
   report_added(path, warnings, json: json, publish: publish)
 rescue Refused => e
   # Outside quietly, so file descriptor 1 is the caller's again. stderr
@@ -1942,7 +1923,13 @@ def draft_decision_loop(slug, path: nil, announce: true)
     end
     puts
     slot = next_publish_slot(slug)
-    prompt = slot ? t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format'))) : t('cli.what_next_prompt')
+    langs = other_languages
+    offer = translate_offer(langs)
+    prompt = if slot
+               t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format')), translate: offer)
+             else
+               t('cli.what_next_prompt', translate: offer)
+             end
     case Tui.key_choice(prompt)
     # Every action gets the path the dialog is SHOWING. Re-resolving by
     # slug here meant the screen could describe one post while the
@@ -1971,7 +1958,18 @@ def draft_decision_loop(slug, path: nil, announce: true)
 
       rebuild_and_deploy(t('cli.updating_preview'))
       return
-    else puts t('cli.unknown_choice_pde')
+    # #66: a site in more than one language offers the translation where
+    # the draft was just written, rather than leaving the author to find
+    # `./blog.sh translate` afterwards. Back here once it is saved, with
+    # the draft still a draft and the question asked again.
+    when 't'
+      if langs.empty?
+        puts t('cli.unknown_choice_pde')
+      elsif (lang = langs.size == 1 ? langs.first : pick_translation_language(langs))
+        puts
+        cmd_translate(slug, lang, path: path)
+      end
+    else puts langs.empty? ? t('cli.unknown_choice_pde') : t('cli.unknown_choice_pdet')
     end
   end
 end
@@ -4110,6 +4108,22 @@ def props_preview_url(post)
   draft_url(post)
 end
 
+# The same for a translation of a draft -- nil when the post is not a
+# draft or has no words in the language, where there is nothing to look at.
+# Only where the build makes a page of it: a translation with words in it
+# (Translations.written?) -- a title alone is saved, and stands nowhere --
+# and on a site with an address, as url_for_json answers "" without one.
+# The address was said for both, and led to "nothing here".
+def translation_preview_url(post, lang)
+  return nil unless draft?(post) && Translations.written?(post.dig('translations', lang))
+  return nil if SITE_BASE_URL.to_s.empty?
+
+  site_path = translation_draft_path(post, lang)
+  return "http://localhost:#{LOCAL_PREVIEW_PORT}#{site_path}" if placeholder_base_url?
+
+  "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"
+end
+
 # [q] only where a QR code can do its job: a draft, in a terminal, on a
 # site with a real address. A phone that scans example.com or localhost
 # lands on a domain this author does not own, or on itself.
@@ -5116,6 +5130,25 @@ def other_languages
   (named.reject(&:empty?) - [own]).uniq
 end
 
+# The [t] of the draft dialog (#66): naming the language where there is
+# one to translate into, asking which where there are several, and
+# nothing at all on a site in one language, whose dialog stays as it was.
+def translate_offer(langs)
+  return '' if langs.empty?
+  return t('cli.what_next_translate_one', lang: language_name(langs.first)) if langs.size == 1
+
+  t('cli.what_next_translate')
+end
+
+# Which language [t] translates into, on a site with several: a key per
+# language, in the order the site names them. Anything else is back.
+def pick_translation_language(langs)
+  choices = langs.each_with_index.map { |code, i| "[#{i + 1}] #{language_name(code)}" }.join('  ')
+  key = Tui.key_choice(t('cli.translate_which', choices: choices))
+  index = key.to_s =~ /\A[1-9]\z/ ? key.to_i - 1 : nil
+  index && langs[index]
+end
+
 # A language's name in its own language, which is the only name somebody
 # looking for it recognises -- and the code itself when the engine has no
 # file for it, rather than a blank where a name should be.
@@ -5323,14 +5356,19 @@ def translation_from_file(file, raw, meta, path, original_raw, post, json:, conf
   cleanup_incoming({}, [file])
   deployed, more = quietly(json) { rebuild_and_deploy(t('cli.updating_preview')) }
   if json
-    puts JSON.pretty_generate(acted_answer(path, warnings + more, rebuilt: deployed).merge('lang' => lang))
+    written = JSON.parse(File.read(path, encoding: 'utf-8'))
+    puts JSON.pretty_generate(acted_answer(path, warnings + more, rebuilt: deployed)
+                                .merge('lang' => lang, 'translation_url' => translation_preview_url(written, lang)))
   else
     puts t('cli.translate_saved', lang: lang, slug: slug)
+    print_translation_preview(path, lang)
   end
 end
 
-def cmd_translate(slug, lang)
-  path = find_post_path(slug)
+# `path:` is the draft dialog's (#66): the post it is showing, which a
+# second post sharing the slug in another year must not stand in for.
+def cmd_translate(slug, lang, path: nil)
+  path ||= find_post_path(slug)
   abort t('cli.post_not_found', slug: slug) unless path
 
   translate_language!(lang)
@@ -5377,7 +5415,30 @@ def cmd_translate(slug, lang)
   discard_editor_buffer
   puts
   puts said
-  draft?(post) ? rebuild_and_deploy(t('cli.updating_preview')) : maybe_rebuild
+  return maybe_rebuild unless draft?(post)
+
+  rebuild_and_deploy(t('cli.updating_preview'))
+  print_translation_preview(path, lang)
+end
+
+# Where the translation just written can be read (#67). `add` and `edit`
+# end a draft on its preview address; `translate` rebuilt the preview and
+# said nothing of where it was, so the one page the writer wanted to look
+# at next had to be found by hand. The address is the language's own:
+# the site's root for the post's own words, /<code>/ for these. Nothing
+# when the save took the language off the post.
+def print_translation_preview(path, lang)
+  post = JSON.parse(File.read(path, encoding: 'utf-8'))
+  if SITE_BASE_URL.to_s.empty? && draft?(post) && Translations.written?(post.dig('translations', lang))
+    warn t('cli.base_url_missing_preview')
+    return
+  end
+  return unless translation_preview_url(post, lang)
+
+  site_path = translation_draft_path(post, lang)
+  puts Tui.paint(t('cli.preview_label', url: "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"), :cyan)
+  puts_local_preview_hint(site_path)
+  puts
 end
 
 # The save itself: the words of one language parsed, checked for an
@@ -6044,13 +6105,11 @@ def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined:
   updated['scheduled'] = true if post['scheduled']
   # The receipt is deliberately never written into the markdown the editor
   # sees (FILE_ONLY_FRONTMATTER_KEYS), so this line is the only way it can
-  # survive an edit -- and without it an edit at the desk swept the answer
-  # a phone was still polling for: the build stopped generating
-  # public/write/r/<receipt>.json and the next prune deleted it, so the page
-  # asked every three seconds for five minutes about a post that had gone
-  # out perfectly well.
-  # A post edited from the phone carries the receipt of THAT send, so the
-  # page that sent it can ask after it; anything else keeps the one it has.
+  # survive an edit -- without it an edit at the desk dropped the one
+  # identity a phone-written post has (PostWriter.receipts). Until 1.11 it
+  # also swept the answer the /write/ page was still polling for.
+  # A post edited from the phone carries the receipt of THAT send, so a
+  # retry of it is recognised; anything else keeps the one it has.
   fresh = receipt.to_s.strip
   refuse('bad_receipt', t('cli.receipt_shape')) unless fresh.empty? || PathSafety.hex_token?(fresh)
   if !fresh.empty?
@@ -6590,11 +6649,11 @@ end
 # and the digest that `base:` hands back, so a draft that changed in the
 # meantime is refused instead of overwritten (edit_from_file).
 #
-# The texts travel back to the phone inside an address (scripts/receive.sh
-# answers, the shortcut opens /write/#b=<base64>), so they are handed out
-# up to a budget, newest first; a draft past it comes without its text,
-# and the phone asks for that one by name. Every draft is LISTED either
-# way.
+# The texts are handed out up to a budget, newest first; a draft past it
+# comes without its text, and the phone asks for that one by name. Every
+# draft is LISTED either way. The budget was set while the texts travelled
+# back inside an address (the shortcut opened /write/#b=<base64>, gone in
+# 1.11); it stays because the apps read the answer in this shape.
 DRAFTS_TEXT_BUDGET = 48_000
 
 # What a reader would call the post: its own title, a link block's, or its
@@ -8577,8 +8636,13 @@ def run_wizard_screen
       when :enter then chosen = selected
       when :escape then break
       when String
-        break if %w[q 0].include?(key)
-
+        # Esc is the only way out (#64). 0 used to leave too, as it goes back
+        # in every other menu -- but here back is out, and a 0 pressed to see
+        # what it does closed ./blog.sh without a word; q did the same, the
+        # one screen left where q was a second Esc. Both are no key here now,
+        # like a digit past the last row. A piped run keeps its "0) exit":
+        # it has no Esc.
+        #
         # Quick select keeps working, and moves the cursor as it goes, so
         # the frame under the action names the same row the digit chose.
         if key =~ /\A[1-9]\z/ && key.to_i <= WIZARD_MENU.size
@@ -8713,7 +8777,8 @@ begin
     case command
     when 'drafts'
       # Read-only and quick: what the phone asks for when it opens a draft
-      # (scripts/receive.sh, drafts.txt), and a plain list without --json.
+      # (the apps through scripts/remote.sh; scripts/receive.sh answers
+      # drafts.txt with it too), and a plain list without --json.
       json = !ARGV.delete('--json').nil?
       unknown = ARGV.find { |arg| arg.start_with?('--') }
       abort t('cli.drafts_unknown_option', option: unknown) if unknown

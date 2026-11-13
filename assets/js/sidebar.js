@@ -67,8 +67,11 @@
 // is this LANGUAGE's (the card names it in data-src), and what it holds is
 // a whole day cut into windows -- the card shows the one the clock is in.
 // A file from another day has no window for now, so a cron that stopped
-// turning the day over hides the card rather than showing yesterday as
-// today. Titles and addresses are escaped like every other foreign string
+// turning the day over leaves the card hidden rather than showing
+// yesterday as today. Hidden is where it starts: the build writes the card
+// with `hidden`, and only a day with rows takes it off (#62) -- a heading
+// over an empty box was what a reader saw while the file was on its way,
+// and for good when the script did not run. Titles and addresses are escaped like every other foreign string
 // here, even though the build wrote them: a title is whatever the author
 // typed, and that includes a "<".
 var i18n = window.BLOG_I18N || {};
@@ -116,10 +119,11 @@ function onThisDay() {
       var all = data.all || [];
       box.innerHTML = current.rows.map(dayRow).join('') +
                       (all.length > current.rows.length ? wholeDay(all) : '');
+      if (card) card.hidden = false;
       return null;
     })
     .catch(function () {
-      if (card) card.style.display = 'none';
+      if (card) card.hidden = true;
     });
 }
 

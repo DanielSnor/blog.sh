@@ -1,0 +1,250 @@
+/* minimal literal -- a skin for blog.sh, of the minimal family.
+
+   The page is a book's setting. Minimal stands underneath: the head, the
+   menu, the lead, the engine's pages, the foot. This file gives the text
+   the page: one column in the middle, set large in a serif at a book's
+   measure, with what minimal keeps beside the posts moved under them. A
+   listing is read by its titles, the date after the excerpt; and the small
+   furniture of a text -- a quotation, a break, a caption -- is set the way
+   a book sets it.
+
+   The serif is the reader's own: no font file comes with this skin. The
+   palette is the site's, as everywhere in the family.
+
+   Worn with `site.skin: minimal-literal`. Made by skins/src/build.rb:
+   skins/minimal.css whole, then the layer in skins/src/literal.css --
+   change the layer, never the file made from it. */
+
+/* ---- literal: the layer over minimal ---------------------------------- */
+
+:root {
+  --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Charter, "Bitstream Charter", Cambria, Georgia, serif;
+  /* The column a text is set in. */
+  --column: 820px;
+}
+
+/* ----------------------------------------------------------- the page
+
+   The text has the page to itself. The head, the menu and the foot stand
+   where they stand in every skin of the family; between them is one column
+   in the middle, and what minimal keeps beside the posts stands under them,
+   three cards across, as in pictorial. */
+.layout,
+.layout--no-aside { display: block; }
+.layout > main { max-width: var(--column); margin: 0 auto; padding-top: 16px; }
+/* The line over what stands under the text is the column's lower edge, as
+   the menu's line is its upper one, and the air at the two is the same:
+   about thirty-six pixels under the menu, over the way to the next page and
+   under it. A listing's last row gives up its own hairline to that edge, so
+   there are never two lines with nothing between them. */
+main > .post-list-item:last-child { border-bottom: 0; }
+/* The lead brings no air of its own to the top: the column's is enough. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x) { margin-top: 0; }
+.layout > aside { margin-top: 18px; padding-top: 30px; border-top: 1px solid var(--line); columns: 3 280px; column-gap: 28px; }
+.layout > aside > .card { margin: 0 0 22px; break-inside: avoid; }
+@media (max-width: 700px) { .layout > aside { columns: 1; } }
+
+/* ---------------------------------------------------------- the voice
+
+   What is read speaks in the serif. What the engine says about it -- a date,
+   a count, a tag, the part of a series -- keeps minimal's voice. */
+.content,
+.post-body h1,
+.card.has-hero .post-hero__content h1,
+.post-list-item h2,
+.search-result h2 { font-family: var(--serif); }
+
+/* A post's title is a chapter's heading: larger, lighter and not tightened
+   -- under a picture that opens the post as much as over the text. */
+.post-body h1,
+.card.has-hero .post-hero__content h1 {
+  font-size: clamp(29px, 4.6vw, 46px);
+  font-weight: 600;
+  line-height: 1.12;
+  letter-spacing: 0;
+}
+
+/* ----------------------------------------------------------- the text
+
+   Set large, in a column narrow enough that a line holds about seventy-five
+   characters: a long piece is read here the way a book is read, not
+   scanned. The size comes down with the column on a narrower screen, so the
+   line keeps its length. Old-style figures; words broken where a line would
+   otherwise end far short. */
+article .content {
+  font-size: clamp(19.5px, 2.9vw, 24px);
+  line-height: 1.6;
+  font-variant-numeric: oldstyle-nums;
+  hyphens: auto;
+  hyphenate-limit-chars: 8 3 4;
+  text-wrap: pretty;
+  hanging-punctuation: first;
+}
+.content > p,
+.content > ul,
+.content > ol,
+.content > blockquote,
+.content > dl { max-width: none; }
+
+/* A heading inside a text is the text's own: in the ink, not in the accent.
+   The accent stays what it is everywhere in the family, an action or a
+   value the engine knows. */
+.content h1, .content h2, .content h3, .content h4, .content h5, .content h6 { font-weight: 600; letter-spacing: 0; color: var(--ink); }
+article .content h2 { font-size: 1.42em; line-height: 1.2; margin-top: 1.9em; }
+article .content h3 { font-size: 1.12em; font-style: italic; font-weight: 500; margin-top: 1.6em; }
+
+/* The contents of a long post stand over the text, across the column: at
+   this size a box floated beside the opening would leave it half a line. */
+.card > article .toc { float: none; width: auto; margin: 18px 0 0; }
+
+/* A quotation is a paragraph set in from both sides, in italics, with no
+   rule -- in a post, in a row of a listing and in the lead alike. */
+.content blockquote {
+  border-left: 0;
+  padding: 0 1.6em;
+  font-style: italic;
+  color: var(--ink);
+}
+article .content blockquote { margin: 1.3em 0; font-size: 0.95em; }
+
+/* A break in the text is three stars, not a line. */
+article .content hr {
+  border: 0;
+  height: auto;
+  margin: 1.8em 0;
+  text-align: center;
+  background: none;
+  overflow: visible;
+}
+article .content hr::before {
+  content: "*\2002*\2002*";
+  font-family: var(--serif);
+  font-size: 1.1em;
+  letter-spacing: 0.3em;
+  color: var(--muted);
+}
+
+/* A caption is a legend under its picture, in the text's own voice. */
+article .content figcaption {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.72em;
+  letter-spacing: 0;
+  line-height: 1.4;
+  text-align: center;
+  padding-top: 6px;
+}
+
+/* Code keeps its own face and is brought down to sit with the serif. */
+article .content code { font-size: 0.82em; }
+
+/* A table is set a step under the text, not at minimal's small size. */
+article .content table { font-size: 0.78em; }
+
+/* -------------------------------------------------------- the listing
+
+   A row of a listing is the title, how it begins, and then one line of what
+   the engine knows -- the date first. A listing is read by its titles here,
+   not down a margin of dates. The lead keeps minimal's shape. */
+.post-list-item .post-body > h2 { font-size: 28px; font-weight: 600; line-height: 1.2; letter-spacing: 0; }
+.post-list-item .content { max-width: none; font-size: 19px; line-height: 1.55; font-variant-numeric: oldstyle-nums; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))) .post-header {
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 7px 14px;
+}
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))) .post-body { display: contents; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type))) .date-badge {
+  order: 5;
+  flex: 0 0 auto;
+  width: auto;
+  padding: 0;
+}
+
+/* The lead's words run the width of the lead, at the size of a row's. */
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x) .content > p,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x) .content > p:first-of-type,
+body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x) .content > blockquote { max-width: none; font-size: 19px; line-height: 1.55; }
+
+/* ---------------------------------------------------------- the phone */
+@media (max-width: 700px) {
+  article .content { line-height: 1.55; }
+  .content blockquote { padding: 0 1em; }
+  .post-list-item .post-body > h2 { font-size: 24px; }
+  .post-list-item .content { font-size: 18px; }
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x) .content > p,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(.x) .content > p:first-of-type,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x) .content > p,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x) .content > p:first-of-type,
+  body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(.x) .content > blockquote { font-size: 18px; }
+}
+
+/* ------------------------------------------------------ where one is
+
+   A book tells its reader how far in they are by the thickness under each
+   thumb. Here a line stands to the right of the text, and a mark on it goes
+   from its top to its foot as the text goes from its first line to its
+   last. The line belongs to the text: it begins where the text begins,
+   under the title and the contents; once the reader is in, it holds its
+   place on the screen while the text moves past; and it goes out when
+   the text's last lines have gone up the screen. So it measures the text of the post alone -- not the
+   comments, not the foot.
+
+   The mark is in the ink: where a reader is, is neither an action nor a
+   value the engine knows. No script: the browser ties the mark to the
+   scroll itself, and where a browser cannot, nothing is drawn. Not on a
+   phone, where there is no margin to stand in.
+
+   Only a text long enough to be lost in has one: a post of six paragraphs
+   or more. A picture with a line under it, or a note of three sentences,
+   is seen whole and needs no telling where one is in it.
+
+   The line is the text's first box, as tall as most of the screen and
+   taking no room (its own height is given back as a negative margin), set
+   out past the column's right edge. */
+@supports (animation-timeline: view()) {
+  @media (min-width: 701px) {
+    :root { --where-gap: 60px; --where-width: 5px; --where-top: 190px; --where-height: calc(92vh - var(--where-top)); }
+    article .content:has(> p:nth-of-type(6)) { view-timeline: --literal-text block; }
+    article .content:has(> p:nth-of-type(6))::before {
+      content: "";
+      display: block;
+      position: sticky;
+      z-index: 2;
+      top: var(--where-top);
+      width: var(--where-width);
+      height: var(--where-height);
+      /* in the page's own margin, by the edge of the screen */
+      margin: 0 0 calc(-1 * var(--where-height)) calc(100% + 8px);
+      pointer-events: none;
+      background:
+        linear-gradient(var(--ink), var(--ink)) no-repeat 50% 0% / 3px 56px,
+        linear-gradient(var(--line), var(--line)) no-repeat 50% 50% / 1px 100%;
+      border-radius: 2px;
+      /* the mark follows the text; the whole goes out as the text's last
+         lines go up the screen */
+      animation: literal-where linear both, literal-left linear both;
+      animation-timeline: --literal-text, --literal-text;
+      animation-range: contain 0% contain 100%, exit 15% exit 65%;
+    }
+  }
+  /* Where the screen is wider than the text, the line stands a little way
+     off to the right, and the two are centred as one: the column moves left
+     by half of what the line and its distance take. */
+  @media (min-width: 960px) {
+    main:has(> .card > article .content > p:nth-of-type(6)) { position: relative; left: calc((var(--where-gap) + var(--where-width)) / -2); }
+    article .content:has(> p:nth-of-type(6))::before { margin-left: calc(100% + var(--where-gap)); }
+  }
+}
+@keyframes literal-where {
+  from { background-position: 50% 0%, 50% 50%; }
+  to { background-position: 50% 100%, 50% 50%; }
+}
+@keyframes literal-left {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}

@@ -189,6 +189,9 @@ module Doctor
     findings.concat(of(:tag_icons, check_tag_icons(data)))
     findings.concat(of(:social_icons, check_social_icons(data)))
     findings.concat(of(:share, check_share(data)))
+    findings.concat(of(:retired_keys, check_retired_keys(data)))
+    findings.concat(of(:series_index, check_series_index(data)))
+    findings.concat(of(:skin, check_skin(data, root)))
     findings.concat(of(:trash, check_trash(root)))
     findings.concat(of(:pairing, check_pairing(root)))
     findings.concat(of(:deploy, check_deploy(root)))
@@ -281,7 +284,7 @@ module Doctor
   # from the example and never rewritten put the example's German on the
   # Czech pages, with nobody saying so.
   def check_language_yml(root, data)
-    files = Dir.glob(File.join(root, 'config', 'site.*.yml')).sort
+    files = PathGlob.under(root, 'config', 'site.*.yml').sort
     parsed = {}
     findings = files.filter_map do |path|
       parsed[path] = YAML.load_file(path)
@@ -835,10 +838,23 @@ module Doctor
     tags = Checker.stream_tags(posts)
 
     findings = []
-    entries.each do |entry|
+    entries.each_with_index do |entry, at|
       next unless entry.is_a?(Hash)
 
       label = entry['label'].to_s.strip
+      # A group is a label over the items after it, and leads nowhere: an
+      # address written on one is never followed, and a group with no item
+      # under it is left out of the menu altogether. Neither stops a build,
+      # and either way the menu is not the one its author wrote.
+      if SiteConfig::Chrome.nav_group?(entry)
+        target = %w[tag series url].map { |key| entry[key].to_s.strip }.find { |value| !value.empty? }
+        findings << error(t('nav_group_address', label: label, target: target), t('nav_group_address_fix')) if target
+        held = entries[(at + 1)..].take_while { |e| !SiteConfig::Chrome.nav_group?(e) }
+        if !label.empty? && held.none? { |e| SiteConfig::Chrome.nav_item?(e) }
+          findings << warn(t('nav_group_empty', label: label), t('nav_group_empty_fix'))
+        end
+        next
+      end
       slug = entry['tag'].to_s.strip
       if !slug.empty?
         # Compared through Slug.slugify, because that is what the build
@@ -857,6 +873,18 @@ module Doctor
                       else
                         error(t('nav_tag_missing', label: label, tag: slug), t('nav_tag_missing_fix'))
                       end
+        end
+        next
+      end
+
+      # A series item leads to the series' listing, which the build writes
+      # only for a series with two published parts and a name short enough
+      # to be a directory -- the same answer check gives (known_paths).
+      series = entry['series'].to_s.strip
+      unless series.empty?
+        path = "/series/#{Slug.slugify(series)}/"
+        unless known.include?(path) || posts.empty?
+          findings << error(t('nav_series_missing', label: label, series: series), t('nav_series_missing_fix'))
         end
         next
       end
@@ -903,7 +931,8 @@ module Doctor
 
       findings << error(t('nav_url_missing', label: label, url: url), t('nav_url_missing_fix'))
     end
-    findings << ok(t('nav_ok', count: entries.size)) if findings.empty? && !posts.empty?
+    items = entries.count { |e| SiteConfig::Chrome.nav_item?(e) && !SiteConfig::Chrome.nav_group?(e) }
+    findings << ok(t('nav_ok', count: items)) if findings.empty? && !posts.empty?
     findings
   end
 
@@ -1369,6 +1398,51 @@ module Doctor
       warn(I18n.t('doctor.share_unknown', name: name.to_s,
                                           known: ShareTargets::NAMES.join(', ')))
     end
+  end
+
+  # site.skin: the look the site wears (skins/<name>.css). A name the
+  # engine has no file for is worn as classic -- the build says so in a
+  # line that scrolls past with the rest of its output, and this is where
+  # somebody looks afterwards.
+  def check_skin(data, root)
+    name = dig(data, 'site', 'skin')
+    return [] if name.nil? || name.to_s.strip.empty?
+
+    word = name.to_s.strip
+    # PathGlob: the root is a NAME. In an installation at `blog [1]` or
+    # `blog {old}` a bare glob read the brackets as a pattern, found no
+    # skin at all and called the one the build wears unknown.
+    known = PathGlob.under(root, 'skins', '*.css').map { |f| File.basename(f, '.css') }.sort
+    return [] if word.match?(/\A[a-z0-9-]{1,64}\z/) && known.include?(word)
+
+    [warn(t('skin_unknown', name: word[0, 60], known: known.join(', ')), t('skin_unknown_fix'))]
+  end
+
+  # series_index: the page of every series. A section that is not a map
+  # holds none of the three keys, and an order the build does not know is
+  # read as the default -- newest first -- with nothing saying why.
+  SERIES_INDEX_ORDERS = %w[newest oldest].freeze
+
+  def check_series_index(data)
+    section = dig(data, 'series_index')
+    return [] if section.nil?
+    return [error(t('series_index_shape', value: section.inspect[0, 60]), t('series_index_shape_fix'))] unless section.is_a?(Hash)
+
+    order = section['order']
+    return [] if order.nil? || SERIES_INDEX_ORDERS.include?(order.to_s.strip)
+
+    [warn(t('series_index_order', value: order.to_s, known: SERIES_INDEX_ORDERS.join(', ')))]
+  end
+
+  # A key the engine has stopped reading. `write:` switched on the /write/
+  # page, which 1.11 took out together with the SendPost shortcut: left in
+  # the config it does nothing at all, and nothing else would ever say so
+  # -- somebody reading the file years later would look for a page that
+  # is not there. Present at all is enough, whatever it says.
+  def check_retired_keys(data)
+    return [] unless data.is_a?(Hash) && data.key?('write')
+
+    [warn(t('write_retired'), t('write_retired_fix'))]
   end
 
   # What is in the trash, said out loud once in a while. Not an error: a

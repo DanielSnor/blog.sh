@@ -23,6 +23,7 @@ require_relative '../lib/content_type'
 require_relative '../lib/file_size'
 require_relative '../lib/i18n'
 require_relative '../lib/colors_css'
+require_relative '../lib/css_text'
 require_relative '../lib/post_text'
 require_relative '../lib/card_teaser'
 require_relative '../lib/path_glob'
@@ -295,7 +296,32 @@ EXTRA_CSS = extra_css_hrefs.freeze
 # adding the feature would rewrite every page of every existing archive to
 # say exactly what it said yesterday.
 def extra_css_links
-  EXTRA_CSS.map { |href| %(\n  <link rel="stylesheet" href="#{h(href)}">) }.join
+  EXTRA_CSS.map { |href| %(\n  <link rel="stylesheet" href="#{h(css_href(href))}">) }.join
+end
+
+# A stylesheet's address carries a fingerprint of its bytes: ?v= and the
+# first ten hex digits of their SHA-256. A host keeps a stylesheet for a
+# while (Surfer says an hour) and a page for no time at all, so after a
+# change of look a returning reader got the new page with the old
+# stylesheet -- a site moved from extra_css to site.skin looked like
+# classic for an hour (16. 10. 2026). A changed stylesheet is a new
+# address, the same one is the same address. A file the build cannot
+# read keeps its bare address.
+def css_href(path)
+  version = CSS_VERSIONS[path]
+  version ? "#{path}?v=#{version}" : path
+end
+
+# The same for a script: a host keeps it as long as a stylesheet, and a
+# new page beside an old script is as wrong -- after #62 the card "On
+# this day" is built hidden and only the new sidebar.js shows it.
+def js_href(path)
+  version = JS_VERSIONS[path]
+  version ? "#{path}?v=#{version}" : path
+end
+
+def asset_fingerprint(bytes)
+  Digest::SHA256.hexdigest(bytes)[0, 10]
 end
 
 # Mastodon reads this off a shared link and puts the author's account on
@@ -374,13 +400,13 @@ SITE_LOCALE = if SITE_LANG == SiteConfig.get('site', 'lang', default: 'en').to_s
 # of its own, in the same output tree, so the two are merged by simply
 # existing side by side.
 #
-# /assets/ and /write/ are NOT in it: one copy of the stylesheet, the
-# pictures and the writing app serves every language, and duplicating them
-# per language would mean a second cache-buster for identical bytes.
+# /assets/ is NOT in it: one copy of the stylesheet and the pictures
+# serves every language, and duplicating them per language would mean a
+# second cache-buster for identical bytes.
 SITE_OWN_LANG = SiteConfig.get('site', 'lang', default: 'en').to_s
 LANG_ROOT = SITE_LANG == SITE_OWN_LANG ? '' : "/#{SITE_LANG}"
 CONTENT_ROOT = LANG_ROOT.empty? ? PUBLIC_DIR : File.join(PUBLIC_DIR, SITE_LANG)
-SHARED_ROOTS = %w[/assets/ /write/].freeze
+SHARED_ROOTS = %w[/assets/].freeze
 
 # Everything about languages -- addresses inside this run's language, the
 # stand-in for a missing text, the sweep's share of the tree, alternates,
@@ -425,6 +451,11 @@ LAYOUT_HERO = SiteConfig.get('layout', 'hero', default: false)
 # stands after the opening paragraph usually falls outside it, and a
 # front page that suddenly leads with one is a front page reshaped.
 LAYOUT_LEAD_CARD = SiteConfig.get('layout', 'lead_card', default: false) == true
+# Every part of a series listed on each part's page, under "part N of M":
+# the standing navigation of a manual, whose chapters are series. Off
+# unless a site asks for it -- a series of twenty travel posts does not
+# want twenty lines above every one of them.
+LAYOUT_SERIES_CONTENTS = SiteConfig.get('layout', 'series_contents', default: false) == true
 # The menu repeated under the content. It carries no search field, so with
 # an empty `nav:` there would be nothing left in it to show -- but a site
 # with a menu may still not want it twice.
@@ -1334,7 +1365,7 @@ end
 # Only on the post's own page, and only when there is no title: in a
 # listing the heading is the post title at h2 and the badge beside it is a
 # link to the post, which is a different job.
-def date_badge(post, link: nil, pinned: false, heading: false)
+def date_badge(post, link: nil, pinned: false, heading: false, time: false)
   # A tag's icon REPLACES the content type's rather than joining it. The
   # badge is a small tile carrying a date and one glyph, and the only
   # thing that ever adds a second is a pinned post -- which earns it by
@@ -1344,10 +1375,53 @@ def date_badge(post, link: nil, pinned: false, heading: false)
   icon = tag_icon_for(post) || CONTENT_ICONS[dominant_content_type(post)]
   date = post_display_time(post).strftime(t('date_format'))
   pin = pinned ? %(<span class="pin-mark" aria-hidden="true">#{PIN_GLYPH}</span>) : ''
-  inner = "#{icon}<span>#{date}</span>"
+  inner = "#{icon}<span>#{date}</span>#{time ? card_time_html(post) : ''}"
   inner = %(<a href="#{link}">#{inner}</a>) if link
   tag = heading ? 'h1' : 'div'
   %(<#{tag} class="date-badge#{pinned ? ' is-pinned' : ''}">#{pin}#{inner}</#{tag}>)
+end
+
+# The hour of a post on its card, for a skin that wants it -- a journal's
+# card says when in the day (Minimal Journal, 13. 10. 2026) -- and hidden
+# from every other: `hidden` keeps it off the page and out of what a
+# screen reader says, and the stylesheet that wants it says so. Only on a
+# listing's card; the post's own page already says its date.
+#
+# Only a time somebody actually had. An importer that knew the day and
+# not the hour wrote one in: midnight, in the site's zone or in UTC (both
+# turn up in b2evolution archives), noon for Jekyll and Medium, and the
+# moment of capture for the Wayback Machine. Said as the hour a post went
+# out, each would be wrong, so none is said.
+INVENTED_HOUR_PLATFORMS = %w[jekyll medium].freeze
+
+def card_time_html(post)
+  platform = post['source'].is_a?(Hash) ? post['source']['platform'].to_s : ''
+  return '' if platform == 'wayback'
+
+  time = post_display_time(post)
+  on_the_hour = ->(t, hour) { t.hour == hour && t.min.zero? && t.sec.zero? }
+  return '' if on_the_hour.call(time, 0) || on_the_hour.call(time.getutc, 0)
+  # ...and midnight in the offset the record itself carries: b2evolution
+  # wrote a day as 00:00:00+01:00 the whole year round, which in summer is
+  # 01:00 in the site's zone and not midnight in UTC either.
+  stored = begin
+    Time.iso8601(post['date'].to_s)
+  rescue ArgumentError
+    nil
+  end
+  return '' if stored && on_the_hour.call(stored, 0)
+  # ...and, for a post an importer brought, midnight in the zone's standard
+  # offset. The archive does not keep b2evolution's 00:00+01:00 as written:
+  # in summer it lies there as 01:00+02:00, the same instant said in the
+  # site's zone, and 16 posts of sean.cz kept a made-up 1:00 past the rule
+  # above. Not for the engine's own posts, where 1:00 is an hour somebody had.
+  unless platform.empty? || platform == 'manual'
+    standard = [Time.local(time.year, 1, 1), Time.local(time.year, 7, 1)].map(&:utc_offset).min
+    return '' if on_the_hour.call(time.getlocal(standard), 0)
+  end
+  return '' if INVENTED_HOUR_PLATFORMS.include?(platform) && on_the_hour.call(time, 12)
+
+  %(<time class="date-time" datetime="#{time.iso8601}" hidden>#{time.strftime(t('time_format'))}</time>)
 end
 
 # Folding/slugification lives in lib/slug.rb, shared with the CLI and both
@@ -1642,14 +1716,20 @@ end
 
 # A post's first picture worth showing large, with the file it shows --
 # the question the hero asks of a post and the lead card asks too.
+#
+# 🪤 The first block that is a real picture AND has a file. It took the
+# first real picture and only then asked for its file, so an image block
+# with none -- no importer writes one, but a post file can say anything --
+# hid every picture after it from the hero, the lead card and the card of
+# a photo post (found checking lead_card, 14. 10. 2026).
 def first_usable_image(post)
-  block = (post['content'] || []).find do |b|
-    b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
-  end
-  return nil unless block
+  (post['content'] || []).each do |b|
+    next unless b.is_a?(Hash) && b['type'] == 'image' && !Blocks.degenerate_image?(b)
 
-  media = (block['media'] || []).first
-  media && media['url'] ? [block, media] : nil
+    media = (b['media'] || []).first
+    return [b, media] if media.is_a?(Hash) && media['url']
+  end
+  nil
 end
 
 # Empty string rather than a conditional in the template: post.html.erb
@@ -1869,6 +1949,26 @@ def series_nav_html(slug, in_series, index, position, post = nil)
   # bar, this one and the pagination -- of which only the toc had a name.
   # Three entries reading "navigation" are three guesses.
   %(<nav class="series-nav" aria-label="#{h(t('post.series_nav_label'))}">#{links.join}</nav>\n                )
+end
+
+# The whole series on a part's page (layout.series_contents): its name, a
+# link to its listing where it has one, and every part in reading order,
+# the one being read marked. Never cut short, however long the series --
+# a manual needs all of its chapters, and a skin that wants less can say
+# so in CSS. An <ol>, not a <ul>: the order is the point, and the narrow
+# screen's rule that folds the menu bar hides `nav ul`. Not on a draft: a
+# draft is not in the published set the list is made of.
+def series_contents_html(slug, in_series, index)
+  return '' unless LAYOUT_SERIES_CONTENTS && slug && index && in_series.size >= 2
+
+  name = h(series_name(slug))
+  heading = Slug.pageable?(slug) ? %(<a href="#{loc("/series/#{h(slug)}/")}">#{name}</a>) : name
+  items = in_series.each_with_index.map do |part, i|
+    current = i == index ? ' aria-current="page"' : ''
+    %(<li><a href="#{h(post_href(part))}"#{current}>#{h(post_title_for(part))}</a></li>)
+  end
+  %(<nav class="series-contents" aria-label="#{h(t('post.series_contents_label'))}">) +
+    %(<p class="series-contents__heading">#{heading}</p><ol>#{items.join}</ol></nav>\n                )
 end
 
 # A link post carries no title of its own -- what the reader takes for its
@@ -2211,14 +2311,38 @@ def nav_active_for(path)
   # PARTIAL_RESULTS key: returning every path would give each of thousands
   # of tag and post pages its own cache entry for an identical menu.
   tag = bare[%r{\A/tag/([^/]+)/}, 1]
-  candidate = tag ? loc("/tag/#{tag}/") : path
+  # ...and a series listing, page 2 and on included, under its own.
+  series = bare[%r{\A/series/([^/]+)/}, 1]
+  candidate = if tag then loc("/tag/#{tag}/")
+              elsif series then loc("/series/#{series}/")
+              else path
+              end
   NAV_ITEM_HREFS.include?(candidate) ? candidate : nil
+end
+
+# The series item a post belongs under, when the menu names its series
+# with `series:` -- a manual's chapter, lit up on every part of it. Marked
+# aria-current="true" rather than "page": the reader is IN the chapter,
+# not on its listing. Nil for everything else, so the menu of every other
+# post stays one cached partial.
+def nav_part_for(post)
+  return nil unless post.is_a?(Hash) && NAV_SERIES_HREFS.any?
+
+  slug = Series.series_slug_of(post)
+  candidate = slug && loc("/series/#{slug}/")
+  NAV_SERIES_HREFS.include?(candidate) ? candidate : nil
 end
 
 # The entire attribute, or an empty string -- see the comment in
 # templates/partials/nav.html.erb for why this isn't an <% if %> block.
-def nav_current(href, active)
-  href == active ? ' aria-current="page"' : ''
+# `kind` is the node's: only an item written as `series:` is the chapter a
+# part belongs to. A `url:` to the same listing stayed dark on a part only
+# while no series: item stood beside it -- the two share an href.
+def nav_current(href, active, part_of = nil, kind = :item)
+  return ' aria-current="page"' if href == active
+  return ' aria-current="true"' if part_of && kind == :series && href == part_of
+
+  ''
 end
 
 # The origins a set of posts needs for their comment threads: the instance
@@ -2280,6 +2404,7 @@ def layout(main_html, title:, description:, path:, image: DEFAULT_OG_IMAGE, og_t
     page_description: description,
     page_url: "#{SITE_BASE_URL}#{path}",
     nav_active: nav_active_for(path),
+    nav_part: nav_part_for(post),
     og_image: image,
     og_type: og_type,
     extra_head: Languages.alternates_head(links) + extra_head,
@@ -2687,37 +2812,68 @@ PathGlob.under(DEFAULT_IMAGES_DIR, '*').each do |src|
   FileUtils.cp(src, live) unless File.exist?(live)
 end
 
+# The stylesheet a page asks for, /assets/css/site.css, is two files: the
+# engine's own rules (assets/css/site.css, what every page needs whatever
+# it looks like) and the skin the site wears after them (skins/<name>.css,
+# `site.skin:` in config/site.yml, classic unless it says otherwise). One
+# file, so a page asks for what it always did and nothing about a site that
+# keeps the default changes but the order its rules come in. A skin the
+# engine does not have is said and classic worn instead -- a site with no
+# stylesheet at all is not a site anybody can read. Only the one chosen is
+# published: skins/ is not under assets/, so the others never reach a
+# server.
+ENGINE_CSS = File.join(ROOT, 'assets', 'css', 'site.css')
+SKINS_DIR = File.join(ROOT, 'skins')
+
+def site_skin
+  name = SiteConfig.get('site', 'skin', default: nil).to_s.strip
+  return 'classic' if name.empty?
+  return name if name.match?(/\A[a-z0-9-]{1,64}\z/) && File.file?(File.join(SKINS_DIR, "#{name}.css"))
+
+  known = PathGlob.under(SKINS_DIR, '*.css').map { |f| File.basename(f, '.css') }.sort
+  warn t('build.skin_unknown', name: name[0, 60], known: known.join(', '))
+  'classic'
+end
+SITE_SKIN = site_skin.freeze
+
 PathGlob.under(ROOT, 'assets', '**', '*').each do |src|
   next unless File.file?(src)
   next if src.start_with?("#{DEFAULT_IMAGES_DIR}/")
+  next if src == ENGINE_CSS
 
   Output.emit_copy(src, File.join(PUBLIC_DIR, src.delete_prefix("#{ROOT}/")), compare_content: true)
 end
-# The writer: a page the owner opens on a phone, writes a post in, and
-# hands to a shortcut that carries it to scripts/receive.sh. Off unless a
-# site asks for it -- it is a page for whoever runs the blog, not for the
-# people reading it, and a site with no use for it should not carry the
-# weight or answer for the address.
-#
-# ⚠️ A NAMED LIST, not the directory. write/ also holds the locale sources
-# and the script that turns them into i18n.js, and neither belongs on a
-# public web server; a directory copy would publish whatever anyone ever
-# dropped in there, which is how a note-to-self becomes a URL.
-WRITE_FILES = %w[index.html app.js i18n.js manifest.webmanifest].freeze
-if SiteConfig.get('write', default: false)
-  WRITE_FILES.each do |name|
-    src = File.join(ROOT, 'write', name)
-    next unless File.file?(src)
+# The engine's rules come first, so a skin's rule of the same weight wins --
+# all but the part below `---- after the skin ----`, which no skin may undo
+# (that hidden means hidden), and which therefore goes last.
+ENGINE_BEFORE, ENGINE_AFTER = File.read(ENGINE_CSS, encoding: 'utf-8').split(%r{^/\* ---- after the skin ---- \*/\r?\n}, 2)
+# Without the comments: they are for whoever edits the files, and they are
+# most of the bytes (lib/css_text.rb).
+SITE_CSS_TEXT = CssText.without_comments("#{ENGINE_BEFORE.rstrip}\n\n#{File.read(File.join(SKINS_DIR, "#{SITE_SKIN}.css"), encoding: 'utf-8').rstrip}\n" \
+                                         "#{ENGINE_AFTER ? "\n#{ENGINE_AFTER.lstrip}" : ''}")
+Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'site.css'), SITE_CSS_TEXT)
+COLORS_CSS_TEXT = ColorsCss.generate(colors: SITE_COLORS,
+                                     plain_banner: !BANNER_SHOW_IMAGE,
+                                     fonts: SiteConfig.get('fonts', default: {}),
+                                     fonts_dir: File.join(ROOT, 'assets', 'fonts'))
+Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'), COLORS_CSS_TEXT)
+# What css_href puts after each address: the two the build writes, from
+# the bytes it just wrote, and every extra_css file the site has under
+# assets/, from the bytes that were copied. Sealed into the build cache
+# below, so a stylesheet that changed rewrites every page that asks for it.
+CSS_VERSIONS = EXTRA_CSS.each_with_object(
+  '/assets/css/colors.css' => asset_fingerprint(COLORS_CSS_TEXT),
+  '/assets/css/site.css' => asset_fingerprint(SITE_CSS_TEXT)
+) do |href, versions|
+  file = File.expand_path(href.delete_prefix('/'), ROOT)
+  next unless file.start_with?(File.join(ROOT, 'assets', '')) && File.file?(file)
 
-    Output.emit_copy(src, File.join(PUBLIC_DIR, 'write', name), compare_content: true)
-  end
-end
-
-Output.emit(File.join(PUBLIC_DIR, 'assets', 'css', 'colors.css'),
-     ColorsCss.generate(colors: SITE_COLORS,
-                        plain_banner: !BANNER_SHOW_IMAGE,
-                        fonts: SiteConfig.get('fonts', default: {}),
-                        fonts_dir: File.join(ROOT, 'assets', 'fonts')))
+  versions[href] ||= asset_fingerprint(File.binread(file))
+end.freeze
+# ...and every script under assets/js/, from the bytes that are copied.
+JS_VERSIONS = PathGlob.under(ROOT, 'assets', 'js', '*.js').to_h do |src|
+  ["/assets/js/#{File.basename(src)}", asset_fingerprint(File.binread(src))]
+end.freeze
 ico = build_favicon_ico
 Output.emit(File.join(PUBLIC_DIR, PostAddress::ROOT_FILES[:favicon]), ico) if ico
 
@@ -3115,7 +3271,36 @@ def nav_url(url)
   PostAddress::ROOT_DIRS.include?(first) ? "#{loc(path)}#{rest}" : url
 end
 
-def configured_nav_items
+# Where a menu entry leads: a tag's listing, a series' listing -- `series:`
+# takes the name as the posts write it or the slug, the address is the
+# same -- or the `url:` as written.
+def nav_entry_href(entry)
+  tag = entry['tag'].to_s.strip
+  return loc("/tag/#{tag}/") unless tag.empty?
+
+  series = entry['series'].to_s.strip
+  return loc("/series/#{Slug.slugify(series)}/") unless series.empty? || Slug.slugify(series).empty?
+
+  nav_url(entry['url'].to_s.strip)
+end
+
+# The menu as the bar draws it: items, and groups of items under a label
+# of their own -- a manual's "Basics" over its first chapters. A group is
+# an entry with `group: true` and a label, and it holds the items after
+# it up to the next group; the list stays flat in config/site.yml, so
+# ./style.sh and a language's own list of labels read it as they always
+# have. A group leads nowhere (an address written on one is doctor's to
+# name, and the build does not follow it), a group with nothing in it is
+# left out, and a group with no label ends the one before it: what it
+# holds stands in the menu ungrouped rather than under somebody else's
+# heading. [:item, href, label] or [:group, label, [items]]; an item
+# written as `series:` is [:series, href, label], so the bar can tell it
+# from a `url:` to the same listing.
+def nav_group?(entry)
+  SiteConfig::Chrome.nav_group?(entry)
+end
+
+def configured_nav_tree
   return nil unless SiteConfig.key?('nav')
 
   entries = SiteConfig.get('nav', default: nil)
@@ -3123,16 +3308,24 @@ def configured_nav_items
   # key at its word rather than quietly restoring a menu nobody asked for.
   return [] unless entries.is_a?(Array)
 
-  entries.filter_map do |entry|
+  tree = []
+  group = nil
+  entries.each do |entry|
     next unless entry.is_a?(Hash)
 
     label = entry['label'].to_s.strip
-    slug = entry['tag'].to_s.strip
-    href = slug.empty? ? nav_url(entry['url'].to_s.strip) : loc("/tag/#{slug}/")
+    if nav_group?(entry)
+      group = label.empty? ? nil : [:group, label, []]
+      tree << group if group
+      next
+    end
+    href = nav_entry_href(entry)
     next if label.empty? || href.empty?
 
-    [href, label]
+    kind = entry['tag'].to_s.strip.empty? && !entry['series'].to_s.strip.empty? ? :series : :item
+    (group ? group[2] : tree) << [kind, href, label]
   end
+  tree.reject { |kind, _, items| kind == :group && items.empty? }
 end
 
 # The archive by the address each piece has in the language the site is
@@ -3143,8 +3336,21 @@ end
 # under a token, and a menu item pointing into a token is not a menu item.
 NAV_POSTS_BY_ADDRESS = (pages + posts + unlisted_posts)
                        .to_h { |p| [Languages.address_of(p, SITE_OWN_LANG), p] }.freeze
-NAV_ITEMS = (configured_nav_items || ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS)).freeze
+NAV_TREE = (configured_nav_tree ||
+            ([[loc('/'), t('nav.all')]] + NAV_TYPE_ITEMS).map { |href, label| [:item, href, label] }).freeze
+# Every item, whatever group it stands in, as [href, label]: what the
+# current item, a tag's feed and the cache are worked out from.
+NAV_ITEMS = NAV_TREE.flat_map { |kind, *rest| kind == :group ? rest[1] : [[kind, *rest]] }
+                    .map { |_, href, label| [href, label] }.freeze
 NAV_ITEM_HREFS = NAV_ITEMS.map(&:first).freeze
+# The items written as `series:`, by their href: the part of a series lights
+# its item up too, which an item written as a `url:` to the same listing
+# does not (docs/decisions.md, "The bar is a filter").
+NAV_SERIES_HREFS = (configured_nav_tree ? Array(SiteConfig.get('nav', default: nil)) : []).filter_map { |entry|
+  next unless entry.is_a?(Hash) && !nav_group?(entry) && entry['tag'].to_s.strip.empty? && !entry['series'].to_s.strip.empty?
+
+  nav_entry_href(entry)
+}.freeze
 
 # Everything a page's bytes can depend on that is not the page's own
 # content: the engine and the templates (read off disk), plus the handful
@@ -3215,7 +3421,7 @@ TIMEZONE_FACT = timezone_fact
 # says in its head and in its switcher whether that language has the same
 # listing, and the post that decides it need not be one this listing
 # shows.
-BuildCache.seal!(NAV_ITEMS, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL,
+BuildCache.seal!(NAV_TREE, PRESENT_TYPES, PAGE_SIZE, COMMENTS_APPROVAL, CSS_VERSIONS, JS_VERSIONS,
                  SEARCH_INDEX_RECENT_LIMIT, RSS_ITEM_LIMIT,
                  SITE_BASE_URL, TIMEZONE_FACT,
                  TYPES_BY_LANGUAGE.reject { |lang, _| lang == SITE_LANG },
@@ -3615,95 +3821,9 @@ end
 page_count = write_listing(posts, index_template, CONTENT_ROOT, base_path: LANG_ROOT, pinned: pinned_post,
                            lead: LAYOUT_LEAD_CARD)
 
-# Which tags the posts carry, by address (build/tags.rb). Early, because
-# the writing app below counts them too; the sitemap reads the map at the end.
+# Which tags the posts carry, by address (build/tags.rb): the tag listings
+# below are made from it, and the sitemap reads it at the end.
 tags_map = Tags.collect(posts)
-
-# What the writer page knows about the blog it belongs to, written beside
-# it as site.js: the name and claim for its header, the palette so it is
-# dressed like the blog, the favicon, and every tag the blog has used with
-# a count, so a tag can be tapped rather than typed -- and typed the way
-# it was typed before, instead of growing a second spelling. Generated
-# here rather than kept in write/, because all of it is this site's, and
-# the page itself is the same file on every site.
-#
-# 🪤 Only in the run of the site's own language. /write/ is one shared copy
-# at the root, and every language run used to write this file into it --
-# so the last run won: blogsh.app, an English site, served its writing app
-# in Czech and marked the previews lang="cs". The author writes in the
-# site's own language, and that run always goes first, so the others have
-# nothing to add.
-if SiteConfig.get('write', default: false) && SITE_LANG == SITE_OWN_LANG
-  # Each tag with two counts: all time, and the last twelve months. The
-  # page ranks an empty field by the second -- what the blog is tagging
-  # NOW -- because all time is led by where an archive came from
-  # (twitter, tumblr, an old blog), and nobody tags a new post with
-  # those. Typing searches every tag, ranked by all time.
-  recent_since = Time.now - (365 * 24 * 60 * 60)
-  tag_counts = tags_map.map do |_slug, data|
-    recent = data[:posts].count { |post| post_time(post) >= recent_since }
-    [data[:name].to_s, data[:posts].length, recent]
-  end
-  tag_counts.sort_by! { |name, count, recent| [-recent, -count, name.downcase] }
-  site_facts = {
-    'name' => SITE_SHORT_NAME,
-    'claim' => SiteConfig.get('banner', 'claim', default: nil) || SITE_DESCRIPTION,
-    'lang' => SITE_LANG,
-    'favicon' => (File.file?(FAVICON_PNG) ? '/assets/images/favicon.png' : nil),
-    'colors' => SITE_COLORS,
-    # The stylesheets a post page wears, in order, so a preview can wear
-    # the same ones.
-    'css' => ['/assets/css/colors.css', '/assets/css/site.css'] + EXTRA_CSS,
-    # The receiver's ceiling on one delivery, as this build sees it, so the
-    # page can say "too big" before the phone spends the upload finding
-    # out. The receiver reads the same variable in ITS environment -- the
-    # forced command's -- so raise it in both places or in neither.
-    'max_mb' => (ENV['BLOGSH_MAX_MB'] || 24).to_i,
-    'tags' => tag_counts
-  }
-  Output.emit(File.join(PUBLIC_DIR, 'write', 'site.js'),
-       "// Generated by the build from config/site.yml and the posts -- do not edit.\n" \
-       "window.BLOG_SITE = #{JSON.generate(site_facts)};\n")
-
-  # A RECEIPT for a post that arrived carrying one: a small answer at an
-  # address the sender knew before it sent anything, so the page that
-  # wrote the post can ask what became of it.
-  #
-  # It exists because the road the answer takes today has one break in it
-  # that nothing on this end can mend: a page added to a phone's home
-  # screen has storage of its own, and the reply -- which arrives as a URL
-  # -- opens in the browser instead, where the draft it is about is not.
-  # So the page asks rather than waits.
-  #
-  # Written by the BUILD rather than by the save, which is what makes it
-  # keep up: publish the post and the next build says published and gives
-  # the public address; delete it and the file stops being produced, and
-  # the sweep takes it away like any other page nothing generates.
-  (posts + drafts + pages + unlisted_posts).each do |post|
-    name = post['receipt'].to_s
-    # The same predicate the CLI checks the incoming receipt with. It was
-    # this regex, written out in both places.
-    next unless PathSafety.hex_token?(name)
-
-    # `warnings` under the same name the engine's own `add --json` answer
-    # uses, because the page renders both with the same lines. Without it
-    # a post that arrived with a complaint -- an unreadable picture, a
-    # video that will make the reader wait -- looked identical on the
-    # phone to one that arrived clean, and the phone is the one place
-    # where nobody can go and read the terminal instead.
-    #
-    # Whatever the save left in the post, and nothing gathered here: the
-    # build's own warnings are about the whole site (another post's tag,
-    # somebody else's dead link), and this file is served to anyone who
-    # has the sixteen characters.
-    Output.emit(File.join(PUBLIC_DIR, 'write', 'r', "#{name}.json"),
-         "#{JSON.generate('slug' => post['slug'].to_s,
-                          'state' => post['state'].to_s,
-                          'title' => post_title_for(post).to_s,
-                          'url' => SITE_BASE_URL.empty? ? '' : "#{SITE_BASE_URL}#{post_href(post)}",
-                          'warnings' => Array(post['receipt_warnings']).map(&:to_s))}\n")
-  end
-end
 
 # A feed per tag, but only for the tags the site's own menu points at.
 #
@@ -3744,20 +3864,42 @@ Tags.write_index(tags_map)
 # too different in size for anything a tag's pill does.
 SERIES_PAGES = SERIES_MAP.select { |slug, _| Slug.pageable?(slug) }.freeze
 
+# `series_index:` lets a site call the page what it is to it -- a manual's
+# list of chapters is not "Series" -- and say which way it runs. `order:
+# oldest` lists by each series' FIRST part, the order the chapters were
+# begun in; anything else is the newest part first, as it always was
+# (doctor names a word it does not know). The title and the description
+# stand in for the engine's own, and a language file may give its own.
+SERIES_INDEX = SiteConfig.get('series_index', default: nil).then { |v| v.is_a?(Hash) ? v : {} }
+SERIES_INDEX_TITLE = SERIES_INDEX['title'].is_a?(String) && !SERIES_INDEX['title'].strip.empty? ? SERIES_INDEX['title'].strip : t('series.index_title')
+SERIES_INDEX_DESCRIPTION =
+  if SERIES_INDEX['description'].is_a?(String) && !SERIES_INDEX['description'].strip.empty?
+    SERIES_INDEX['description'].strip
+  else
+    t('series.index_description', site_title: SITE_TITLE)
+  end
+SERIES_INDEX_OLDEST = SERIES_INDEX['order'].to_s.strip == 'oldest'
+
 unless SERIES_PAGES.empty?
-  series_index_rows = SERIES_PAGES.sort_by { |slug, parts| [-parts.map { |part| post_time(part).to_i }.max, slug] }
-                                  .map do |slug, parts|
+  ordered = if SERIES_INDEX_OLDEST
+              SERIES_PAGES.sort_by { |slug, parts| [parts.map { |part| post_time(part).to_i }.min, slug] }
+            else
+              SERIES_PAGES.sort_by { |slug, parts| [-parts.map { |part| post_time(part).to_i }.max, slug] }
+            end
+  series_index_rows = ordered.map do |slug, parts|
     # The years a reader sees on the parts themselves: the displayed date.
     years = parts.map { |part| post_display_time(part).year }.minmax.uniq.join("–")
     %(<li class="series-index-item"><a class="series-index-name" href="#{loc("/series/#{h(slug)}/")}">#{h(series_name(slug))}</a>) +
       %(<sup class="series-index-count">#{parts.size}</sup><span class="series-index-years">#{h(years)}</span></li>)
   end
-  # Names, counts and years are the whole page, so the rows are the whole key.
-  Output.cached_emit(File.join(CONTENT_ROOT, 'series', 'index.html'), Digest::SHA256.hexdigest(series_index_rows.join)) do
-    layout(listing_heading_html(t('series.index_title'), variant: 'series-index', icon: :series, count: SERIES_PAGES.size) +
+  # Names, counts and years are the whole page, with the heading and the
+  # description the site gave it, so those are the whole key.
+  key = Digest::SHA256.hexdigest([SERIES_INDEX_TITLE, SERIES_INDEX_DESCRIPTION, *series_index_rows].join("\n"))
+  Output.cached_emit(File.join(CONTENT_ROOT, 'series', 'index.html'), key) do
+    layout(listing_heading_html(SERIES_INDEX_TITLE, variant: 'series-index', icon: :series, count: SERIES_PAGES.size) +
            %(\n<ul class="series-index">\n#{series_index_rows.join("\n")}\n</ul>),
-           title: "#{t('series.index_title')} – #{SITE_SHORT_NAME}",
-           description: t('series.index_description', site_title: SITE_TITLE),
+           title: "#{SERIES_INDEX_TITLE} – #{SITE_SHORT_NAME}",
+           description: SERIES_INDEX_DESCRIPTION,
            path: loc('/series/'))
   end
 end
@@ -3849,7 +3991,16 @@ def search_index_entry(post)
     # -- it is the address of the tag page -- and where the two are one
     # word, as on a site's own language, nothing changes.
     folded: PostText.searchable(post.merge('tags' => searchable_tags(post)), text)
-  }
+  }.merge(search_picture(post))
+end
+
+# The post's first picture, for a skin that shows one beside a result: a
+# wall of pictures (Pictorial) whose search was a list of words. Only where
+# there is one, so the index of a site that writes text grows by nothing;
+# the address the page's own <img> uses.
+def search_picture(post)
+  picture = first_usable_image(post)
+  picture ? { img: "#{post_href(post)}#{media_name_encoded(picture.last['url'])}" } : {}
 end
 
 def searchable_tags(post)
@@ -3989,7 +4140,7 @@ Output.emit(File.join(CONTENT_ROOT, PostAddress::ROOT_FILES[:not_found]),
             path: loc('/404.html'),
             # The script is this page's alone, so only this page asks for it.
             extra_head: %(\n  <meta name="robots" content="noindex">) +
-                        %(\n  <script src="/assets/js/not-found.js" defer></script>)))
+                        %(\n  <script src="#{js_href('/assets/js/not-found.js')}" defer></script>)))
 
 if File.exist?(CHEAT_SHEET_SOURCE)
   cheat_meta, cheat_body = MarkdownParser.parse_frontmatter(File.read(CHEAT_SHEET_SOURCE, encoding: 'utf-8'))

@@ -87,14 +87,25 @@ one real step is a current Ruby via [Homebrew](https://brew.sh):
 
 ```bash
 brew install ruby
+exec zsh
+ruby -v    # 4.0.x now (3.x from an older Homebrew), not 2.6.10
+```
+
+Homebrew links its Ruby into `/opt/homebrew/bin` -- since October 2026
+the `ruby` formula is no longer keg-only -- and that is already on the
+PATH Homebrew set up, so a new shell finds it. Only if `ruby -v` still
+says 2.6.10 (an older Homebrew, or a PATH that puts `/usr/bin` first)
+put Homebrew's Ruby first by hand:
+
+```bash
 echo 'export PATH="/opt/homebrew/opt/ruby/bin:$PATH"' >> ~/.zshrc
 exec zsh
-ruby -v    # 3.x now, not 2.6.10
 ```
 
 (That PATH line is for Apple Silicon; on an Intel Mac it's
-`/usr/local/opt/ruby/bin`. `brew install ruby` prints the exact line for
-your machine at the end of its output -- trust that one.)
+`/usr/local/opt/ruby/bin`. Where it is needed, `brew install ruby`
+prints the exact line for your machine at the end of its output -- trust
+that one.)
 
 (No Homebrew yet? Install it first with the one command on
 [brew.sh](https://brew.sh). `git` is already there on any Mac with the
@@ -240,9 +251,23 @@ Or let `./setup.sh` do it: it seeds the file from this same example --
 comments and all -- and fills in the answers you give it, which is the
 same file you would have written by hand, minus the chance of a tab
 where a space belongs. It covers the `site` block, the comments network
-and the deploy target; `./style.sh` covers `banner`, `about`, `footer`,
-`social`, `colors`, `fonts`, `widgets` and `nav`. Both are re-runnable and
-neither takes anything away from editing the file directly.
+(and which replies a post shows, `comments.approval`), the deploy target,
+`publishing.slots`, and -- behind one question Enter passes -- `media` and the request to AI
+crawlers in `seo`; `./style.sh` covers `colors`, `banner`, `fonts`,
+`layout` with the skin and `site.extra_css`, `nav`, `series_index`, `about`, `widgets`,
+`footer`, `social` with `share`, `tag_icons` and `analytics`. Both are
+re-runnable and neither takes anything away from editing the file
+directly: in a list they change, every item they did not touch stays as
+you wrote it -- its quotes, an item on one line, a comment between items
+-- and the review before the write shows only what changes. (A list
+written whole on one line, `share: [mastodon, email]`, or given by an
+alias is written out again, as before; one they did not change is not
+written at all.) What only
+the file sets is the rare and the markup:
+`site.author_name`, a second language (`site.locales`), an icon drawn as
+SVG (`icon_svg`), the banner title's and claim's own colours
+(`colors.<mode>.banner_title`, `banner_claim`), `mastodon.toot_length` and `link_length`,
+`publishing.allow_partial`, `seo.robots_extra` and `deploy.keep`.
 
 If you do edit it directly -- which is a first-class way to use this
 engine, not a fallback -- run **`./blog.sh doctor`** when you are done. It
@@ -283,6 +308,8 @@ The example is fully commented. The short version:
   keys fall back to the built-in JetBrains Mono at 45px/20px),
   `nav` and `layout` (what the pages are made of --
   [below](#the-menu-the-regions-and-a-stylesheet-of-your-own)),
+  `series_index` (what the page of every series is called and which way
+  it runs -- [operations.md](operations.md#reading-the-archive)),
   `publishing.slots` (the times posts usually go out, so scheduling stops
   asking for a date --
   [operations.md](operations.md#publishing-slots)),
@@ -297,9 +324,6 @@ The example is fully commented. The short version:
   `share` (the row of controls under a post, drawn in the order you name
   them --
   [operations.md](operations.md#letting-a-reader-pass-a-post-on)),
-  `write` (`write: true` publishes a page at `/write/` to write a post on
-  from a phone --
-  [operations.md](operations.md#a-post-sent-from-the-phone-itself)),
   and `seo`
   (`block_ai_crawlers` writes a maintained list of the crawlers that
   collect text to train on into `robots.txt`, `robots_extra` is appended
@@ -346,7 +370,7 @@ English per key. Adding another language is data, not code -- see
 `site.locales` is the list of languages the site **publishes**, and it is
 only needed when that is more than one. The language in `site.lang` keeps
 the site root; every other one is built into a root of its own (`/de/`),
-with one copy of `/assets/` and one writing app shared between them. The
+with one copy of `/assets/` shared between them. The
 words of a post in another language are written with `./blog.sh translate`
 (see [operations.md](operations.md#writing-a-post-in-another-language)),
 and `./blog.sh rebuild` produces every language in one go. Leave the key
@@ -377,13 +401,22 @@ there are seven keys and not twenty, and why a palette cannot end up
 internally inconsistent. Omit the section entirely and the site uses
 blog.sh's own blue (`DEFAULT_COLORS`).
 
-`assets/css/site.css` is the other half, and it is not generated: layout
-and structure, plus the few colors that are fixed because they work
-against any palette -- white on accent surfaces, the dark scrims behind
-the banner overlays and the lightbox, the search field's grey
-placeholder. Changing `colors:` is configuration; editing that file is
-editing an engine file, with the pull conflicts that implies (see
-[step 9](#9-updating-the-engine)).
+The stylesheet is the other half, and it is not generated. It is two
+files published as one `/assets/css/site.css`: the engine's own rules
+(`assets/css/site.css` -- the fonts, the focus ring, media that keep to
+their column, the lightbox) and the skin the site wears
+(`skins/<name>.css`, `site.skin:` in `config/site.yml` or `./style.sh` under
+Layout -- `classic` unless you say otherwise, `minimal`, or one of the Minimal family's variants,
+`minimal-literal`, `minimal-journal`, `minimal-manual`, `minimal-pictorial`
+or `minimal-terminal`): layout and structure, plus the few colors that are
+fixed because they work against any palette -- white on accent surfaces,
+the dark scrims behind the banner overlays, the search field's grey
+placeholder. Only the skin chosen is published, and a name with no skin
+behind it is worn as classic -- the build and `doctor` say so. Changing `colors:` or
+`site.skin` is configuration; editing either file is editing an engine
+file, with the pull conflicts that implies (see
+[step 9](#9-updating-the-engine)) -- a look of your own belongs in
+`site.extra_css`, loaded after both ([skinning.md](skinning.md)).
 
 `fonts.banner_title` and `fonts.banner_claim` take a CSS font stack each,
 `fonts.banner_title_size` and `fonts.banner_claim_size` any CSS length,
@@ -400,16 +433,48 @@ they look like. Each has a default that leaves a site saying nothing
 exactly as it was, so none of them has to be touched.
 
 `nav:` replaces the menu bar the build otherwise derives from the content
-types that actually have posts. An entry takes a `label` plus either a
-`tag` (a tag's slug, which becomes `/tag/<slug>/`) or a `url` taken as
-written -- so an item can point at a post, at a generated page, or off the
-site entirely:
+types that actually have posts. An entry takes a `label` plus one of a
+`tag` (a tag's slug, which becomes `/tag/<slug>/`), a `series` (the
+series' name as the posts write it, or its slug, which becomes
+`/series/<slug>/`) or a `url` taken as written -- so an item can point at
+a post, at a generated page, or off the site entirely:
 
 ```yaml
 nav:
   - { label: "Home", url: "/" }
   - { label: "Photographs", tag: "photo" }
+  - { label: "Getting started", series: "Getting started" }
 ```
+
+The item of the page you are on is marked `aria-current="page"`. A
+`series` item is marked on every part of its series as well, with
+`aria-current="true"` -- the reader is in that chapter, not on its
+listing -- which is what a manual's menu of chapters is for; a `tag` or a
+`url` item is not, since a post is not its tag's listing. A series has a
+listing once it has two published parts; until then its item leads to a
+404, and `doctor` says so.
+
+A menu that has grown chapters can sort them. An entry with `group: true`
+and a `label` -- and nothing to lead to -- is a heading over the items
+after it, up to the next group, the way a manual stands "Basics" over its
+first chapters:
+
+```yaml
+nav:
+  - { label: "Start here", url: "/start-here/" }
+  - { label: "Basics", group: true }
+  - { label: "Installing", series: "Installing" }
+  - { label: "Writing", series: "Writing" }
+  - { label: "Running a site", group: true }
+  - { label: "Deploying", series: "Deploying" }
+```
+
+The list stays flat, so `./style.sh` writes a group as it writes an item
+and a language's own file words it the same way. The bar draws each group
+as a list of its own under its label: classic and minimal keep its items
+in the row and set the label before them as a quiet caption, the phone's
+menu as a heading over them. A group with nothing under it is left out,
+and an address written on a group is never followed; `doctor` names both.
 
 An entry missing either half is skipped rather than rendered as an empty
 link. An empty list is a decision rather than a mistake: the entries and
@@ -436,7 +501,11 @@ that opens the front page leads with its post's first picture -- a card
 is otherwise cut by height, so a picture after the opening paragraph is
 usually left out -- and carries `post-list-item--lead` for a skin, with
 or without a picture. Off unless you ask; what a skin can do with it is in
-[skinning.md](skinning.md).
+[skinning.md](skinning.md). `layout.series_contents` is the fourth: every
+part of a series listed on each part's page, under "part N of M" and
+above the text, the part being read marked -- the standing navigation of
+a manual whose chapters are series. Never cut short, however long the
+series; off unless you ask.
 
 `site.extra_css` is that stylesheet -- one path, or a list of them, loaded
 after the site's own, so a skin can live in a file of yours instead of in
@@ -565,8 +634,8 @@ them -- and their sizes are scaled down from the configured ones (32px and
 16px with the defaults), since 45px is a size for a line laid across a
 picture. Leave `src`, `alt`, `width` and `height` as they are: `src` is
 also the picture a page with none of its own is shared with, and `alt`
-becomes the name of the link. It is a key to set by hand; `./style.sh` does
-not ask about it.
+becomes the name of the link. `./style.sh` asks it last, in the banner's
+section.
 
 ## 5. First build and local preview
 
@@ -782,10 +851,9 @@ variant:
    photos are uploaded there by name and referenced as bare filenames
    in posts (see
    [operations.md](operations.md#writing-from-a-phone)).
-4. For a post sent whole from a phone, add the key the shortcut uses to
-   `authorized_keys` with a forced command pointing at
-   `scripts/receive.sh` -- the line, the RSA requirement and the size
-   ceiling are in
+4. For a post sent whole by a script, add its key to `authorized_keys`
+   with a forced command pointing at `scripts/receive.sh` -- the line
+   and the size ceiling are in
    [operations.md](operations.md#a-post-sent-from-the-phone-itself).
    Nothing new listens on the network; it travels over the SSH the
    server already has. The blog.sh app on a phone or a tablet uses the
@@ -928,25 +996,45 @@ followed by a deploy leaves the second language's pages as the previous
 version built them -- and uploads them that way.
 
 `main` is the release branch: a clone on it gets each release by `git
-pull`. A clone that was put on a release tag (`git checkout v1.9`) is on
+pull`. A clone that was put on a release tag (`git checkout v1.10`) is on
 no branch, and `git pull` refuses with "You are not currently on a
 branch"; move it to the next release by name instead:
 
 ```bash
-git fetch --tags && git checkout v1.10
+git fetch --tags && git checkout v1.11
 ```
 
 The first build after an upgrade may be a full one -- the engine's own
 fingerprint changed, so the record of the last build is thrown away --
-and it writes `.build_cache.json` in the installation directory, which
-is per-machine, gitignored and always safe to delete. Deploy the assets
+and it writes `.build_cache.json` in the installation directory -- on a
+site of several languages one `.build_cache-<hash>.json` for each of them
+-- which is per-machine, gitignored and always safe to delete. Deploy the assets
 with it: a page that cannot fetch `assets/js/share.js` logs a 404 on
-every load.
+every load. From 1.10 to 1.11 that first deploy uploads every page, once:
+each link to a stylesheet or a script now carries a fingerprint of the
+file (`?v=`), so a returning reader is never handed a new page with
+yesterday's stylesheet -- and every later change to one does the same.
+The same deploy takes `/write/` off the site, so a post that links to it
+now leads to a 404; `./blog.sh check` names each one (`link_dead`).
 
 **Going back a version** is `git checkout <tag>` and a rebuild, and what
 the newer version was given to work with is looked at first, because the
-older one does not treat all of it alike. From 1.10 back to 1.9: take
-`series:` and `language_name:` out of every `config/site.<lang>.yml`, or
+older one does not treat all of it alike. From 1.11 back to 1.10: take
+`series_index:` out of every `config/site.<lang>.yml`, or the build
+stops on it and nothing is deployed. A menu entry that names a series
+(`series:`) or heads a group (`group: true`) 1.10 leaves out of the
+menu, with a line in the build and an error in `doctor` for each -- a
+chapter can lead to its listing by `url: "/series/<slug>/"` instead.
+`site.skin`, `layout.series_contents` and `series_index:` in `site.yml`
+it passes over without a word: the site wears classic again, and
+`skins/` goes with the checkout. The pages ask for their stylesheets
+and scripts by the bare address again, so the deploy after that first
+build uploads every page. `write: true`, where it is still in
+`site.yml`, publishes `/write/` again. What 1.11 left in the
+installation folder for itself, `tmp/pairing/seen/`, is safe to delete.
+
+From 1.10 back to 1.9: take `series:` and `language_name:` out of
+every `config/site.<lang>.yml`, or
 the build stops on them and nothing is deployed -- a language's file is
 where 1.9 refuses a key it does not know. `on_this_day` under `widgets:` it does not refuse: the
 build says one line about it, `doctor` marks it, and the card is simply
@@ -964,8 +1052,8 @@ What 1.10 left in the installation folder for itself
 door they come through, `scripts/remote.sh`, is new in 1.10 and 1.9 does
 not have it. A line `./blog.sh pair` wrote into `~/.ssh/authorized_keys`
 (it ends `blog.sh:<device>`) then points at nothing -- take it out by
-hand. The posts, the media and the rest of the configuration
-are otherwise untouched in both directions.
+hand. Either step, the posts, the media and the rest of the
+configuration are otherwise untouched in both directions.
 
 Per-deployment files (`content.nosync/`, `media.nosync/`,
 `config/site.yml`, `config/site.<lang>.yml`, `env.sh`, `incoming/`, `trash/`, `drafts/`,

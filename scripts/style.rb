@@ -18,6 +18,7 @@
 # before it is kept.
 
 require 'yaml'
+require 'json'
 require_relative '../lib/yaml_compat'
 require 'rbconfig'
 # For $CHILD_STATUS -- whether the build or the deploy left because the lock
@@ -26,7 +27,9 @@ require 'English'
 require_relative '../lib/run_lock'
 require_relative '../lib/social_icons'
 require_relative '../lib/icons'
+require_relative '../lib/share_targets'
 require_relative '../lib/site_config'
+require_relative '../lib/language_file'
 require_relative '../lib/account_id'
 
 ROOT = File.expand_path('..', __dir__)
@@ -55,6 +58,7 @@ require_relative '../lib/version'
 require_relative '../lib/site_header'
 require_relative '../lib/qr_code'
 require_relative '../lib/slug'
+require_relative '../lib/path_glob'
 # For the menu section: what tags and pages exist, and which addresses
 # the build answers at. Shared with check and doctor rather than read
 # again here, so that all three agree about what a menu item can point
@@ -118,6 +122,16 @@ end
 
 def site
   @site ||= ConfigWriter::YamlFile.new(SITE_YML, template: SITE_YML_EXAMPLE)
+end
+
+# The language files this run changes, by path: config/site.<lang>.yml,
+# reviewed and written with site.yml.
+def language_writers
+  @language_writers ||= {}
+end
+
+def language_writer(path)
+  language_writers[path] ||= ConfigWriter::YamlFile.new(path)
 end
 
 # Same arrangement as setup.rb: a value still equal to the template's
@@ -206,13 +220,24 @@ def section_palette
   now = current_palette
   options = palettes.map { |slug, data| [slug, palette_name(slug, data)] }
   options << ['custom', t('palette_custom')]
-  index = options.index { |o| o.first == now } || 0
+  # Colours that are no palette of the list -- the site's own, or none at
+  # all, the engine's built-in blue -- are kept by Enter, as every other
+  # prompt here keeps what is there. The first palette used to be the
+  # default, so Enter on such a site proposed fourteen new colours and
+  # opened a preview of them. Last in the list, so a palette keeps its
+  # number.
+  options << ['keep', t('palette_keep')] unless now
+  index = options.index { |o| o.first == (now || 'keep') }
 
   # palettes is read by the line above, so any complaint about a malformed
   # entry exists by now and travels into the frame with the intro.
   chosen = Wizard.choose(t('q_palette'), options, current_index: index,
                          note: palette_warnings + [Tui.paint(t('palette_intro'), :dim)])
   return section_colors_by_hand if chosen == 'custom'
+  # The palette the site already wears is Enter's answer, and there is
+  # nothing to apply: on blogsh.app Enter, Enter wrote nothing and opened a
+  # preview of the colours it already had.
+  return if chosen == 'keep' || chosen == now
 
   data = palettes[chosen]
   return unless data
@@ -454,11 +479,14 @@ def section_banner
   # Enter keeps whatever the site already does -- which for an unset key is
   # ON, the engine's own default (BANNER_SHOW_TITLE/_CLAIM in
   # build_blog.rb). Asking with a bare [y/N] meant a run through the banner
-  # section turned both overlays off for anyone who pressed Enter.
+  # section turned both overlays off for anyone who pressed Enter. And
+  # written only when it differs from that, as show_image below: Enter on
+  # a site that never set them proposed two lines of the engine's own
+  # defaults, with the template's comment above them.
   show_title = Wizard.confirm(t('q_show_title'), default: at('banner', 'show_title') != false)
-  site.set(%w[banner show_title], show_title)
+  set_switch(%w[banner show_title], show_title, default: true)
   show_claim = Wizard.confirm(t('q_show_claim'), default: at('banner', 'show_claim') != false)
-  site.set(%w[banner show_claim], show_claim)
+  set_switch(%w[banner show_claim], show_claim, default: true)
 
   # Only where it can be seen. The claim's text is site.description unless
   # this overrides it -- and it exists because site.description has to stay
@@ -466,6 +494,12 @@ def section_banner
   # cannot carry a line break. This field can, since the banner overlay is
   # the only thing that reads it.
   ask_banner_claim if show_claim
+
+  # The picture itself (banner.show_image). Off, the header is the name and
+  # the claim set as text -- what Minimal Terminal suits. On is the engine's
+  # own default, so it is written only when it is turned off, or back on.
+  image = Wizard.confirm(t('q_show_image'), default: at('banner', 'show_image') != false)
+  set_switch(%w[banner show_image], image, default: true)
 
   puts
 end
@@ -649,14 +683,75 @@ end
 # changes nothing, which is the rule the menu section had to learn the
 # hard way.
 def section_layout
+  section_skin
+
   sidebar = Wizard.confirm(t('q_layout_sidebar'), default: at('layout', 'sidebar') != false)
   set_switch(%w[layout sidebar], sidebar, default: true)
 
   hero = Wizard.confirm(t('q_layout_hero'), default: at('layout', 'hero') == true)
   set_switch(%w[layout hero], hero, default: false)
 
+  lead = Wizard.confirm(t('q_layout_lead_card'), default: at('layout', 'lead_card') == true)
+  set_switch(%w[layout lead_card], lead, default: false)
+
+  # The two that only a site with a series has any use for, asked only
+  # there: everywhere else they would be two more Enters through a
+  # section about something the site does not have.
+  if site_has_series?
+    contents = Wizard.confirm(t('q_layout_series_contents'), default: at('layout', 'series_contents') == true)
+    set_switch(%w[layout series_contents], contents, default: false)
+    section_series_index
+  end
+
   puts
   section_extra_css
+end
+
+# site.skin: the look the site wears, one of the skins in skins/ beside
+# the engine. classic first -- what a site that says nothing wears --
+# and the rest by name; a skin a site dropped in itself is listed by its
+# file name. Absent means classic, so classic chosen on a site that
+# never named one writes nothing.
+def section_skin
+  names = PathGlob.under(ROOT, 'skins', '*.css').map { |f| File.basename(f, '.css') }
+  names = ['classic'] + (names - ['classic']).sort
+  written = at('site', 'skin').to_s.strip
+  current = names.include?(written) ? written : 'classic'
+  labels = t('skin_labels')
+  labels = {} unless labels.is_a?(Hash)
+  options = names.map { |name| [name, labels[name] || name] }
+  chosen = Wizard.choose(t('q_skin'), options, current_index: names.index(current),
+                                               note: [Tui.paint(t('h_skin'), :dim)])
+  return if chosen == current
+
+  site.set(%w[site skin], chosen)
+end
+
+# Whether any post names a series -- read off the posts themselves, since
+# nothing else keeps a list of them.
+def site_has_series?
+  PathGlob.under(ROOT, 'content.nosync', 'posts', '*', '*.json').any? do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8'))
+    post.is_a?(Hash) && !post['series'].to_s.strip.empty?
+  rescue JSON::ParserError, SystemCallError
+    false
+  end
+end
+
+# series_index: the page of every series -- its heading, what a search
+# result says of it, and which way it runs. Enter keeps each as it is,
+# and an empty heading or description is the engine's own.
+def section_series_index
+  { 'title' => 'q_series_title', 'description' => 'q_series_description' }.each do |key, question|
+    value = Wizard.ask(t(question), at('series_index', key), hint: t("h_series_#{key}"))
+    site.set(['series_index', key], value) if value && !value.to_s.empty? && value != at('series_index', key)
+  end
+  oldest = Wizard.confirm(t('q_series_oldest'), default: at('series_index', 'order') == 'oldest')
+  order = oldest ? 'oldest' : 'newest'
+  current = at('series_index', 'order')
+  return if current == order || (current.nil? && order == 'newest')
+
+  site.set(%w[series_index order], order)
 end
 
 # A switch written only when the answer changes what the site does. Enter
@@ -703,7 +798,11 @@ def section_extra_css
       entries << entry if entry
       touched = true
     when 'remove'
-      entries = remove_from(entries) { |e| e }
+      # As in section_nav: Esc took nothing out.
+      kept = remove_from(entries) { |e| e }
+      next if kept.equal?(entries)
+
+      entries = kept
       touched = true
     else
       break
@@ -791,6 +890,7 @@ end
 def section_social
   entries = SiteConfig::Chrome.list(current, 'social')
   entries = [] unless entries.is_a?(Array)
+  before = entries.dup
 
   loop do
     # `note:` for the reason section_nav's state rows ride there -- see
@@ -824,8 +924,98 @@ def section_social
     end
   end
 
-  site.set_list(%w[social], entries)
+  # As for share: a list that came back as it was is not written -- Enter
+  # through the section proposed a `social:` written on one line anew.
+  site.set_list(%w[social], entries) unless entries == before
   puts
+  section_share
+end
+
+# share: where a reader can carry a post away to -- the names in
+# lib/share_targets.rb, in the order the block draws them; none, and there
+# is no block. Here because it is the other half of a site's networks: the
+# icons above say where the author is, this where a reader may go.
+def section_share
+  names = SiteConfig::Chrome.list(current, 'share').map(&:to_s)
+  labels = t('share_labels')
+  labels = {} unless labels.is_a?(Hash)
+  before = names.dup
+  touched = false
+
+  loop do
+    state = [Tui.paint(t('share_current'), :bold)]
+    state << (names.empty? ? Tui.paint("   #{t('share_none')}", :dim) : "   #{names.join(', ')}")
+    left = ShareTargets::NAMES - names
+    options = []
+    options << ['add', t('list_add')] unless left.empty?
+    options << ['remove', t('list_remove')] unless names.empty?
+    options << ['keep', t('list_keep')]
+    case Wizard.choose(t('q_share_action'), options, current_index: options.size - 1, note: state)
+    when 'add'
+      name = Wizard.choose(t('q_share_network'), left.map { |n| [n, labels[n] || n] }, current_index: nil)
+      next unless name
+
+      names << name
+      touched = true
+    when 'remove'
+      names = remove_from(names) { |n| labels[n] || n }
+      touched = true
+    else break
+    end
+  end
+
+  # A list that came back as it was is not written: rewriting it would
+  # only turn every entry into the writer's own spelling.
+  site.set_list(%w[share], names) if touched && names != before
+  puts
+end
+
+# tag_icons: the mark a tag wears beside its name, over its own listing and
+# on the date of every post that has it. A list, because the order is the
+# priority -- a post wears the first one it has. An icon the engine ships,
+# by name; a drawing of one's own (icon_svg) is markup and stays in the file.
+def section_tag_icons
+  entries = SiteConfig::Chrome.list(current, 'tag_icons').select { |e| e.is_a?(Hash) }
+  before = entries.map(&:dup)
+  touched = false
+
+  loop do
+    state = [Tui.paint(t('tag_icons_current'), :bold)]
+    if entries.empty?
+      state << Tui.paint("   #{t('list_empty')}", :dim)
+    else
+      entries.each_with_index { |e, i| state << "   #{i + 1}) #{e['tag']} -> #{e['icon'] || t('tag_icon_own')}" }
+    end
+    options = [['add', t('list_add')]]
+    options << ['remove', t('list_remove')] unless entries.empty?
+    options << ['keep', t('list_keep')]
+    case Wizard.choose(t('q_tag_icons_action'), options, current_index: options.size - 1, note: state)
+    when 'add'
+      entry = ask_tag_icon
+      next unless entry
+
+      entries << entry
+      touched = true
+    when 'remove'
+      entries = remove_from(entries) { |e| "#{e['tag']} (#{e['icon'] || t('tag_icon_own')})" }
+      touched = true
+    else break
+    end
+  end
+
+  # As for share: an icon_svg written by hand stays as it was written
+  # unless the list itself changed.
+  site.set_list(%w[tag_icons], entries) if touched && entries != before
+  puts
+end
+
+def ask_tag_icon
+  hint = nav_tag_sample.empty? ? t('h_nav_tag_empty') : t('h_nav_tag', list: nav_tag_sample)
+  tag = Slug.slugify(Wizard.ask(t('q_tag_icon_tag'), '', hint: hint).to_s)
+  return nil if tag.empty?
+
+  icon = Wizard.choose(t('q_tag_icon_icon'), Icons::NAMES.map { |n| [n, n] }, current_index: nil)
+  icon ? { 'tag' => tag, 'icon' => icon } : nil
 end
 
 # --- the menu bar ----------------------------------------------------
@@ -850,6 +1040,7 @@ def section_nav
   # the author the opposite of what their own site was doing.
   derived = !SiteConfig::Chrome.written?(current, 'nav')
   entries = SiteConfig::Chrome.list(current, 'nav')
+  before = entries.dup
   touched = false
 
   loop do
@@ -888,7 +1079,13 @@ def section_nav
       derived = false
       touched = true
     when 'remove'
-      entries = remove_from(entries) { |e| nav_summary(e) }
+      # Esc gives the list back as it was: nothing to write. Marked all the
+      # same, it proposed the menu written anew (or a language's list
+      # reshaped) on a run that had taken nothing out.
+      kept = remove_from(entries) { |e| nav_summary(e) }
+      next if kept.equal?(entries)
+
+      entries = kept
       derived = false
       touched = true
     when 'off'
@@ -902,12 +1099,87 @@ def section_nav
     end
   end
 
-  site.set_list(%w[nav], entries) if touched
+  if touched
+    site.set_list(%w[nav], entries)
+    reshape_language_menus(before, entries)
+  end
   puts
 end
 
+# A menu worded in another language (config/site.<lang>.yml) goes to the
+# same places as the site's own, item by item -- the build refuses one that
+# does not. Changing the menu here used to leave those lists as they were,
+# and blogsh.app then built in no language at all. So each is reshaped with
+# the site's: an item that stayed keeps the word that language gave it, a
+# new one comes without a word (the site's own stands in, and check says
+# so, until somebody writes one), and one taken out goes.
+def reshape_language_menus(before, after)
+  own = at('site', 'lang').to_s.strip
+  codes = Array(at('site', 'locales')).map { |code| code.to_s.strip }.reject { |code| code.empty? || code == own }.uniq
+  codes.each do |code|
+    path = File.join(File.dirname(SITE_YML), "site.#{code}.yml")
+    next unless File.file?(path)
+
+    # What an earlier visit to this section made of the file, not the file
+    # as it lies: a second visit held the menu it had left against the
+    # language's list as it was, the two no longer went to the same places,
+    # and a group that stayed took the word of the one taken out.
+    text = language_writers.key?(path) ? language_writers[path].current : File.read(path, encoding: 'utf-8')
+    theirs = begin
+      YamlCompat.load(text)
+    rescue Psych::Exception
+      # Said rather than skipped: the site's menu is written all the same,
+      # and once the file reads again the build stops on its menu.
+      Wizard.say("⚠️  #{t('nav_language_unreadable', file: relative(path))}", :yellow)
+      nil
+    end
+    theirs = theirs['nav'] if theirs.is_a?(Hash)
+    next unless theirs.is_a?(Array)
+
+    reshaped = reshaped_menu(before, after, theirs)
+    language_writer(path).set_list(%w[nav], reshaped) unless reshaped == theirs
+  end
+end
+
+# Each item of the new menu, in that language's words. Where the language's
+# list went to the same places as the menu before this run, an item is
+# matched by being the same item -- a group keeps its word when another
+# group goes. Otherwise, or for an item that is new, by the place it leads
+# to, the first of that language's items to lead there.
+#
+# The items that stayed are matched first, so a new one cannot take a word
+# one of them still has. A new group is matched by nothing: every group's
+# place is the same, and Extras took "Projekty" from the group taken out.
+# A matched item is the language's own, as it wrote it -- a series by its
+# name where the site has the slug -- so set_list copies it as it stands.
+def reshaped_menu(before, after, theirs)
+  place = LanguageFile::PLACED_LISTS[%w[nav]]
+  place_of = ->(entry) { entry.is_a?(Hash) ? place.call(entry) : nil }
+  aligned = before.size == theirs.size && before.zip(theirs).all? { |mine, word| place_of.(mine) && place_of.(mine) == place_of.(word) }
+  found = after.map { |entry| aligned ? before.index { |was| was.equal?(entry) } : nil }
+  unused = theirs.each_index.to_a - found.compact
+  found = after.each_with_index.map do |entry, n|
+    next found[n] if found[n]
+    next nil if aligned && SiteConfig::Chrome.nav_group?(entry)
+
+    at = unused.find { |i| place_of.(theirs[i]) == place_of.(entry) }
+    unused.delete(at)
+    at
+  end
+  after.zip(found).map do |entry, at|
+    next theirs[at] if at
+
+    entry.is_a?(Hash) ? entry.slice('group', 'tag', 'series', 'url') : {}
+  end
+end
+
 def nav_summary(entry)
-  target = entry['tag'].to_s.empty? ? entry['url'].to_s : "/tag/#{entry['tag']}/"
+  return "#{entry['label']} [#{t('nav_group_mark')}]" if SiteConfig::Chrome.nav_group?(entry)
+
+  target = if !entry['tag'].to_s.empty? then "/tag/#{entry['tag']}/"
+           elsif !entry['series'].to_s.empty? then "/series/#{Slug.slugify(entry['series'].to_s)}/"
+           else entry['url'].to_s
+           end
   "#{entry['label']} -> #{target}"
 end
 
@@ -917,14 +1189,26 @@ def ask_nav_entry
 
   kinds = [['home', t('nav_kind_home')], ['tag', t('nav_kind_tag')]]
   kinds << ['page', t('nav_kind_page')] if nav_pages.any?
+  # A series names its listing and lights up on every part of it (1.11,
+  # the chapter of a manual); offered where the archive has one, as a page
+  # is. Until this the wizard showed such an item and could not add one.
+  kinds << ['series', t('nav_kind_series')] if nav_series.any?
   kinds << ['url', t('nav_kind_url')]
+  # Last, because it is the one kind that leads nowhere: a heading over the
+  # items added after it, up to the next group.
+  kinds << ['group', t('nav_kind_group')]
 
-  case Wizard.choose(t('q_nav_kind'), kinds, current_index: 0)
+  case Wizard.choose(t('q_nav_kind'), kinds, current_index: nil)
+  when nil then nil
   when 'home' then { 'label' => label.strip, 'url' => '/' }
+  when 'group' then { 'label' => label.strip, 'group' => true }
   when 'tag' then ask_nav_tag(label.strip)
   when 'page'
-    path = Wizard.choose(t('q_nav_page'), nav_pages.map { |p| [p, p] }, current_index: 0)
-    { 'label' => label.strip, 'url' => path }
+    path = Wizard.choose(t('q_nav_page'), nav_pages.map { |p| [p, p] }, current_index: nil)
+    path && { 'label' => label.strip, 'url' => path }
+  when 'series'
+    name = Wizard.choose(t('q_nav_series'), nav_series.map { |n| [n, n] }, current_index: nil)
+    name && { 'label' => label.strip, 'series' => name }
   else ask_nav_url(label.strip)
   end
 end
@@ -997,12 +1281,11 @@ def nav_tags
 end
 
 def nav_known
-  # 🪤 With the root, because two of the answers depend on it: `/write/`
-  # exists only on a site that publishes the writing app, and a site
-  # published in more than one language answers under each language's own
-  # root. Asked without it, the wizard told the person their own address
-  # was a 404 -- the same defect check carried for `/write/` until 1.9,
-  # in the other tool.
+  # 🪤 With the root, because the answer depends on it: a site published in
+  # more than one language answers under each language's own root. Asked
+  # without it, the wizard told the person their own address was a 404 --
+  # the same defect check carried for `/write/` until 1.9, in the other
+  # tool, when that page still existed.
   @nav_known ||= Checker.known_paths(nav_posts, root: ROOT)
 end
 
@@ -1010,6 +1293,14 @@ def nav_pages
   # Asked of PostAddress, because "page: No" is true to Ruby and false to
   # the build: the menu offered an address the site does not answer at.
   @nav_pages ||= nav_posts.select { |p| PostAddress.page?(p) }.map { |p| "/#{p['slug']}/" }.sort
+end
+
+# The series a menu item can name: the ones a published post belongs to --
+# a draft's series has no listing yet -- by the name the posts give them,
+# which is what `series:` takes.
+def nav_series
+  @nav_series ||= nav_posts.reject { |p| p['state'] == 'draft' }
+                          .map { |p| p['series'].to_s.strip }.reject(&:empty?).uniq.sort
 end
 
 # The tags worth putting in a menu are the ones with posts behind them, so
@@ -1026,7 +1317,9 @@ def ask_social_entry
   # of every page on the site.
   return nil if name.to_s.strip.empty? || url.to_s.strip.empty?
 
-  icon = Wizard.choose(t('q_social_icon'), ICONS.map { |i| [i, i] }, current_index: 0)
+  icon = Wizard.choose(t('q_social_icon'), ICONS.map { |i| [i, i] }, current_index: nil)
+  return nil unless icon
+
   entry = { 'name' => name, 'url' => url, 'icon' => icon }
   # rel="me" is what earns the verification tick on a Mastodon profile,
   # and it is the single least discoverable thing in the whole config --
@@ -1252,7 +1545,11 @@ def section_font_faces
       entries << entry
       touched = true
     when 'remove'
-      entries = remove_from(entries) { |e| "#{e['family']} -- #{e['file']}" }
+      # As in section_nav: Esc took nothing out.
+      kept = remove_from(entries) { |e| "#{e['family']} -- #{e['file']}" }
+      next if kept.equal?(entries)
+
+      entries = kept
       touched = true
     else
       break
@@ -1354,12 +1651,12 @@ def remove_from(entries)
   return entries if entries.empty?
 
   options = entries.each_with_index.map { |e, i| [i, yield(e)] }
-  index = Wizard.choose(t('q_list_which'), options, current_index: 0)
-  # Esc gives nil, and nil is not an index: rejecting "the entry whose
-  # position equals nil" matched nothing, so the list came back one item
-  # shorter -- the FIRST one, which on a default site is the Mastodon link
-  # carrying rel="me". Backing out of a question must leave the answer
-  # exactly as it was.
+  index = Wizard.choose(t('q_list_which'), options, current_index: nil)
+  # Esc gives nil -- nothing is current in a pick of which entry to take
+  # out -- and the list stays as it was. With current_index: 0 the menu
+  # turned Esc into 0, and backing out removed the FIRST entry: the
+  # Mastodon link carrying rel="me", or a tag's hand-drawn icon_svg the
+  # wizard has no way to put back.
   return entries if index.nil?
 
   entries.reject.with_index { |_, i| i == index }
@@ -1381,6 +1678,7 @@ SECTIONS = [
   ['widgets', 'section_widgets'],
   ['footer', 'section_footer'],
   ['social', 'section_social'],
+  ['tag_icons', 'section_tag_icons'],
   ['analytics', 'section_analytics']
 ].freeze
 
@@ -1413,7 +1711,8 @@ def run
   # the run's whole verdict arrived glued to the bottom edge of the menu:
   # "…· Esc dokončit" and under it, touching, "Nic se nezměnilo".
   puts
-  outcome = Wizard.review_and_write([[relative(SITE_YML), site]], also: pending_review)
+  outcome = Wizard.review_and_write([[relative(SITE_YML), site]] + language_writers.map { |path, writer| [relative(path), writer] },
+                                    also: pending_review)
   # A refused or rolled-back write is exit 1 (a cancel at the diff stays 0
   # -- that is the user's choice, not a fault).
   exit 1 if outcome == :failed

@@ -11,13 +11,47 @@ It is not a CSS tutorial. Everything here is specific to this engine.
 
 ## What a skin is, and what it is not
 
-A skin is one stylesheet of yours, loaded after the engine's own, that
-repaints what is already on the page.
+A skin is one stylesheet that repaints what is already on the page. The
+engine ships its own in `skins/` and a site picks one with `site.skin:` in
+`config/site.yml` -- `classic`, the look blog.sh has always had, unless it
+says otherwise, or `minimal`: paper, ink and one colour, the base of the
+Minimal family -- or one of its variants: `minimal-literal` (a book's
+setting: one column, a serif, a reader's measure), `minimal-journal` (a
+diary, read by its days: a line of time down the left, the date its
+heading), `minimal-manual` (a manual: a series is a chapter, the menu --
+chapters, and `group: true` over them -- down the side from 1100px, the
+sections of a page numbered), `minimal-pictorial`
+(a wall of pictures where the listing stood, three across, the front
+page's lead a row of its own; `layout.lead_card` and a page of nine or
+twelve posts suit it) or `minimal-terminal`
+(a page the way a terminal would print it, two faces and square
+brackets; it sets the site's name and claim as text, so it wants
+`banner.show_image: false` and the two `show_` keys for the words on).
+A variant is minimal whole with a layer of its own after it -- Terminal,
+written over classic, stands on classic less what it says again, and
+Pictorial narrows minimal's rules for a post in a listing to the one
+card that stays a row -- and
+its file in `skins/` is made rather than written: `skins/src/build.rb`
+puts the two together from `skins/<base>.css` and
+`skins/src/<layer>.css`, so a change to the base reaches every variant,
+and the suite says so when one was not made again. Edit the layer and run `ruby skins/src/build.rb`; never edit the
+made file. The build publishes `/assets/css/site.css` as the engine's
+own rules (`assets/css/site.css`: the fonts, the focus ring, media that
+keep to their column, the lightbox), then the skin, then the engine's last
+word -- that a control arriving `hidden` stays hidden, which no skin may
+undo. Only the skin chosen reaches the server, and without its comments:
+the sources explain themselves at length, and that is for whoever edits
+them (lib/css_text.rb).
+
+A skin of your own is one stylesheet of yours, loaded after all of that,
+that repaints what is already on the page. The rest of this guide is
+about that one.
 
 Before writing one, spend ten minutes with `./style.sh`. A surprising
 amount of what looks like skinning is a setting: the colour palette (seven
 shipped, or your own), the banner and what is written over it, the menu,
-the sidebar and its widgets, whether a post opens with a lead image. A
+the sidebar and its widgets, whether a post opens with a lead image -- and
+which of the skins the engine ships the site wears, under Layout. A
 site that only wants different colours does not want a skin at all -- it
 wants a palette, and the palette keeps working when the engine changes.
 
@@ -29,7 +63,8 @@ can do without owning anything.
 ## Where the skin lives
 
 `site.extra_css` in `config/site.yml` -- one path, or a list of them,
-loaded in order after `colors.css` and `site.css`:
+loaded in order after `colors.css` and `site.css` (the engine's rules and
+the skin `site.skin` names, published as one file):
 
 ```yaml
 site:
@@ -151,6 +186,64 @@ its picture stays `--lead` alone; a video post's lead with no picture to
 lead with is the media card it would have been, with `--lead` beside its
 marks.
 
+With `layout.series_contents` on, a part's page lists the whole series
+under "part N of M": `<nav class="series-contents">`, the series' name in
+`.series-contents__heading` (a link to its listing where it has one) and
+an `<ol>` of every part in reading order, the one being read carrying
+`aria-current="page"`. Every skin sets it in the flow, with the table of
+contents' rule; a skin that wants it beside the text moves it there:
+
+```css
+.series-contents { float: right; width: 16rem; margin: 0 0 1rem 1.5rem; }
+@media (max-width: 700px) { .series-contents { float: none; width: auto; margin: 0 0 1rem; } }
+```
+
+A menu written with groups (`group: true` in `nav:`) draws each of them
+as `<li class="nav-group">`: its label in `.nav-group__label`, which is no
+link, and its items in a `<ul>` of their own after it. Classic and
+minimal keep the items in the row they always stood in, with the label a
+quiet caption before them, and on a phone a heading over them; a skin
+that wants the groups as columns, or as the sections of a menu down the
+side, has the structure to do it. Every rule written for `nav ul` or
+`nav li` reaches the inner list too -- undo what should not on
+`.nav-group > ul`, as both skins do for the row a phone slides sideways.
+
+A `series` item of the menu is marked on every part of its series with
+`aria-current="true"` -- the chapter the reader is in -- where the item of
+the page itself has `aria-current="page"`. Every shipped skin draws the
+two apart (classic keeps the bar's line under it, in the accent); a skin
+of your own wants a rule for `nav a[aria-current="true"]` too.
+
+The date badge of a card carries the hour the post went out, as
+`<time class="date-time" datetime="…" hidden>` after the date -- hidden,
+so a skin that wants it shows it and every other skin is unchanged. It is
+left out where the engine does not know the hour: a post an importer
+dated at midnight, at noon from Jekyll or Medium, or from the Wayback
+Machine. Only on a listing's card, not on the post's own page.
+
+```css
+.post-list-item .date-time[hidden] { display: inline; margin-left: 0.4em; }
+```
+
+A card of a post with two pictures or more says how many it has, as
+`data-photos="N"` on the card -- the card itself shows one at most, its
+height budget sees to that, so this is the only place a skin can learn
+the post is a gallery. A card with one picture or none has no such
+attribute.
+
+```css
+.post-list-item[data-photos]::after { content: attr(data-photos) " photos"; }
+```
+
+The next pictures of a gallery -- three at most -- ride inside the card's
+first `<figure>`, after its picture, as
+`<span class="card-mosaic" data-more="N">` with an `<img>` each (decorative,
+lazy). `site.css` hides them, so a skin that does not want a mosaic pays
+a few lines of markup and no download; one that does shows them and lays
+the figure out (Minimal Pictorial: four in two rows, three as one tall
+beside two, two side by side). They are the original files -- the engine
+makes no smaller copies -- so a mosaic costs up to four originals a card.
+
 The pair says nothing about *which* listing you are on. That is already in
 the markup: the front page's heading carries its own modifier, and a tag
 listing names itself.
@@ -232,7 +325,11 @@ it (`reply: true`), so the indent appears with the next refresh.
 so a skin can keep the number and drop the word. In a result's title and
 excerpt the words that were asked for are `<mark>`; `site.css` gives it
 the pills' ground instead of the browser's yellow
-(`.search-result mark`).
+(`.search-result mark`). A result whose post has a picture carries its
+first one, first in the card: `<img class="search-result__picture"
+alt="" loading="lazy">`. `site.css` hides it -- a site of words keeps its
+list of words -- and a skin that wants it says `display: block` and where
+it goes (Minimal Pictorial puts a square at the end of the row).
 
 **The days a page covers.** Under a listing, the label between the two
 links is `page 12` -- the word in `.pagination-word`, the number in
@@ -511,7 +608,8 @@ Three traps in browser tooling, all of which have cost an afternoon here:
   instant it loads can show empty frames that are fine a moment later.
 - The preview cache outlives a reload. A different origin
   (`127.0.0.1` instead of `localhost`) gets you one clean look; after
-  that, version the stylesheet's address in the built page.
+  that, a rebuild gives a changed stylesheet a new address (`?v=`) of its
+  own.
 - `:focus` and `:focus-visible` do not match in a headless browser unless
   the page is told it has focus -- a window nobody is looking at has
   none. A focus ring that "does not work" there may be fine, and one that
@@ -530,7 +628,7 @@ curl -s https://YOUR-BLOG/assets/css/skin.css | shasum -a 256
 shasum -a 256 assets/css/skin.css
 ```
 
-## Two skins that exist
+## Two skins of your own
 
 | One engine, two skins |  |
 | --- | --- |

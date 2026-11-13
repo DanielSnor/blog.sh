@@ -15,6 +15,7 @@
 # without depending on each other.
 require 'time'
 require_relative 'path_safety'
+require_relative 'path_glob'
 
 module PostAddress
   module_function
@@ -151,12 +152,11 @@ module PostAddress
   # lives here rather than in the build because `check` has to refuse the
   # same names: two copies of it is how a page ends up unbuilt on a site
   # whose check calls the archive sound.
-  # `write` is here for the reason `archive` is: the build copies the writer
-  # app to public/write/ and then renders the pages, so a published page
-  # slugged "write" was emitted over it and won. The app came off the site
-  # with no warning, exit 0 from the build, nothing from check or doctor --
-  # and the home-screen icon opened the blog page instead, with any unsent
-  # draft still sitting in that origin's storage and no way back to it.
+  # `write` was here until 1.11, for the reason `archive` is: the build
+  # copied the writer app to public/write/ and then rendered the pages, so a
+  # published page slugged "write" was emitted over it and won. The app is
+  # gone, and with it the name -- tests/test_reserved_roots.rb holds this
+  # list to what the build writes, in both directions.
   #
   # 🪤 The list drifted, and it drifted the same way every time: somebody
   # added a root write and nobody added the name. `archive` and `write`
@@ -174,7 +174,7 @@ module PostAddress
   # of public.nosync and what this says part company, in either direction.
   # Adding a root write without adding its name here is now a red suite,
   # not a quiet gap.
-  ROOT_DIRS = %w[posts tag type series draft page search markdown archive assets write].freeze
+  ROOT_DIRS = %w[posts tag type series draft page search markdown archive assets].freeze
   # Written by the build. stats.json is refreshed by cron as well, but the
   # build creates it, so it is the build's name.
   ROOT_FILES = {
@@ -202,7 +202,7 @@ module PostAddress
   # language is data and not code (docs/localization.md), and a list kept
   # by hand is exactly how `archive` and `write` went missing from the one
   # above.
-  LOCALE_ROOTS = Dir.glob(File.join(__dir__, '..', 'locales', '*.yml'))
+  LOCALE_ROOTS = PathGlob.under(File.expand_path('../locales', __dir__), '*.yml')
                     .map { |path| File.basename(path, '.yml') }.sort.freeze
   RESERVED_ROOT_SEGMENTS = (ROOT_DIRS + LOCALE_ROOTS + ROOT_FILES.values + CRON_FILES.values).uniq.freeze
   # The longest a single segment of a redirect origin may be. POSIX NAME_MAX

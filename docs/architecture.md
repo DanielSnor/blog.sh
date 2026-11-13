@@ -422,7 +422,7 @@ places than site.yml's (`lib/language_file.rb`, which the build asks too).
 The addresses a site answers at are worked out per language on the same
 terms the build uses: every listing exists in every language `site.locales`
 names, a POST exists in a language only if it has words there, and
-`/assets/` and `/write/` are shared and have no copy per language.
+`/assets/` is shared and has no copy per language.
 
 A question that raises is **one finding, not the end of the run**: every
 question is asked through a guard that turns an exception into an error
@@ -578,13 +578,17 @@ A single linear pass, no framework:
    `templates/`, `lib/`, `build/`, `locales/` and `config/`, plus the
    facts the build works out for itself (the menu, the types present, the
    page size), so a template edit or a new menu item throws it away.
-   `assets/` is deliberately not among them: a page links a stylesheet, a
-   script and a favicon rather than carrying their bytes, and there is no
-   `?v=` on those links, so nothing under `assets/` can change a rendered
-   page. Assets have their own path -- `emit_copy` compares them byte for
-   byte on every build, before the cache is opened -- and `colors.css`,
-   the one asset a page's own colours come from, is generated out of
-   `config/`, which IS in the fingerprint. The cache is an optimisation and never an authority: anything
+   `assets/` is not among them: a page links a stylesheet, a script and a
+   favicon rather than carrying their bytes. Assets have their own path --
+   `emit_copy` compares them byte for byte on every build, before the
+   cache is opened. A stylesheet's link, though, ends in `?v=` and ten hex
+   digits of the SHA-256 of what was published (since 1.11), so that a
+   reader whose host kept the old stylesheet is never handed it with a new
+   page; those fingerprints (`CSS_VERSIONS`: `colors.css`, `site.css` --
+   the engine's rules with the skin -- and every `extra_css` file), and
+   the scripts' the same way (`JS_VERSIONS`, every file of `assets/js/`),
+   are sealed in with the facts above, and a changed stylesheet or script
+   rewrites every page that asks for it. The cache is an optimisation and never an authority: anything
    it cannot vouch for is rendered and compared the old way, and `--full`
    believes none of it while still recording what it wrote.
 5. **Render.** Per-post pages, then listings: homepage, per-tag,
@@ -603,7 +607,9 @@ A single linear pass, no framework:
    `assets/js/search.js` matches on; it scores the hits afterwards -- a
    word in the title above a word in the text, a whole word above the
    same letters inside a longer one, date as the tiebreak -- and draws at
-   most `RESULT_LIMIT` of them while reporting the true count;
+   most `RESULT_LIMIT` of them while reporting the true count; an entry
+   whose post has a picture carries the first one too (`img`), hidden
+   unless a skin shows it;
    RSS (last-build date = newest post, not "now", to keep the file
    byte-stable); sitemap; robots.txt.
 7. **Assets, colors and the root favicon.** Before `assets/` is copied
@@ -614,11 +620,15 @@ A single linear pass, no framework:
    overwritten; `defaults/` itself is not published. `config/site.yml`'s 7-key palettes
    compile into `assets/css/colors.css`, together with the header's font
    stacks and sizes and any `@font-face` a site declared for its own files
-   in `assets/fonts/`; `site.css` itself contains no palette values -- its
+   in `assets/fonts/`; the published `site.css` -- the engine's rules
+   (`assets/css/site.css`) and the skin `site.skin` names (`skins/<name>.css`),
+   with the part no skin may undo after the skin -- contains no palette values -- its
    only color literals are palette-independent neutrals (white, two fixed
    grays, black/white alpha overlays) -- and no site-specific typography. One generated stylesheet rather than two on
-   purpose: it is already linked from the layout, so adding fonts to it
-   changes two files on a deploy instead of every page in the archive. `build_favicon_ico` wraps `assets/images/favicon.png` in
+   purpose: it is already linked from the layout, so fonts need no link of
+   their own -- though a change to it, like any stylesheet's, is a new
+   address (`?v=`) and so a change to every page. Both stylesheets are
+   published without their comments (`lib/css_text.rb`). `build_favicon_ico` wraps `assets/images/favicon.png` in
    an ICO container (a 22-byte header, then the PNG verbatim) and emits
    `/favicon.ico` -- pages link the PNG, so this exists purely for clients
    that request the root path without reading the `<link>`. No image
@@ -653,19 +663,17 @@ post says in them.
 - **Roots.** The site's own language keeps the site root (`LANG_ROOT` is
   empty); every other writes under `/<lang>/` (`CONTENT_ROOT`). `loc()`
   turns a site path into this language's, and `SHARED_ROOTS` --
-  `/assets/` and `/write/` -- are the two it leaves alone: one copy for
-  every language.
+  `/assets/` -- is what it leaves alone: one copy for every language.
 - **The sweep.** Each run removes what it did not write, but only in the
   part of the tree it owns (`prune_root`): another language's run owns its
   root and nothing else; the site's own run owns everything except those
   roots. Without that the second run would carry off the first one's site.
 - **Written once.** `robots.txt`, `sitemap.xml` (one document naming every
   language, with `xhtml:link` alternates only where an address exists in
-  more than one), the sidebar's JSON and the writing app's `site.js` come
-  from the site's own run alone. A crawler reads the robots.txt at the
-  origin, the sidebar fetches its data by absolute address, and the writing
-  app speaks the language its author writes in -- a copy per language would
-  be files nothing reads, and for `site.js`, the last run's language.
+  more than one) and the sidebar's JSON come from the site's own run
+  alone. A crawler reads the robots.txt at the origin and the sidebar
+  fetches its data by absolute address -- a copy per language would be
+  files nothing reads.
 - **What a post says here.** `Translations.for_lang` gives the post as this
   language renders it: its own text when it has one, otherwise the nearest
   language on the `fallback` chain in `config/site.<lang>.yml`, ending at

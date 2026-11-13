@@ -19,6 +19,8 @@
 # of that language and refuses a file it cannot honour, and `check`, which
 # says the same thing about an archive without building it. One answer for
 # both, so neither can pass what the other refuses.
+require_relative 'slug'
+
 module LanguageFile
   SETTINGS = %w[fallback ui_language language_name].freeze
 
@@ -31,7 +33,10 @@ module LanguageFile
     'site' => %w[title short_name description],
     'banner' => %w[claim alt],
     'about' => %w[heading html],
-    'footer' => %w[links_heading links note_heading note_html copyright social_heading]
+    'footer' => %w[links_heading links note_heading note_html copyright social_heading],
+    # The heading and the description of /series/ (`order:` is a fact, the
+    # same in every language).
+    'series_index' => %w[title description]
   }.freeze
   # Texts that stand in for something when site.yml leaves them out: the
   # engine's own headings, in the language of the page, and the banner's
@@ -40,7 +45,8 @@ module LanguageFile
   # shows one, in its own words. Every other text translates something
   # site.yml says, and with nothing there it would be a text only this
   # language has.
-  STANDS_IN = %w[about.heading footer.links_heading footer.social_heading banner.claim].freeze
+  STANDS_IN = %w[about.heading footer.links_heading footer.social_heading banner.claim
+                 series_index.title series_index.description].freeze
   # A widget's heading is words; its account, instance and limit are not.
   WIDGET_TEXTS = %w[heading].freeze
   # What the reader of this language sees for a tag: `tags:` maps a tag to
@@ -56,8 +62,18 @@ module LanguageFile
   # the same order with other words: a menu that drifts apart between the
   # languages is a second site, and the reader who switches language would
   # lose the item they were about to click.
+  # A group of the menu is no place, but it stands at one in the list: a
+  # translation keeps its groups where the site's own list has them.
   PLACED_LISTS = {
-    %w[nav] => ->(entry) { entry['tag'].to_s.strip.empty? ? entry['url'].to_s.strip : "tag:#{entry['tag'].to_s.strip}" },
+    %w[nav] => lambda { |entry|
+      if entry['group'] == true then 'group'
+      elsif !entry['tag'].to_s.strip.empty? then "tag:#{entry['tag'].to_s.strip}"
+      # By its slug, which is where it leads: `series:` takes the name or
+      # the slug, and "Příručka" here with "prirucka" there is one place.
+      elsif !entry['series'].to_s.strip.empty? then "series:#{Slug.slugify(entry['series'].to_s.strip)}"
+      else entry['url'].to_s.strip
+      end
+    },
     %w[footer links] => ->(entry) { entry['url'].to_s.strip }
   }.freeze
 

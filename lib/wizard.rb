@@ -323,7 +323,12 @@ module Wizard
 
   # Returns the chosen option's first element. Esc (or an unusable
   # answer when piped) keeps whatever is current, which is the same
-  # promise every other prompt here makes.
+  # promise every other prompt here makes. Where nothing is current --
+  # current_index: nil, a pick among items rather than a value: which
+  # entry to remove, which network to add -- Esc returns nil and the
+  # caller does nothing. It used to fall back to 0, so backing out of
+  # "which one to remove?" removed the first one, a tag's hand-drawn
+  # icon among them, and backing out of "which to add?" added it.
   # `note:` is what the reader needs to see WHILE choosing -- the state the
   # options act on. Same rule as the label, and for the same reason the
   # comment below already gives: this menu paints from the top of the
@@ -367,7 +372,9 @@ module Wizard
       answer = line.strip
       index = answer.to_i - 1
       puts
-      return options[current_index].first unless answer.match?(/\A\d+\z/) && index.between?(0, options.size - 1)
+      unless answer.match?(/\A\d+\z/) && index.between?(0, options.size - 1)
+        return current_index && options[current_index].first
+      end
 
       return options[index].first
     end
@@ -384,8 +391,10 @@ module Wizard
     index = Tui.menu(options.map { |(_, desc)| desc },
                      header: header + [Tui.paint(label, :bold), ''],
                      hint: t('menu_hint', count: options.size),
-                     initial: current_index)
+                     initial: current_index || 0)
     chosen = index || current_index
+    return nil if chosen.nil?
+
     record(label, options[chosen].last)
     options[chosen].first
   end
@@ -615,19 +624,39 @@ module Wizard
       return :failed
     end
 
+    # The same for what each file will read back as: every one is proved
+    # on its text first, and one that fails after another was saved puts
+    # that one back. Two files written one by one -- site.yml and a
+    # language's menu -- left the first new and the second refused, the
+    # build stopping in that language, under "nothing was changed".
+    saved = []
     begin
-      changed.each { |(_, writer)| writer.save! }
+      changed.each do |(label, writer)|
+        next unless writer.respond_to?(:check!)
+
+        begin
+          writer.check!
+        rescue ConfigWriter::VerificationFailed => e
+          raise ConfigWriter::VerificationFailed, "#{label}: #{e.message}"
+        end
+      end
+      changed.each do |(_, writer)|
+        writer.save!
+        saved << writer
+      end
     rescue ConfigWriter::NotWritable => e
       # The pre-flight above catches the ordinary permission refusal before
       # any file is touched; this remains for the race where a mode changes
       # between the check and the write. Rare enough that naming the file
       # (the Errno does) is enough.
+      saved.each { |writer| writer.restore! if writer.respond_to?(:restore!) }
       puts Tui.paint("❌ #{t('write_denied', message: e.message)}", :red)
       puts
       return :failed
     rescue ConfigWriter::VerificationFailed => e
       # The writer has already put the file back; all that is left is to
       # say so in a way that does not read as "your config is ruined".
+      saved.each { |writer| writer.restore! if writer.respond_to?(:restore!) }
       puts Tui.paint("❌ #{t('write_failed', message: e.message)}", :red)
       # Both wizards stop here, so this is the last thing either of them
       # says -- and a command that stops on a failure owes the same single
@@ -662,7 +691,10 @@ module Wizard
   # no active one exists, so the "-" side of a diff replacing a
   # commented-out credential carries the old token too -- and used to
   # print it in the clear, in the one place this promises it will not.
-  MASKED = /\A([-+]\s*(?:#\s*)?(?:export\s+)?(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*$/.freeze
+  # Anywhere on the line, not only first: `export SITE_BASE_URL=...
+  # MASTODON_ACCESS_TOKEN=...` printed the token because the first name
+  # on it was not a secret.
+  MASKED = /\A([-+].*?\b(?:\w*TOKEN|\w*PASSWORD|\w*SECRET|\w*KEY)\w*=).*$/.freeze
 
   def mask(line)
     line.sub(MASKED) { "#{Regexp.last_match(1)}••••••••" }

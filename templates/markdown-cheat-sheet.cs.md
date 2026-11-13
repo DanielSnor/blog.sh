@@ -251,19 +251,19 @@ Poslední řádek začínající dlouhou pomlčkou (nebo `--`) se stane atribuc�
 Dialog patří do ohrady `chat`, jedna replika na řádek — mluvčí před
 dvojtečkou. Řádek bez dvojtečky pokračuje v předchozí replice.
 
-```
+````
+```chat
 Watson: Co to znamená?
 Holmes: Elementární.
 ```
-
-Zapsáno jako:
+````
 
 ::: example
 
-    ```chat
-    Watson: Co to znamená?
-    Holmes: Elementární.
-    ```
+```chat
+Watson: Co to znamená?
+Holmes: Elementární.
+```
 
 ::: end
 

@@ -36,7 +36,7 @@ from both.
 
    | Section | Who sees it |
    | --- | --- |
-   | `date_format`, `date_time_format` | everyone -- strftime formats for every rendered date |
+   | `date_format`, `time_format`, `date_time_format` | everyone -- strftime formats for every rendered date, and the hour a card carries |
    | `thousands_separator`, `decimal_point` | nobody reads these as words: they are how a number is written, not a message. English keeps `,` and `.`, German swaps them, Czech separates thousands with a non-breaking space. `./blog.sh stats` formats its numbers through them, and every file size the engine prints -- beside an attachment on a page as well -- takes its decimal mark from `decimal_point` |
    | `language_name` | site visitors -- the language's name in itself (`Deutsch`), which the language switcher shows to a reader of any other language |
    | `nav`, `post`, `pagination`, `tag`, `tags`, `type`, `series`, `index`, `archive`, `search`, `not_found`, `markdown_page`, `ui`, `redirect` | site visitors -- the chrome, the listings, the tag index and the archive map, a post's own furniture (reading time, contents, series navigation), the 404 page and the one line an old address shows while it forwards |
@@ -61,18 +61,6 @@ from both.
    what a source becomes: they are not shown, they put the result in an
    element a stylesheet can set apart. A sheet without them builds the
    page it always did.
-
-3. **`write/locales/<lang>.yml`** -- the strings of the `/write/` page,
-   which is a separate app: it runs in a browser with no Ruby behind it,
-   so its locales are compiled into `write/i18n.js` by
-   `ruby write/build-i18n.rb`. Copy `write/locales/en.yml`, translate the
-   values, run that script, and commit the generated file with them; it
-   reports every key that still falls back to English as it goes. The
-   `error` section is the codes `scripts/receive.sh` and `add --json`
-   return -- the server sends a code, never translated text, and this is
-   where it becomes a sentence. Optional the way the cheat sheet is: a
-   page with no locale of its own falls back to English key by key, and a
-   site without `write: true` never publishes it at all.
 
 That's the whole list. `README.md` and `docs/` stay English.
 
@@ -195,7 +183,6 @@ root of its own:
 /                 the site's own language
 /de/              every listing, tag, series, feed and post that has German words
 /assets/          one copy, shared
-/write/           one writing app, shared
 /robots.txt       one copy -- a crawler reads the origin's root and nothing else
 /sitemap.xml      one copy, naming every language and their alternates
 /stats.json …     the sidebar's data, refreshed by cron at the root
@@ -260,8 +247,8 @@ The keys it takes, and nothing else: `site.title`, `site.short_name`,
 `site.description`; `banner.claim`, `banner.alt`; `about.heading`,
 `about.html`; `footer.links_heading`, `footer.links`,
 `footer.note_heading`, `footer.note_html`, `footer.copyright`,
-`footer.social_heading`; `nav`; `heading` under a widget; `tags`; and
-`series`.
+`footer.social_heading`; `series_index.title`, `series_index.description`;
+`nav`; `heading` under a widget; `tags`; and `series`.
 Everything else in site.yml -- the picture in the banner, the author, the
 address, the colours, the widgets' accounts -- is a fact about the site,
 the same in every language, and a translation of it would be a second site.
@@ -307,12 +294,18 @@ footer links are written out in full, the way site.yml has them, but
 every item goes where the same item goes in site.yml, in the same order;
 only the label changes. An item left without a label of its own -- or a
 footer link without a title -- is shown under the word the site's own
-list has for it, and `check` says which one. A menu that drifts apart between languages is a
+list has for it, and `check` says which one. A group of the menu
+(`group: true`) is worded like an item and stands where the site's own
+list has it. A menu that drifts apart between languages is a
 second site, and a reader who switches language would lose the item they
 were reaching for. The address is still the one the site's own language
 writes -- `/posts/2026/blog-sh/` above -- and the Czech build takes it to
 the Czech copy of that post, as it does for the site's own menu. A footer
-link goes the same way.
+link goes the same way. A menu changed in `./style.sh` is changed in every
+language file that words it: an item that stayed keeps that language's
+word, a new one is written without a word -- the site's own stands in
+until you write one -- and one taken out goes; the review shows each file
+before anything is written.
 
 The rules, which the build and `check` both enforce: the site's own
 language has no file (site.yml is it); a file for a language
@@ -329,10 +322,6 @@ until it is written -- every language shows one of those anyway. A tag
 given an empty word is refused too; leave it out to show it as written.
 A language file that is not valid YAML stops the build of every language,
 and `check` and `doctor` both name it.
-
-The writing app is not translated this way: it is one copy for the site,
-and it speaks the site's own language, because that is the language its
-author writes in.
 
 ### What a post carries
 

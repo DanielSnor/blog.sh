@@ -225,6 +225,7 @@ def run
   ask_deploy(env, current)
   tell_about_scheduler(site, current)
   ask_network(site, env, current)
+  ask_more(site, current)
 
   review_and_write(site, env)
 end
@@ -478,6 +479,21 @@ def ask_network(site, env, current)
     puts t('network_off')
     puts
   end
+  # Which replies a post shows is a question for a site with a network,
+  # and only once there is one to ask it of.
+  ask_approval_of(site, current) if site.intended.key?(%w[mastodon instance]) || site.intended.key?(%w[bluesky handle])
+end
+
+# comments.approval: every reply under a post, read live from the network
+# (off, the default), or only the ones the author favourites. What the
+# second costs -- a cron, a token that may read, the comments already
+# there hidden until starred -- is said before the choice, not after.
+def ask_approval_of(site, current)
+  now = current.dig('comments', 'approval').to_s == 'fav' ? 'fav' : 'off'
+  options = [['off', t('approval_off')], ['fav', t('approval_fav')]]
+  chosen = Wizard.choose(t('q_approval'), options, current_index: options.index { |o| o.first == now },
+                                                  note: [Tui.paint(t('h_approval'), :dim)])
+  site.set(%w[comments approval], chosen) unless chosen == now
 end
 
 def ask_mastodon(site, env, current)
@@ -558,6 +574,12 @@ def ask_bluesky(site, env, current)
 
   site.deactivate(%w[mastodon])
   site.set(%w[bluesky handle], handle)
+  # A self-hosted Personal Data Server; empty is bsky.social, as it is
+  # when the key is not there.
+  pds = ask_valid(t('q_pds'), current.dig('bluesky', 'pds'), hint: t('h_pds')) do |answer|
+    t('e_pds') unless answer.start_with?('https://')
+  end
+  site.set(%w[bluesky pds], pds) unless pds.to_s.strip.empty? || pds == current.dig('bluesky', 'pds')
 
   password = Tui.password(t('q_app_password'))
   puts unless Tui.interactive? # see the note by the Mastodon token above
@@ -569,6 +591,39 @@ def ask_bluesky(site, env, current)
     env.set('BLUESKY_APP_PASSWORD', password)
   end
   puts
+end
+
+# Photos, videos and robots: set once if ever, and the defaults suit most
+# sites -- so behind one question that Enter passes, and a first run stays
+# the length it was. In the order config/site.yml has them.
+def ask_more(site, current)
+  say(t('section_more'), :bold)
+  say('')
+  return unless Wizard.confirm(t('q_more'), default: false)
+
+  ask_media(site, current)
+  ask_robots(site, current)
+end
+
+# media: each a switch with the engine's own default, written only when the
+# answer is not what the site already does.
+MEDIA_SWITCHES = [['convert_heic', false], ['remux_video', false], ['strip_location', true]].freeze
+
+def ask_media(site, current)
+  MEDIA_SWITCHES.each do |key, default|
+    now = current.dig('media', key)
+    now = default unless [true, false].include?(now)
+    value = Wizard.confirm(t("q_media_#{key}"), default: now, note: t("h_media_#{key}"))
+    site.set(['media', key], value) unless value == now
+  end
+end
+
+# seo.block_ai_crawlers: a request in robots.txt to the crawlers that
+# collect text to train on. Off unless asked; robots_extra stays the file's.
+def ask_robots(site, current)
+  now = current.dig('seo', 'block_ai_crawlers') == true
+  value = Wizard.confirm(t('q_block_ai'), default: now, note: t('h_block_ai'))
+  site.set(%w[seo block_ai_crawlers], value) unless value == now
 end
 
 # Six backends, each with its own one or two values. The menu leads with
@@ -742,9 +797,25 @@ def review_and_write(site, env)
   puts Tui.paint(t('env_permissions', path: relative(ENV_SH)), :dim) if env.changed?
   offer_launcher
   puts
-  puts t('next_steps')
+  # Where the site can be seen, said as it is (backlog, 16. 10. 2026): this
+  # read "./blog.sh preview shows the site at http://localhost:8000/" -- true
+  # only while a preview runs, and read as the site's address by somebody
+  # whose site was served from somewhere else entirely. The preview, while
+  # it runs; the address just given, once a rebuild has built it.
+  puts t('next_steps', url: site_address(site))
   puts
   run_doctor
+end
+
+# The address the run ended with: env.sh's, which the build reads first,
+# or site.yml's.
+def site_address(site)
+  from_env = ENV['SITE_BASE_URL'].to_s.strip
+  return from_env unless from_env.empty?
+
+  (YAML.safe_load(site.current) || {}).dig('site', 'base_url').to_s
+rescue Psych::Exception
+  ''
 end
 
 def relative(path)

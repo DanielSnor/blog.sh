@@ -8,6 +8,7 @@ require_relative 'slug'
 require_relative 'translations'
 require_relative 'language_file'
 require_relative 'yaml_compat'
+require_relative 'path_glob'
 
 # lib/search_index.rb -- the words `browse` and `list --search` search,
 # kept between runs.
@@ -110,7 +111,7 @@ module SearchIndex
   # and the tag labels. A stat per file, not a read -- this runs on every
   # search, and the answer only has to change when a file does.
   def stamp(root, labels)
-    engine = (Dir.glob(File.join(root, 'lib', '*.rb')) + [File.join(root, 'scripts', 'manage_post.rb')]).sort.map do |file|
+    engine = (PathGlob.under(root, 'lib', '*.rb') + [File.join(root, 'scripts', 'manage_post.rb')]).sort.map do |file|
       stat = File.stat(file)
       [File.basename(file), stat.size, stat.mtime.to_i, stat.mtime.nsec]
     rescue SystemCallError

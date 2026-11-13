@@ -76,7 +76,7 @@ around one workflow rather than around the general case.
   readable, greppable and backed up by copying it.
 - **Authoring is a command.** `./blog.sh` writes, edits, publishes,
   schedules and deploys. A phone writes in an app over the SSH the server
-  already has; the `/write/` page does it too, until 1.11.
+  already has.
 - **The deploy is paranoid.** A SHA-256 manifest ships only what changed,
   and refuses when the file count or the byte total swings too far from
   the last build it accepted.
@@ -92,7 +92,7 @@ Each part says where it is described in full.
 
 - **Content.** One post is one JSON file, `content.nosync/posts/<year>/<slug>.json`, holding typed blocks. Drafts, scheduled posts, pages, unlisted posts, series, tags and a trash with restore. → [architecture.md](docs/architecture.md#content-model)
 - **Writing.** `./blog.sh` bare is a menu; every command also works directly: add, edit, publish, schedule, unpublish, delete, restore, rename, re-announce. `add <file>` takes a markdown file and asks nothing; `--json` answers as one object. On a Mac, `./setup.sh --launcher` puts an icon in Applications that opens it. → [operations.md](docs/operations.md#writing-and-publishing), [install.md](docs/install.md#macos)
-- **From a phone.** Native apps for iOS and Android, in preparation, reach the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut work as before and leave in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
+- **From a phone.** Native apps for iOS and Android, in preparation, reach the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut were taken out in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
 - **Markdown.** One parser, shared by the build and the authoring tool, with a cheat sheet the parser generates for your own site at `/markdown/`. Editing a post round-trips through it. → [operations.md](docs/operations.md#writing-and-publishing)
 - **Search, and the other ways to find a post.** Full text over the whole archive, entirely in the
   reader's browser -- no server, no index service, nothing called from outside, on a site of any
@@ -107,7 +107,7 @@ Each part says where it is described in full.
 - **Deploy.** Cloudron Surfer, a local directory, rsync over SSH, a git-pages push, any rclone remote, or SFTP. A SHA-256 manifest ships only what changed and refuses a build that swings too far from the last one. → [operations.md](docs/operations.md#deploying)
 - **Comments.** The announcement's replies are the thread; `comments.approval: fav` publishes only the ones you favourite. → [Why this exists](#why-this-exists)
 - **Sidebar widgets.** Toots, Bluesky posts, Pixelfed posts, commits, any RSS feed, per-post stats -- each optional, all fetched server-side on a cron -- and the archive's own posts from this day in earlier years. → [operations.md](docs/operations.md#cron-sidebar-widgets-and-post-stats), [operations.md](docs/operations.md#on-this-day)
-- **Appearance.** Light and dark from CSS custom properties, a three-state toggle, and a seven-key palette in `config/site.yml` that the wizard previews before writing. A listing card is cut to a size budget as it is written rather than drawn in full and hidden with CSS. → [install.md](docs/install.md#the-palette-and-the-headers-type)
+- **Appearance.** Light and dark from CSS custom properties, a three-state toggle, and a seven-key palette in `config/site.yml` that the wizard previews before writing; a skin (`site.skin`: classic, Minimal or one of its five variants) dresses the rest. A listing card is cut to a size budget as it is written rather than drawn in full and hidden with CSS. → [install.md](docs/install.md#the-palette-and-the-headers-type), [skinning.md](docs/skinning.md)
 - **Reachable without a mouse.** One focus ring for the whole site, skip links, and motion that respects `prefers-reduced-motion`. → [architecture.md](docs/architecture.md#the-client-side)
 - **Security.** A Content-Security-Policy on every page, self-hosted fonts, nothing third-party in post data, `env.sh` out of git at mode 600. → [architecture.md](docs/architecture.md#security)
 - **Importing.** Twenty-two sources through `./import.sh`, always previewed in dry-run before anything is written, landing in the same schema as a hand-written post. → [importing.md](docs/importing.md)
@@ -132,7 +132,7 @@ Each part says where it is described in full.
 ```
 blog.sh                  Main tool -- CLI and interactive wizard (see below)
 setup.sh                 Setup wizard -- identity, address, comments network, deploy target
-style.sh                 Appearance wizard -- palette, banner, menu, about, footer, sidebar
+style.sh                 Appearance wizard -- palette, banner, skin and layout, menu, about, footer, sidebar
 import.sh                Import wizard -- pick a source, preview, confirm (see below)
 build/                   Build script (JSON posts -> static HTML)
 scripts/                 Ruby CLI, import/deploy scripts, and their .sh wrappers:
@@ -149,14 +149,12 @@ locales/                 UI strings for the generated site and the CLI (en.yml, 
 templates/               ERB templates (layout, post, index, search, partials)
                          + markdown-cheat-sheet.<lang>.md, the /markdown/ page's source
 assets/                  CSS/JS/fonts (drop your own images into assets/images/)
-write/                   The page served at /write/ when write: true -- the editor itself, its
-                         locale sources and the script that turns them into i18n.js
+skins/                   The skins a site can wear (site.skin; classic unless it says otherwise)
 config/site.yml.example  Documented config template -- copy to config/site.yml (gitignored) per deployment
 config/site.lang.yml.example  One more published language, described -- copy to config/site.<lang>.yml
 env.sh.example           Documented secrets/env template -- copy to env.sh (gitignored) per deployment
 docs/                    Install, operations, importing, architecture, decisions, skinning and
-                         localization guides; this README's screenshots; and shortcuts/,
-                         the shortcut that sends a post from a phone (iOS, and macOS too)
+                         localization guides; this README's screenshots
 
 content.nosync/, media.nosync/, public.nosync/, incoming/, trash/, drafts/, env.sh, config/site.yml
                          Per-deployment/generated, not part of the engine -- see .gitignore
@@ -202,7 +200,7 @@ path per platform in [install.md → Quick start](docs/install.md#quick-start).
 
 ```bash
 ./setup.sh                 # title, address, timezone, comments network, deploy target
-./style.sh                 # palette, banner, bio, footer, sidebar
+./style.sh                 # palette, banner, skin, bio, footer, sidebar
 ./blog.sh doctor           # is the configuration sound?
 ./blog.sh add              # write the first post
 ./blog.sh rebuild          # build and deploy
@@ -480,8 +478,9 @@ copy button on code blocks were both their requests -- a blog of terminal
 how-tos wanted them first.
 
 [pavelchcepsat.cz](https://pavelchcepsat.cz) is a personal blog in Czech,
-and the first to be written from an Android phone: the writing app sends
-its text from Chrome and Edge because its owner tested what they refuse.
+and the first to be written from an Android phone: the `/write/` page of
+its day sent its text from Chrome and Edge because its owner tested what
+they refuse.
 
 [archive.bierfaristo.com](https://archive.bierfaristo.com) is the largest
 archive we know of running this engine, some 13,700 posts -- a working

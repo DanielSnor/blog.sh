@@ -35,15 +35,17 @@
 # this file explains each one where it stands.
 #
 #   site        title, short_name, description, author, (author_name), lang, locale, (locales),
-#               timezone, base_url, (page_size), (extra_css)
+#               timezone, base_url, (page_size), (skin), (extra_css)
 #   banner      src, alt, width, height, (show_title), (show_claim), (claim),
 #               (show_image)
 #   colors      light/dark: bg, text, meta_text, accent, nav_bg, border,
 #               pill_bg, (banner_title), (banner_claim)
 #   fonts       (faces), (banner_title), (banner_title_size),
 #               (banner_claim), (banner_claim_size)
-#   layout      (sidebar), (hero), (lead_card)
-#   nav         (the menu bar: label with tag or url -- or [] for none)
+#   layout      (sidebar), (hero), (lead_card), (series_contents)
+#   nav         (the menu bar: label with tag, series or url, or group: true
+#               over the items after it -- or [] for none)
+#   series_index  (title), (description), (order: newest or oldest)
 #   about       (heading), html
 #   widgets     (toots, pixelfed, commits, bluesky, rss, on_this_day)
 #   footer      (links_heading), links, note_heading, note_html, copyright,
@@ -51,7 +53,6 @@
 #   social      name, url, icon or icon_svg, (rel)
 #   tag_icons   (a list: tag with icon or icon_svg)
 #   share       (the share block: a list of network names)
-#   write       (the /write/ page: true to publish it, off by default)
 #   mastodon    (instance), (toot_length)        -- OR bluesky, never both
 #   bluesky     (handle), (pds)
 #   comments    (approval)
@@ -65,8 +66,8 @@
 # the header, the palette and the type, then the regions, the menu, the
 # sidebar, the footer, the marks beside the tags and the block a reader
 # carries the post away from -- and after that the parts with no place on
-# the page at all: the writing page, the comments network, publishing,
-# media, robots, analytics.
+# the page at all: the comments network, publishing, media, robots,
+# analytics.
 # ./style.sh walks its own menu the same way.
 
 site:
@@ -127,6 +128,20 @@ site:
   # the first deploy -- pagination is anchored so page contents never
   # change, and changing this later renumbers every existing page.
   # page_size: 10
+  # Optional: the look the site wears, one of the skins the engine ships
+  # (skins/ beside this engine): classic, the look blog.sh has always had,
+  # unless a site says otherwise; or minimal -- paper, ink and one colour;
+  # or minimal-literal -- minimal set as a book: one column and a serif;
+  # or minimal-journal -- a diary: a line of time down the left;
+  # or minimal-manual -- a manual: chapters (series) in a menu down the side;
+  # or minimal-pictorial -- a wall of pictures three across where the
+  # listing stood (layout.lead_card and a page of 9 or 12 posts suit it);
+  # or minimal-terminal -- a page the way a terminal would print it (it sets
+  # the name and the claim as text: banner.show_image: false suits it).
+  # A name the engine has no skin for is worn as classic, and the build
+  # and ./blog.sh doctor say so.
+  # skin: classic
+
   # Optional: stylesheets loaded after the engine's own, in this order --
   # where a skin belongs, so that dressing the site differently never
   # means editing a template and losing the edit to the next git pull.
@@ -278,6 +293,11 @@ colors:
 #   # post-list-item--lead for a stylesheet to dress -- also when its post
 #   # has no picture, which leaves the card's body as it was. Default: false.
 #   lead_card: false
+#   # Every part of a series listed on each part's page, under "part N of
+#   # M" and above the text, the part being read marked -- the standing
+#   # navigation of a manual whose chapters are series. Never cut short.
+#   # Default: false.
+#   series_contents: false
 # --- end of layout ---
 
 # Optional. The menu across the top. Without this key the menu is what the
@@ -285,8 +305,10 @@ colors:
 # has, growing as the archive does.
 #
 # With it, the site names its own entries instead -- `tag:` is a tag's
-# slug and becomes its listing, `url:` is taken as written, so an entry
-# can point at a post, at /markdown/, or off the site entirely. Useful
+# slug and becomes its listing, `series:` a series' name (or slug) and
+# becomes its listing, lit up on every part of it too, `url:` is taken as
+# written, so an entry can point at a post, at /markdown/, or off the site
+# entirely. Useful
 # when the site's subjects are a better map of it than its media types.
 #
 # An empty list (nav: []) is an answer too: the entries and the button
@@ -298,11 +320,30 @@ colors:
 # `./style.sh` writes this for you and offers the tags and pages you
 # actually have; `./blog.sh doctor` says so when an entry stops pointing
 # at anything, which is what happens to a menu written a year ago.
+#
+# An entry with `group: true` and a label is a heading over the entries
+# after it, up to the next group -- a manual's "Basics" over its first
+# chapters. It leads nowhere, and one with nothing under it is left out.
 # nav:
 #   - { label: "Home", url: "/" }
 #   - { label: "Photography", tag: "photography" }
 #   - { label: "Syntax", url: "/markdown/" }
+#   - { label: "Basics", group: true }
+#   - { label: "Getting started", series: "Getting started" }
 # --- end of nav ---
+
+# The page that lists every series, /series/: what it is called, what a
+# search result says about it, and which way it runs. All three optional:
+# without them the heading is the engine's ("Series", in the language of
+# the page) and the series whose newest part is newest stands first.
+# `order: oldest` lists them by the day each began instead -- the order a
+# manual's chapters were written in. A language file may give its own
+# title and description.
+# series_index:
+#   title: "Chapters"
+#   description: "Every chapter of the manual, in the order it was written."
+#   order: oldest
+# --- end of series_index ---
 
 # The sidebar's introduction card. Nothing here is load-bearing: an
 # emptied html takes the card with it, heading and all, and deleting
@@ -491,22 +532,6 @@ social:
 #   - bluesky
 #   - email
 # --- end of share ---
-
-# A page at /write/ to write a post on a phone: a title, the text, tags
-# and photographs, and a button that hands the lot to an iOS shortcut,
-# which carries it over SSH to scripts/receive.sh. Nothing new listens on
-# the network and the page holds no secret -- sending needs the key that
-# lives in the shortcut, on the phone.
-#
-# Off by default. It is a page for whoever runs the blog, and a site that
-# writes from a desk has no use for it. Turning it on publishes five files
-# under /write/ and nothing else changes; the page is marked noindex.
-#
-# Setting it up is in docs/operations.md, under "A post sent from the
-# phone itself" -- the key, the forced command, and the shortcut.
-#
-# write: true
-# --- end of write ---
 
 # Optional. The comments/announcement network: every published post is
 # announced there, and replies to that announcement are the post's
