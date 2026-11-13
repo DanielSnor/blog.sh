@@ -11,6 +11,42 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.11.1 -- 2026-11-15
+
+A bug-fix release. Five of its fixes came from Pavel's week of everyday writing on 1.11 before its
+tag, on pavelchcepsat.cz: what a soft line break leaves in the text, a numbered list that forgot
+where it started, Caps Lock, and two questions from the scheduler whose keys read as something else
+than they do. The others are what a review of those fixes found around them, and two skins of the
+Minimal family drawing what their guides say.
+Nothing to migrate -- `git pull`, rebuild, deploy.
+
+One fix goes past what a patch release does: a list block may carry `start`, the number it begins
+at. It is written only for a list that does not begin at 1, so every post on disk reads as before;
+a list an earlier edit renumbered from 1 has lost its number and needs it typed again.
+
+### Fixed
+
+- **A soft line break left two or three spaces in the stored text** (#73). One space, as in CommonMark.
+- **A double space nano wrapped at became a hard break mid-sentence** (#73). The default nano wraps on the screen only.
+- **The line after a hard break kept its indent.** It is no part of the text, as in CommonMark.
+- **A caption wrapped over lines kept the newline, until the next edit.** One line.
+- **An `$EDITOR` or `$VISUAL` set to nothing ran the post's file as the command.** It counts as unset.
+- **A numbered list carried on after a paragraph was renumbered from 1 by the next edit** (#72).
+- **An imported `<ol start>` inside a list came in numbered from 1.** It keeps its number.
+- **An imported list item that was only a picture dropped out, and the numbers after it moved up.** The list parts there.
+- **The Markdown cheat sheet said a list's numbers don't matter.** Only the first one counts.
+- **With Caps Lock on, a key in a terminal screen was "Not understood"** (#70). The browser too.
+- **A byte that is no UTF-8 from a Latin-2 terminal crashed the properties, queue and menu.**
+- **`[Enter] accept`, under a hint about the front of the queue, read as moving the post there** (#74).
+- **A scheduled post was asked about as a draft after an edit** (#71). `[d] keep it scheduled for …`.
+- **A scheduled post past its date was offered to stay scheduled for it.** Overdue, as the queue says.
+- **Minimal Manual drew the card to the next page narrower than the one before it.** It fills its half.
+- **Minimal Manual kept a page too short for contents to 65 characters.** Every page runs to the edge, the cheat sheet too.
+- **Minimal Manual drew a captionless video 1920 pixels wide beside contents.** It keeps the column.
+- **Minimal Pictorial set a link tile's address after its opening words.** First, in the engine's line.
+- **Minimal Pictorial set a link's address under a quotation 14 pixels and faded.** 12, as anywhere.
+
+
 ## 1.11 -- 2026-11-13
 
 The release about how a site looks. The look is now the engine's rules and a skin -- `site.skin:`,
