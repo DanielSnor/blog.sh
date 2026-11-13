@@ -18,6 +18,11 @@ built around drafts:
    point: open the preview on a phone or send it to someone before
    publishing).
 
+   With no `$EDITOR` or `$VISUAL` -- or one set to nothing -- the editor
+   is nano, which wraps a long line on the screen only and never breaks
+   one in the file: a paragraph is one line, and a soft break you type
+   yourself is stored as a single space.
+
    **Saving a draft builds the site and deploys it.** Not only the draft's
    own page: the deploy is the ordinary one, so everything the build
    produced goes to the target, the front page included. It has to -- the
