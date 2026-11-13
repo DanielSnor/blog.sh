@@ -11,7 +11,7 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.11.pre -- 2026-10-15
+## 1.11 -- 2026-11-13
 
 The release about how a site looks. The look is now the engine's rules and a skin -- `site.skin:`,
 classic unless a site says otherwise -- and the Minimal family ships beside it: Minimal and five
