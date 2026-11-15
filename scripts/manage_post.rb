@@ -32,6 +32,7 @@ require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
 require_relative '../lib/translations'
+require_relative '../lib/auto_translate'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
@@ -5342,34 +5343,122 @@ end
 # digest `base:` hands back. The text comes back through `add` of a file
 # saying `edits:`, `base:` and `lang:` (translation_from_file).
 def translate_as_json(slug, lang)
-  answer_json do
-    translate_language!(lang)
-    path, raw, post = post_for_json(slug)
-    year = File.basename(File.dirname(path))
-    entry = post.dig('translations', lang)
-    entry = {} unless entry.is_a?(Hash)
-    media_dir = File.join(MEDIA_DIR, year, slug)
-    # Said before the text is handed out, as `drafts --json` and `edit
-    # --json` say it of the post's own: a translation holding something
-    # its text cannot say is not one to edit from here, and the save
-    # would be refused (content_lost).
-    lost = unwritable_translation(entry, media_dir)
-    problem = if lost.nil?
-                'unreadable'
-              else
-                lost.any? ? 'content_lost' : nil
-              end
-    { 'ok' => true,
-      'post' => { 'slug' => slug, 'lang' => lang, 'title' => post_name_for(post),
-                  'written' => Translations.written?(entry),
-                  'editable' => problem.nil?, 'problem' => problem,
-                  'text' => translation_skeleton(entry, nil),
-                  'original' => translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
-                                                       'content' => LinkCard.split(post['content']).last }, nil),
-                  'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
-                  'preview' => PostAddress.path(post),
-                  'base' => Digest::SHA256.hexdigest(raw) } }
+  answer_json { translate_state(slug, lang) }
+end
+
+# The post's words in `lang` as a program is handed them (`translate
+# --json`), and what `translate --auto --json` starts from.
+def translate_state(slug, lang)
+  translate_language!(lang)
+  path, raw, post = post_for_json(slug)
+  year = File.basename(File.dirname(path))
+  entry = post.dig('translations', lang)
+  entry = {} unless entry.is_a?(Hash)
+  media_dir = File.join(MEDIA_DIR, year, slug)
+  # Said before the text is handed out, as `drafts --json` and `edit
+  # --json` say it of the post's own: a translation holding something
+  # its text cannot say is not one to edit from here, and the save
+  # would be refused (content_lost).
+  lost = unwritable_translation(entry, media_dir)
+  problem = if lost.nil?
+              'unreadable'
+            else
+              lost.any? ? 'content_lost' : nil
+            end
+  { 'ok' => true,
+    'post' => { 'slug' => slug, 'lang' => lang, 'title' => post_name_for(post),
+                'written' => Translations.written?(entry),
+                'editable' => problem.nil?, 'problem' => problem,
+                'text' => translation_skeleton(entry, nil),
+                'original' => translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
+                                                     'content' => LinkCard.split(post['content']).last }, nil),
+                'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
+                'preview' => PostAddress.path(post),
+                'base' => Digest::SHA256.hexdigest(raw) } }
+end
+
+# What a person is told of the differences `AutoTranslate.check` found.
+def auto_warning_lines(warnings)
+  none = t('cli.auto_nothing')
+  warnings.map do |w|
+    items = w[:items]
+    case w[:code]
+    when 'urls', 'images', 'numbers'
+      t("cli.auto_warn_#{w[:code]}", missing: items[:missing].first(8).join(', ').then { |x| x.empty? ? none : x },
+                                     extra: items[:extra].first(8).join(', ').then { |x| x.empty? ? none : x })
+    else
+      t("cli.auto_warn_#{w[:code]}", was: items[:was], now: items[:now])
+    end
   end
+end
+
+def auto_warnings_json(warnings)
+  lines = auto_warning_lines(warnings)
+  warnings.each_with_index.map do |w, at|
+    { 'code' => w[:code], 'message' => lines[at].strip }.merge(w[:items].transform_keys(&:to_s))
+  end
+end
+
+# The translator asked for the post's words in `lang`: the state as
+# `translate --json` gives it and the machine's text. Raises
+# AutoTranslate::Error and nothing else of its own; refuses a post whose
+# text cannot be written back.
+def auto_translation(slug, lang, force:)
+  raise AutoTranslate::Error, 'translator_not_allowed' unless AutoTranslate.permitted?
+
+  state = translate_state(slug, lang)
+  post = state['post']
+  refuse(post['problem'], t('cli.auto_not_editable', slug: slug).strip) unless post['editable']
+  refuse('already_written', t('cli.auto_already_written', slug: slug, lang: lang).strip) if post['written'] && !force
+  [state, AutoTranslate.translate(post['original'], lang_name: language_name(lang), lang_code: lang)]
+end
+
+# The same, said as the command line says things: a refusal whose words
+# are the locale's.
+def auto_translation!(slug, lang, force:)
+  auto_translation(slug, lang, force: force)
+rescue AutoTranslate::Error => e
+  refuse(e.code, t("cli.auto_#{e.code}", detail: e.detail).strip)
+end
+
+# `translate <slug> --lang xx --auto --json`: the machine's text for a
+# program to show, and nothing saved. It comes back through `add` of a file
+# saying `edits:`, `base:` and `lang:`, as a hand-written one does.
+def translate_auto_as_json(slug, lang, force: false)
+  answer_json do
+    state, result = auto_translation!(slug, lang, force: force)
+    state['post']['text'] = result[:text]
+    state['auto'] = { 'warnings' => auto_warnings_json(result[:warnings]) }
+    state
+  end
+end
+
+# `translate <slug> --lang xx --auto`: the machine's text written to a
+# file in tmp/ for `add` to take -- after the person has read it. Nothing is
+# published and nothing is added: a translation nobody has read is not
+# something to put on a site.
+def cmd_translate_auto(slug, lang, force: false)
+  puts t('cli.auto_working', language: language_name(lang), seconds: AutoTranslate.seconds)
+  state, result = auto_translation!(slug, lang, force: force)
+  dir = File.join(ROOT, 'tmp')
+  FileUtils.mkdir_p(dir)
+  target = File.join(dir, "#{slug}.#{lang}.md")
+  AtomicWrite.write(target, AutoTranslate.as_file(result[:text], slug: slug, base: state['post']['base'], lang: lang))
+  shown = "tmp/#{File.basename(target)}"
+  puts t('cli.auto_saved', path: shown)
+  auto_warning_lines(result[:warnings]).each { |line| warn line }
+  puts t('cli.auto_read_then_add', path: shown)
+end
+
+# The post a bare `translate --auto` means: the newest one that is out.
+def newest_published_slug
+  found = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8'))
+    [post['date'].to_s, post['slug'].to_s] if post['state'] == PUBLISHED && !post['slug'].to_s.empty?
+  rescue JSON::ParserError, SystemCallError
+    nil
+  end
+  found.max&.last
 end
 
 # A file saying `edits: <slug>`, `base: <digest>` and `lang: <code>`: the
@@ -5396,6 +5485,35 @@ def translation_from_file(file, raw, meta, path, original_raw, post, json:, conf
     puts t('cli.translate_saved', lang: lang, slug: slug)
     print_translation_preview(path, lang)
   end
+end
+
+# In a terminal, with a translator set up and nothing written in the
+# language yet, the editor may start from the machine's text -- a question
+# first, because it is paid for and sent away. nil: by hand, as ever;
+# :cancel: the person backed out; otherwise { text:, warnings: }. A
+# translation that fails says why and leaves the editor to the person.
+def auto_for_editor(post, lang, entry)
+  return nil unless Array(entry['content']).empty? && Tui.interactive?
+  return nil unless AutoTranslate.configured? && AutoTranslate.permitted?
+
+  answer = Tui.key_choice(t('cli.auto_ask'), escape: :cancel)
+  return :cancel if answer == :cancel
+  return nil unless answer == t('cli.auto_key')
+
+  puts t('cli.auto_working', language: language_name(lang), seconds: AutoTranslate.seconds)
+  original = translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
+                                    'content' => LinkCard.split(post['content']).last }, nil)
+  AutoTranslate.translate(original, lang_name: language_name(lang), lang_code: lang)
+rescue AutoTranslate::Error => e
+  puts t('cli.auto_fallback', reason: t("cli.auto_#{e.code}", detail: e.detail).strip)
+  nil
+end
+
+# What looks wrong with the machine's text, as notes in the editor.
+def auto_notes(warnings)
+  return '' if warnings.empty?
+
+  "\n" + auto_warning_lines(warnings).map { |line| "// #{line}" }.join("\n") + "\n"
 end
 
 # `path:` is the draft dialog's (#66): the post it is showing, which a
@@ -5430,7 +5548,20 @@ def cmd_translate(slug, lang, path: nil)
   # title. It used to come the first time only -- and the first time was
   # the title -- so the body was then written with the original in
   # another window, which is what these lines are there to spare.
-  opened_with = restored || (Array(entry['content']).empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
+  machine = restored ? nil : auto_for_editor(post, lang, entry)
+  if machine == :cancel
+    puts t('cli.cancelled')
+    puts
+    return
+  end
+  opened_with = if restored then restored
+                elsif machine
+                  # The machine's text to read and mend; what it found to doubt, and the original, as `//`
+                  # notes the editor drops on the way back.
+                  machine[:text] + auto_notes(machine[:warnings]) + original_as_notes(post, media_dir)
+                else
+                  Array(entry['content']).empty? ? skeleton + original_as_notes(post, media_dir) : skeleton
+                end
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
                        { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" }, untouched: [skeleton])
   # 🪤 Against the buffer WITHOUT the notes as well: the editor strips
@@ -5438,7 +5569,15 @@ def cmd_translate(slug, lang, path: nil)
   # NEVER returns the bytes it went in with -- and an untouched editor
   # then read as "everything was deleted", which takes the language off
   # the post and rebuilds the site to say so.
-  if raw == opened_with || raw == skeleton
+  if machine && raw.strip == machine[:text].strip
+    # Closed without a change: read, and either left as it is or not wanted.
+    # An editor cannot say which, so it is asked.
+    unless Tui.yes?(Tui.key_choice(t('cli.auto_confirm_as_is')))
+      puts t('cli.no_changes')
+      puts
+      return
+    end
+  elsif raw == opened_with || raw == skeleton
     puts t('cli.no_changes')
     puts
     return
@@ -8853,6 +8992,8 @@ begin
       # INTO a language, so both are required and neither has a default.
       args = ARGV.dup
       json = !args.delete('--json').nil?
+      auto = !args.delete('--auto').nil?
+      force = !args.delete('--force').nil?
       lang = args.find { |arg| arg.start_with?('--lang=') }&.delete_prefix('--lang=')
       args.reject! { |arg| arg.start_with?('--lang=') }
       if lang.nil? && (at = args.index('--lang'))
@@ -8860,7 +9001,8 @@ begin
         args.slice!(at, 2)
       end
       abort t('cli.translate_json_needs_slug') if json && (args.empty? || args.first.to_s.start_with?('--'))
-      slug = args.shift || pick_slug_interactively
+      slug = args.shift || (auto ? newest_published_slug : pick_slug_interactively)
+      abort t('cli.auto_no_post') if auto && slug.to_s.empty?
       lang ||= args.shift unless args.first.to_s.start_with?('--')
       # 🪤 Whatever is still here was not asked for: a typo in `--lang`, a
       # second `--lang`, a stray word. Swallowing it silently is how a
@@ -8879,7 +9021,12 @@ begin
         abort t('cli.translate_needs_locales') if others.empty?
         abort t('cli.translate_needs_language', lang: others.first, langs: others.join(', '))
       end
-      json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
+      if auto
+        json ? translate_auto_as_json(slug, lang.to_s.strip, force: force) : cmd_translate_auto(slug, lang.to_s.strip, force: force)
+      else
+        abort t('cli.translate_force_needs_auto') if force
+        json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
+      end
     when 'edit'
       json = !ARGV.delete('--json').nil?
       unknown = ARGV.find { |arg| arg.start_with?('--') }

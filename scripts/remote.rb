@@ -108,7 +108,7 @@ ALLOWED = {
   'list' => %w[--drafts --type= --tag= --search=],
   'drafts' => %w[],
   'edit' => %w[],
-  'translate' => %w[--lang=],
+  'translate' => %w[--lang= --auto --force],
   'props' => %w[--set= --drop-address= --kind= --rename= --versions --restore-version= --yes --rebuild],
   'queue' => %w[--up= --down= --move= --to=],
   'schedule' => %w[--at= --cancel --compact --allow-partial],
