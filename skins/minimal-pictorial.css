@@ -4084,13 +4084,15 @@ main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--h
    hairline and corner -- half as tall as a photograph, with what it is
    called, two lines of how it begins and its date, set at the foot. One
    with no title leads with its own first words; a quotation with what was
-   said. */
+   said. The address of a link that follows the quotation stays the address:
+   12px in the mono face, as everywhere else, not the 14px of the words
+   under a quotation (fleet over 1.11.1, 11. 11. 2026). */
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) { box-sizing: border-box; aspect-ratio: 2 / 1; justify-content: flex-end; padding: 16px 18px 14px; border: 1px solid var(--line); border-radius: var(--corner); background: var(--plate); }
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .post-body > h2 { order: 1; margin: 0 0 6px; font-size: clamp(17px, 1.5vw, 20px); line-height: 1.25; }
-main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type { order: 2; margin: 0 0 8px; }
-main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(:has(.post-body > h2)) .content > p:first-of-type { font-size: 16px; opacity: 1; -webkit-line-clamp: 5; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > p:first-of-type:not(.link-block:has(> a > strong)) { order: 2; margin: 0 0 8px; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)):not(:has(.post-body > h2)) .content > p:first-of-type:not(.link-block:has(> a > strong)) { font-size: 16px; opacity: 1; -webkit-line-clamp: 5; }
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > blockquote:first-child { display: -webkit-box; order: 1; margin: 0 0 8px; padding: 0 0 0 14px; overflow: hidden; border: 0; border-left: 2px solid var(--accent); background: none; font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
-main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > blockquote:first-child ~ p:first-of-type { font-size: 14px; opacity: 0.82; -webkit-line-clamp: 2; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)) .content > blockquote:first-child ~ p:first-of-type:not(.link-block:has(> a > strong)) { font-size: 14px; opacity: 0.82; -webkit-line-clamp: 2; }
 
 /* The wall is laid in half rows. A picture takes two of them, a tile of
    words one, and the grid fills what would be left empty: beside a picture
@@ -4110,7 +4112,10 @@ body.page-first main:has(> .listing-heading--home) > .post-list-item:is(.post-li
 
 /* A link post with no title of its own opens with the address it points to.
    In a tile the address is the engine's line -- small, in its voice, on one
-   line -- and the words that follow it are what the tile says. */
+   line -- and the words that follow it are what the tile says.
+   The tile's own rules for its opening words leave the address out: they
+   weigh more than this one, and it stood in 16px, after the words, until
+   4. 11. 2026. */
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block:has(> a > strong) { display: block; order: 1; margin: 0 0 8px; overflow: hidden; color: var(--muted); font-family: var(--mono); font-size: 12px; line-height: 1.4; opacity: 1; text-overflow: ellipsis; white-space: nowrap; -webkit-line-clamp: none; }
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block:has(> a > strong) :is(a, strong) { color: inherit; font-weight: 700; text-decoration: none; }
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block:has(> a > strong) br { display: none; }

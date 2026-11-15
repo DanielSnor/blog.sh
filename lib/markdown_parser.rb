@@ -373,9 +373,18 @@ module MarkdownParser
     # whose own last character is a backslash. "\\\\" there is an escaped
     # backslash and there is no marker left over, so the break was lost
     # and the text gained a space instead.
-    para.gsub(/ *(?<!\\)\\\n/, BREAK_SENTINEL)
-        .gsub(/  +\n/, BREAK_SENTINEL)
-        .tr("\n", ' ')
+    # A soft break is one space, whatever whitespace stood round it, as in
+    # CommonMark: an editor that hard-wraps leaves the blank at the end of
+    # the line it broke, an indented continuation brings its own, and the
+    # extra space was stored, then sent out in the feed and the crossposts
+    # as plain text (#73).
+    # The blanks that open the line after a hard break are no part of the
+    # text either, as in CommonMark: an indented line after a break was
+    # stored with its indent, and the feed and crossposts sent it (fleet
+    # over 1.11.1).
+    para.gsub(/ *(?<!\\)\\\n[ \t]*/, BREAK_SENTINEL)
+        .gsub(/  +\n[ \t]*/, BREAK_SENTINEL)
+        .gsub(/[ \t]*\n[ \t]*/, ' ')
   end
   YOUTUBE_RE = %r{\Ahttps?://(?:www\.)?(?:youtube\.com/watch\?(?:[^\s]*&)?v=|youtu\.be/|youtube\.com/shorts/)([\w-]{6,})}
 
@@ -599,6 +608,7 @@ module MarkdownParser
             end
     return nil unless style
 
+    first = style == 'ol' && line.strip[/\A(\d+)[.)]/, 1].to_i
     item_re = style == 'ul' ? UL_ITEM_RE : OL_ITEM_RE
     items = []
 
@@ -707,7 +717,13 @@ module MarkdownParser
       items << item
     end
 
-    [{ 'type' => 'list', 'style' => style, 'items' => items }, idx]
+    block = { 'type' => 'list', 'style' => style, 'items' => items }
+    # The number a numbered list starts at, when it is not 1: a list carried
+    # on after a paragraph ("5. the next step") came back from the next edit
+    # numbered from 1, and saved so (#72). Only the first item counts, as in
+    # HTML and CommonMark; a 1 is the default and is not written.
+    block['start'] = first if first && first != 1
+    [block, idx]
   end
 
   # A paragraph is a list block when its first line is a list item; nested
@@ -1085,6 +1101,11 @@ module MarkdownParser
       # and reading it back raw left the backslashes where the reader could
       # see them -- and put them into the alt attribute on the page.
       alt, path, caption = unescape_title(m[:alt]), m[:target], unescape_title(m[:title])
+      # A caption wrapped over lines is one line, as a paragraph is (#73):
+      # kept, the newline was stored, and the next edit -- the writer puts a
+      # caption on one line -- changed it to a space, so a post differed
+      # from itself after an edit nobody made to it (fleet over 1.11.1).
+      caption = caption&.gsub(/[\t\n\r\f\v ]+/, ' ')&.strip
       # A single exclamation mark is for images only. A video with just one
       # would render as a broken <img>, so this warns about it rather than
       # letting it pass silently.

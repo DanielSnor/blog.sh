@@ -427,21 +427,63 @@ module Import
 
       def emit_list(node)
         lis = node.children.select { |c| c.name == 'li' }
-        items = lis.filter_map { |li| list_item(li) }
-        @blocks << { 'type' => 'list', 'style' => node.name, 'items' => items } unless items.empty?
+        # An item that is only a picture has no words to be an item with, and
+        # it was dropped: the picture went after the list and every item
+        # after it moved up a number, so "3." became "2." (fleet over 1.11.1).
+        # The list now parts there -- the picture stands where it stood, and a
+        # numbered list goes on from the number it had reached.
+        items = []
+        number = ol_start(node) || 1
+        lis.each_with_index do |li, i|
+          if picture_only?(li)
+            emit_list_run(node, items, number)
+            items, number = [], nil
+            collect(li, 'img').each { |img| emit_image(img) }
+          elsif (item = list_item(li))
+            number ||= (ol_start(node) || 1) + i
+            items << item
+          end
+        end
+        emit_list_run(node, items, number)
 
         # The pictures inside the items. A list has no place to put one, so
         # each becomes its own block after the list -- which is what
         # emit_paragraph has always done. Dropped here, they were not even
         # registered with the media ledger: the file was never fetched, and
         # nothing anywhere said a picture had gone.
-        lis.each { |li| collect(li, 'img').each { |img| emit_image(img) } }
+        lis.reject { |li| picture_only?(li) }.each { |li| collect(li, 'img').each { |img| emit_image(img) } }
 
         # A <ul> whose content was never wrapped in <li> -- which no
         # browser minds and plenty of hand-written HTML does -- had its
         # content dropped whole. It is not a list, but it is still words
         # somebody wrote.
         walk(prune(node, lis)) if node.children.any? { |c| !lis.include?(c) }
+      end
+
+      def emit_list_run(node, items, number)
+        return if items.empty?
+
+        block = { 'type' => 'list', 'style' => node.name, 'items' => items }
+        block['start'] = number if node.name == 'ol' && number && number != 1
+        @blocks << block
+      end
+
+      # A picture, perhaps in a link, and nothing else: no words, no list
+      # inside.
+      def picture_only?(li)
+        return false if li.children.any? { |c| %w[ul ol].include?(c.name) }
+        return false if collect(li, 'img').empty?
+
+        Inline.render(li, skip: %w[ul ol]).first.strip.empty?
+      end
+
+      # <ol start="5">, kept as the markdown parser keeps "5." (#72): the
+      # number, when it is a plain one and not the 1 every list begins at.
+      def ol_start(node)
+        return nil unless node.name == 'ol' && node.attrs['start'].to_s[/\A\d+\z/]
+
+        start = node.attrs['start'].to_i
+        start == 1 ? nil : start
       end
 
       def list_item(li)
@@ -459,6 +501,11 @@ module Import
           # imported from HTML printed as raw JSON in a <pre> on the page.
           unless children.empty?
             item['children'] = { 'type' => 'list', 'style' => nested.name, 'items' => children }
+            # ...and a list inside a list keeps its number too: only the
+            # outer one did, and a nested <ol start="3"> came in as 1, 2
+            # (fleet over 1.11.1).
+            start = ol_start(nested)
+            item['children']['start'] = start if start
           end
         end
         item

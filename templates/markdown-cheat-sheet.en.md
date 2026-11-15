@@ -193,7 +193,7 @@ A task list marks items with square brackets — rendered as checkboxes (read-on
 
 ::: end
 
-The numbers don't matter, they're renumbered when rendered. A nested list is indented by two spaces:
+Only the first number counts: the list starts at it and counts on from there, so a list carried on after a paragraph can start at 5. A nested list is indented by two spaces:
 
 ```
 - fruit

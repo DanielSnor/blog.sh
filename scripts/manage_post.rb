@@ -794,12 +794,26 @@ def editor_round_trip(initial_content, hint_comment)
   Dir.mktmpdir do |dir|
     path = File.join(dir, 'post.md')
     File.write(path, "#{hint_comment}#{initial_content}")
-    editor = ENV['EDITOR'] || ENV['VISUAL'] || 'nano --breaklonglines --softwrap'
+    # The default nano wraps on the screen only (--softwrap --atblanks) and
+    # writes a paragraph as the one line it is. A line break nano puts in
+    # has to guess at what the blanks around it meant: kept, a double space
+    # it broke at is two blanks at the end of a line, markdown's hard break
+    # in the middle of a sentence (#73); trimmed, a word ending in a
+    # backslash ("d8-\") ends the line with the other hard break and loses
+    # the backslash; and a long list item or quote line goes on unmarked,
+    # into the prose. Not breaking the line leaves nothing to guess.
+    # --trimblanks stays for ^J, which still breaks lines when asked to,
+    # where the double space is the likelier of the two (fleet over 1.11.1).
+    # An $EDITOR set to nothing is not set: taken as an editor, it split to
+    # no words and the post's own file was run as the command (fleet over
+    # 1.11.1).
+    own = [ENV['EDITOR'], ENV['VISUAL']].map { |e| e.to_s.strip }.find { |e| !e.empty? }
+    editor = own || 'nano --softwrap --atblanks --trimblanks'
     ok = system(*Shellwords.split(editor), path)
     # The default nano flags postdate the 2007-vintage nano Apple still
     # ships -- when the *default* editor rejects them, retry bare nano
     # before giving up. A user's own $EDITOR gets no second-guessing.
-    ok ||= ENV['EDITOR'].nil? && ENV['VISUAL'].nil? && system('nano', path)
+    ok ||= own.nil? && system('nano', path)
     unless ok
       abort(t('cli.editor_failed', editor: editor))
     end
@@ -1925,7 +1939,22 @@ def draft_decision_loop(slug, path: nil, announce: true)
     slot = next_publish_slot(slug)
     langs = other_languages
     offer = translate_offer(langs)
-    prompt = if slot
+    # A post already scheduled is asked about as one (#71): "keep as draft"
+    # and "schedule (the next free slot)" read as if it were a plain draft,
+    # while Enter leaves its date as it is and [s] moves it.
+    scheduled_for = post['scheduled'] && (Time.parse(post['date'].to_s).getlocal rescue nil)
+    # A date already past is said to be, as the queue says it: "keep it
+    # scheduled for" a day gone by promised what had not happened, while
+    # the queue in the same run said nothing publishes it here (fleet
+    # over 1.11.1).
+    scheduled_label = scheduled_for && begin
+      date = scheduled_for.strftime(t('date_time_format'))
+      overdue = scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler'
+      scheduled_for <= Time.now ? "#{date} #{t(overdue)}" : date
+    end
+    prompt = if scheduled_for
+               t('cli.what_next_prompt_scheduled', date: scheduled_label, translate: offer)
+             elsif slot
                t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format')), translate: offer)
              else
                t('cli.what_next_prompt', translate: offer)
@@ -1950,7 +1979,8 @@ def draft_decision_loop(slug, path: nil, announce: true)
       return if prompt_and_schedule(path, post, raw: raw) == true
     when 'd', ''
       puts
-      puts t('cli.left_as_draft', slug: slug)
+      puts(scheduled_for ? t('cli.left_scheduled', date: scheduled_label)
+                         : t('cli.left_as_draft', slug: slug))
       puts
       return
     when 'x'
@@ -2091,7 +2121,10 @@ def prompt_and_schedule(path, post, raw: nil)
   date = nil
   loop do
     if slot
-      puts t('cli.schedule_slot_keys', cancel_word: t('cli.cancel_word'))
+      # The time on the key itself (#74): the line above it ends on carrying
+      # the post to the front of the queue, and "[Enter] accept" read as
+      # accepting THAT, when it takes the slot offered.
+      puts t('cli.schedule_slot_keys', slot: slot.strftime(t('date_time_format')), cancel_word: t('cli.cancel_word'))
       print '> '
     else
       print t('cli.schedule_date_prompt')

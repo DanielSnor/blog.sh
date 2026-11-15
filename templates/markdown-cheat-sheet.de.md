@@ -193,7 +193,7 @@ Eine Aufgabenliste markiert Einträge mit eckigen Klammern — gerendert als Che
 
 ::: end
 
-Die Zahlen sind egal, beim Rendern wird neu durchnummeriert. Eine verschachtelte Liste wird um zwei Leerzeichen eingerückt:
+Nur die erste Zahl zählt: Die Liste beginnt mit ihr und zählt von dort weiter, so kann eine Liste, die nach einem Absatz weitergeht, mit 5 beginnen. Eine verschachtelte Liste wird um zwei Leerzeichen eingerückt:
 
 ```
 - Obst

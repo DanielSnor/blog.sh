@@ -534,6 +534,7 @@ cli:
   surfer_unreachable: "❌ The Surfer at %{url} is not answering (%{reason}) -- the app may be stopped, or SURFER_URL in env.sh points somewhere it does not run. The finished build waits in public.nosync/; once the server is up (or the address fixed), ./blog.sh rebuild ships it."
   what_next_prompt: "What next? [d] keep as draft  [e] edit  [p] publish  [s] schedule%{translate}  [x] delete: "
   left_as_draft: "Left as draft. Publish later: ./blog.sh publish %{slug}"
+  left_scheduled: "Still scheduled for %{date}. The queue: ./blog.sh queue"
   unknown_choice_pde: "Not understood, try d / e / p / s / x."
   unknown_choice_pdet: "Not understood, try d / e / p / s / t / x."
   # The [t] of the dialog above, on a site in more than one language: the
@@ -543,8 +544,9 @@ cli:
   translate_which: "Translate into: %{choices}  (anything else: back): "
   schedule_date_prompt: "Publish at (YYYY-MM-DD HH:MM, or just HH:MM for today; empty = cancel): "
   what_next_prompt_slot: "What next? [d] keep as draft  [e] edit  [p] publish  [s] schedule (%{slot})%{translate}  [x] delete: "
+  what_next_prompt_scheduled: "What next? [d] keep it scheduled for %{date}  [e] edit  [p] publish now  [s] reschedule%{translate}  [x] delete: "
   schedule_slot_offer: "Publish when?\n  Next free slot: %{slot}"
-  schedule_slot_keys: "  [Enter] accept  ·  your own date (YYYY-MM-DD HH:MM, or HH:MM today)  ·  \"%{cancel_word}\" = back"
+  schedule_slot_keys: "  [Enter] accept %{slot}  ·  your own date (YYYY-MM-DD HH:MM, or HH:MM today)  ·  \"%{cancel_word}\" = back"
   schedule_queue_position: "  Post %{count} in the queue (previous: '%{slug}', %{date})."
   schedule_slots_taken: "  Earlier slots are taken:"
   schedule_queue_hint: "Want it sooner -- today's slot, say? Accept the offered time, then carry the post to the front of the queue (./blog.sh queue): the times stay with the slots and the rest step back one."

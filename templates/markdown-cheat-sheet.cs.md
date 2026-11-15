@@ -192,7 +192,7 @@ Zaškrtávací seznam značí položky hranatými závorkami — vykreslí se ja
 
 ::: end
 
-Na číslech nezáleží, při zobrazení se přepočítají. Vnořený seznam se odsadí o dvě mezery:
+Počítá se jen první číslo: seznam od něj začne a dál čísluje sám, takže seznam, který pokračuje za odstavcem, může začít pětkou. Vnořený seznam se odsadí o dvě mezery:
 
 ```
 - ovoce

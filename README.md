@@ -75,8 +75,8 @@ around one workflow rather than around the general case.
 - **The archive is a directory of JSON files.** One post, one file. It is
   readable, greppable and backed up by copying it.
 - **Authoring is a command.** `./blog.sh` writes, edits, publishes,
-  schedules and deploys. A phone writes in an app over the SSH the server
-  already has.
+  schedules and deploys. A phone or a desktop writes in an app over the
+  SSH the server already has.
 - **The deploy is paranoid.** A SHA-256 manifest ships only what changed,
   and refuses when the file count or the byte total swings too far from
   the last build it accepted.
@@ -92,7 +92,7 @@ Each part says where it is described in full.
 
 - **Content.** One post is one JSON file, `content.nosync/posts/<year>/<slug>.json`, holding typed blocks. Drafts, scheduled posts, pages, unlisted posts, series, tags and a trash with restore. → [architecture.md](docs/architecture.md#content-model)
 - **Writing.** `./blog.sh` bare is a menu; every command also works directly: add, edit, publish, schedule, unpublish, delete, restore, rename, re-announce. `add <file>` takes a markdown file and asks nothing; `--json` answers as one object. On a Mac, `./setup.sh --launcher` puts an icon in Applications that opens it. → [operations.md](docs/operations.md#writing-and-publishing), [install.md](docs/install.md#macos)
-- **From a phone.** Native apps for iOS and Android, in preparation, reach the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut were taken out in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
+- **Apps.** The whole of `./blog.sh` in an app, as a thin client: [blog.sh for Android](https://github.com/DanielSnor/blog.sh-android) on phones and tablets, [blog.sh for Windows and Linux](https://github.com/DanielSnor/blog.sh-desktop) on a desktop, and an app for iPhone, iPad and Mac in preparation. Each reaches the engine over the SSH the server already has, held to one script (`scripts/remote.sh`) that runs one engine command per request and nothing else. An app is let in by a code that `./blog.sh pair` draws in the terminal -- no key or address typed anywhere. The `/write/` page and its shortcut were taken out in 1.11. → [operations.md](docs/operations.md#over-ssh-from-an-app), [operations.md](docs/operations.md#letting-an-app-in-by-a-code)
 - **Markdown.** One parser, shared by the build and the authoring tool, with a cheat sheet the parser generates for your own site at `/markdown/`. Editing a post round-trips through it. → [operations.md](docs/operations.md#writing-and-publishing)
 - **Search, and the other ways to find a post.** Full text over the whole archive, entirely in the
   reader's browser -- no server, no index service, nothing called from outside, on a site of any

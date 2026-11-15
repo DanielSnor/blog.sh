@@ -517,6 +517,7 @@ cli:
   surfer_unreachable: "❌ Surfer na %{url} neodpovídá (%{reason}) — appka je nejspíš vypnutá, nebo SURFER_URL v env.sh míří jinam, než kde běží. Sestavený web čeká v public.nosync/; až server poběží (nebo adresu opravíš), nahraje ho ./blog.sh rebuild."
   what_next_prompt: "Co dál? [d] nechat jako koncept  [e] upravit  [p] publikovat  [s] naplánovat%{translate}  [x] smazat: "
   left_as_draft: "Ponecháno jako koncept. Publikovat později: ./blog.sh publish %{slug}"
+  left_scheduled: "Pořád naplánováno na %{date}. Fronta: ./blog.sh queue"
   unknown_choice_pde: "Nerozumím, zkus d / e / p / s / x."
   unknown_choice_pdet: "Nerozumím, zkus d / e / p / s / t / x."
   # [t] dialogu výše na webu ve více jazycích: jazyk jménem, je-li jeden,
@@ -526,8 +527,9 @@ cli:
   translate_which: "Přeložit do: %{choices}  (cokoli jiného: zpět): "
   schedule_date_prompt: "Publikovat kdy? (YYYY-MM-DD HH:MM, jen HH:MM = dnes; prázdné = zrušit): "
   what_next_prompt_slot: "Co dál? [d] nechat jako koncept  [e] upravit  [p] publikovat  [s] naplánovat (%{slot})%{translate}  [x] smazat: "
+  what_next_prompt_scheduled: "Co dál? [d] nechat naplánované na %{date}  [e] upravit  [p] publikovat hned  [s] přeplánovat%{translate}  [x] smazat: "
   schedule_slot_offer: "Publikovat kdy?\n  Nejbližší volný slot: %{slot}"
-  schedule_slot_keys: "  [Enter] přijmout  ·  vlastní datum (YYYY-MM-DD HH:MM, jen HH:MM = dnes)  ·  „%{cancel_word}“ = zpět"
+  schedule_slot_keys: "  [Enter] přijmout %{slot}  ·  vlastní datum (YYYY-MM-DD HH:MM, jen HH:MM = dnes)  ·  „%{cancel_word}“ = zpět"
   schedule_queue_position: "  %{count}. příspěvek ve frontě (předchozí: '%{slug}', %{date})."
   schedule_slots_taken: "  Dřívější sloty jsou obsazené:"
   schedule_queue_hint: "Chceš ho dřív — třeba v dnešním slotu? Přijmi nabídnutý čas a ve frontě (./blog.sh queue) ho přenes na začátek: časy zůstanou slotům a zbytek ustoupí o jeden."

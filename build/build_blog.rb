@@ -1142,7 +1142,7 @@ def render_config_block(block)
         "<li>#{body}#{nested}</li>"
       end
     end.join
-    "<#{tag}>#{items}</#{tag}>"
+    "<#{tag}#{Blocks.list_start(block)}>#{items}</#{tag}>"
   when 'hr'
     '<hr>'
   when 'teaser_end'

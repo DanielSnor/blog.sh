@@ -489,7 +489,11 @@ module MarkdownWriter
   # `children` adds two more spaces of indentation, mirroring what
   # parse_list_level expects on the way back in.
   def list_to_markdown(list, indent = 0)
-    marker_for = ->(idx) { list['style'] == 'ol' ? "#{idx + 1}." : '-' }
+    # A number below 0 is no list marker -- "-2." reads back as prose, and
+    # the guard against losing text then refused the edit. Only a hand-
+    # edited file can carry one; it numbers from 1, as the page does.
+    first = list['start'].is_a?(Integer) && list['start'] >= 0 ? list['start'] : 1
+    marker_for = ->(idx) { list['style'] == 'ol' ? "#{first + idx}." : '-' }
     pad = '  ' * indent
     (list['items'] || []).each_with_index.map do |it, idx|
       task = it.key?('checked') ? (it['checked'] ? '[x] ' : '[ ] ') : ''
