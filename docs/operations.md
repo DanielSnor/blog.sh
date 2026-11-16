@@ -596,10 +596,21 @@ translated text and the warnings and saves nothing; the app shows them and saves
 through `add` with `edits:`, `base:` and `lang:`, as for a hand-written one.
 `translate --json` carries an `auto` block -- `available`, and when it is not, a
 `problem` code and a `message` -- so an app shows its button only where it works.
-A paired device is refused (`translator_not_allowed`) unless the server says
-`TRANSLATOR_REMOTE=allow` in `env.sh`: a translation is paid for by someone and
-sent to someone, and a lost phone must not be able to spend your money or send your
-drafts anywhere. At a terminal it is always allowed.
+A paired device may ask for a translation **unless the server says
+`TRANSLATOR_REMOTE=deny`** in `env.sh` (`off`, `no`, `false` and `0` say the same;
+a word nobody knows, a typo in `deny`, is read as a no). The default is yes, because
+the translator is set up to be used and the apps are where most of the writing is
+done -- but a translation is paid for by someone and sent to someone, so a paired
+device that is lost can have translations made at your cost, and the text of a post
+sent to the translator, until its key is revoked (`./blog.sh pair --revoke`). A server
+that does not want that says `deny`; the app is then told (`translator_not_allowed`)
+and offers no button. At a terminal it is always allowed.
+
+**Setting it up.** `env.sh.example` shows both kinds. `./setup.sh --translator`
+asks about the translator and nothing else -- a program, or a service by name with
+its model and key, and whether the apps may ask -- and writes `env.sh` only; the key
+is never shown. `./blog.sh doctor` says whether what is set is whole (nothing, for
+an installation that has not set one up).
 
 ## Writing from a phone
 

@@ -102,10 +102,17 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
 
 ### Security
 
-- **A paired device may ask for a translation only when the server says so** (`TRANSLATOR_REMOTE=allow` in
-  `env.sh`; off unless set). A translation is paid for by someone and the text of the post is sent to someone:
-  a lost phone must not be able to spend the owner's money or send the owner's drafts anywhere. At a terminal it is
-  always allowed. `translate` in the whitelist of `scripts/remote.rb` now takes `--auto` and `--force`.
+- **A paired device may ask for a translation unless the server says `TRANSLATOR_REMOTE=deny`** in `env.sh` (the
+  owner's decision, 16 November: the translator is set up to be used, and the apps are where most of the writing is
+  done). A translation is paid for by someone and the text of the post is sent to someone: a paired device that is lost
+  can have translations made at the owner's cost until its key is revoked (`./blog.sh pair --revoke`); a server that
+  does not want that says `deny`. A word that is neither `allow` nor `deny` is read as a no, and doctor says so. At a
+  terminal it is always allowed. `translate` in the whitelist of `scripts/remote.rb` now takes `--auto` and `--force`.
+
+- **`./setup.sh --translator`** asks about the machine translator and nothing else -- a program, or a service by name
+  with its model and key, and whether the apps may ask -- and writes `env.sh` only. The main interview is as it was.
+  `env.sh.example` now shows both kinds of translator in full, and **`doctor`** says whether what is set is whole (and
+  nothing at all of an installation that has set nothing).
 
 ### Not done / to settle before the tag
 
@@ -113,7 +120,6 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   from their documentation and our other app's live tests. The docs therefore name no "verified" models.
 - DeepL and LibreTranslate are not covered: they take no instructions and would need the post cut into paragraphs
   first. "Translated from" and a list of departures written by the model are likewise left out.
-- No `doctor` check of a half-set translator yet (`translate --json` says it to the apps).
 
 
 ## 1.11.1 -- 2026-11-15

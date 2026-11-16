@@ -12,17 +12,21 @@
 #   TRANSLATOR=command          a program that reads standard input and
 #   TRANSLATOR_COMMAND='...'    writes the translation to standard output
 #   TRANSLATOR_TIMEOUT=300      seconds it may take (default 300)
-#   TRANSLATOR_REMOTE=allow     lets a paired device ask for a translation
+#   TRANSLATOR_REMOTE=deny      keeps a paired device from asking for one
+#                               (without it, or with `allow`, it may)
 #
 # The settings live in env.sh, not in config/site.yml: that file travels
 # with the site's content, and a line there must never be able to name a
 # program the engine will run.
 #
 # A translation is paid for by someone and sent to someone: the text of
-# the post leaves the machine for whatever the translator is. So a program
-# running over the paired-device road (BLOG_SH_REMOTE) is turned away
-# unless the server said it may -- a lost phone must not be able to spend
-# the owner's money or send the owner's drafts anywhere.
+# the post leaves the machine for whatever the translator is. A program
+# running over the paired-device road (BLOG_SH_REMOTE) may use it unless the
+# server says `TRANSLATOR_REMOTE=deny` -- the owner chose that default knowing
+# what it means: a paired device that is lost or stolen can have a translation
+# made at the owner's cost and the text of a post sent to the translator until
+# its key is revoked (`./blog.sh pair --revoke`), and the setting is how a
+# server that does not want that says so.
 require 'open3'
 require 'set'
 require 'shellwords'
@@ -72,12 +76,22 @@ module AutoTranslate
     env['BLOG_SH_REMOTE'].to_s == '1'
   end
 
+  # A paired device (the phone apps) may ask for a translation unless the
+  # server says it may not: `TRANSLATOR_REMOTE=deny` (off, no, false, 0 and
+  # never say the same). Where it is not said, it may -- the translator is
+  # set up by the owner to be used, and the apps are the way most of the
+  # writing is done. A value this does not know -- a typo in `deny` -- is
+  # read as a no, and doctor says so: a switch that cannot be read is not
+  # permission.
   def remote_allowed?(env = ENV)
-    env['TRANSLATOR_REMOTE'].to_s.strip.downcase == 'allow'
+    value = env['TRANSLATOR_REMOTE'].to_s.strip.downcase
+    return true if value.empty? || %w[allow on yes true 1].include?(value)
+
+    false
   end
 
   # Whether THIS run may use the translator: from a terminal always (the
-  # person at it is the owner), from a paired device only when allowed.
+  # person at it is the owner), from a paired device unless turned off.
   def permitted?(env = ENV)
     !remote?(env) || remote_allowed?(env)
   end

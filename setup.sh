@@ -32,7 +32,7 @@ case "${1:-}" in
     # help still prints.
     ruby -r./lib/site_header -e "puts SiteHeader.render(tool: './setup.sh')" 2>/dev/null && echo || true
     cat <<'USAGE'
-usage: ./setup.sh [--launcher]
+usage: ./setup.sh [--launcher] [--translator]
 
 Asks for the settings a site needs to work, checks the answers as it
 goes, and writes them into config/site.yml and env.sh -- leaving every
@@ -67,6 +67,11 @@ On a Mac the last question offers a launcher: an icon in Applications,
 named after the site, that opens Terminal here and runs ./blog.sh.
 ./setup.sh --launcher asks nothing and makes just that -- at any later
 time, or again after the site's folder moved.
+
+./setup.sh --translator asks about the machine translator and nothing
+else: a program or a web service (OpenAI and look-alikes, Anthropic,
+Gemini), its model and key, and whether the apps may ask for a
+translation. It writes env.sh only.
 
 Related:
   ./style.sh          appearance: palette, header image, fonts, widgets, footer

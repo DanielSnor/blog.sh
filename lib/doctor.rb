@@ -29,6 +29,9 @@ require_relative 'file_size'
 # two diagnostics disagreeing about what the build makes is worse than
 # one of them staying quiet.
 require_relative 'checker'
+# The translator's settings are read the way the translator reads them, by the
+# same code: two readings of one setting is how a doctor and an engine disagree.
+require_relative 'auto_translate'
 # NOT require_relative 'publishing': it pulls in the posters, which read
 # SiteConfig at LOAD time -- and this is the one command that has to run
 # on a config nothing else can load. Requiring it put the raw Psych
@@ -186,6 +189,7 @@ module Doctor
     findings.concat(of(:scheduler, check_scheduler))
     findings.concat(of(:deploy_pending, check_deploy_pending))
     findings.concat(of(:announce_pending, check_announce_pending))
+    findings.concat(of(:translator, check_translator))
     findings.concat(of(:media_location, check_media_location(root)))
     findings.concat(of(:tag_icons, check_tag_icons(data)))
     findings.concat(of(:social_icons, check_social_icons(data)))
@@ -1188,6 +1192,38 @@ module Doctor
       File.mtime(marker)
     end
     [error(t('deploy_pending', ago: humanize_age(Time.now - since)), t('deploy_pending_fix'))]
+  end
+
+  # The machine translator (env.sh), when anybody has set one up. Nothing is said
+  # of an installation that has not: the feature is optional, and a line on
+  # every run about a thing nobody asked for is noise. One that has set
+  # something gets told whether it is whole -- before `translate --auto` finds
+  # out at the first translation, in the middle of writing. Read by
+  # AutoTranslate itself, from the environment this run was given (the wrapper
+  # sources env.sh): the settings mean what the translator takes them to mean.
+  def check_translator
+    kind = ENV['TRANSLATOR'].to_s.strip.downcase
+    command = ENV['TRANSLATOR_COMMAND'].to_s.strip
+    return [] if kind.empty? && command.empty?
+
+    begin
+      AutoTranslate.adapter(ENV)
+    rescue AutoTranslate::Error => e
+      reason = I18n.t("cli.auto_#{e.code}", detail: e.detail).to_s.strip
+      return [warn(t('translator_incomplete', reason: reason), t('translator_incomplete_fix'))]
+    end
+
+    how = if kind.empty? || kind == 'command'
+            Shellwords.split(command).first.to_s
+          else
+            "#{kind}, #{ENV['TRANSLATOR_MODEL'].to_s.strip}"
+          end
+    findings = [ok(t(AutoTranslate.remote_allowed?(ENV) ? 'translator_ok' : 'translator_ok_denied', how: how))]
+    said = ENV['TRANSLATOR_REMOTE'].to_s.strip.downcase
+    unless said.empty? || %w[allow on yes true 1 deny off no false 0 never].include?(said)
+      findings << warn(t('translator_remote_unknown', value: said.inspect), t('translator_remote_unknown_fix'))
+    end
+    findings
   end
 
   # Toots a failed deploy left owed (Publishing::ANNOUNCE_PENDING): a post is
