@@ -92,6 +92,14 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   marks a link block drawn by its address (`link-block link-block--address`) and Pictorial shifts only that one. The
   HTML of such a link block changes by one class, in every skin.
 
+- **`add <file>` with `lang:` or `base:` and no `edits:` is refused** (#79, Pavel). It made a post of its own in the
+  language the file named, with a generated address -- an orphan beside the original, without a word. The refusal names
+  the missing `edits: <slug>` (code `needs_edits` for a program) and writes nothing.
+- **A translation just saved ends on its preview address and its QR code** (#80, Pavel), as the draft dialog does:
+  in a terminal, for a draft, on a site with a real address.
+- **The properties screen says what it means** (#81, Pavel). The Czech hint began "Typ, štítky ...", which reads as
+  "tip"; it now begins with the tags, and all three languages name the command as it is typed, `./blog.sh edit`.
+
 ### Security
 
 - **A paired device may ask for a translation only when the server says so** (`TRANSLATOR_REMOTE=allow` in

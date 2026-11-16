@@ -1502,6 +1502,15 @@ def add_from_file(source, json: false, confined: false)
   # A file that names the draft it edits is not a new post: see edit_from_file.
   return edit_from_file(file, raw, meta, json: json, confined: confined, publish: publish) unless meta['edits'].to_s.strip.empty?
 
+  # `lang:` and `base:` belong to a file that is a new text for a post that
+  # already exists, and the post is named by `edits:`. Without it there is
+  # nothing to attach the text to, and what happened was the worst of the
+  # answers: a post of its own, in the language the file named, with a
+  # generated address -- an orphan beside the original, made without a word
+  # (#79). Refused instead, naming the key that is missing.
+  stray = %w[lang base].select { |key| !meta[key].to_s.strip.empty? }
+  refuse('needs_edits', t('cli.add_needs_edits', keys: stray.join(' / '), file: file)) if stray.any?
+
   path, warnings = quietly(json, keep_stdout: true) do
     compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined,
                  extra_keys: FILE_ONLY_FRONTMATTER_KEYS)
@@ -5685,8 +5694,18 @@ def print_translation_preview(path, lang)
   return unless translation_preview_url(post, lang)
 
   site_path = translation_draft_path(post, lang)
-  puts Tui.paint(t('cli.preview_label', url: "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"), :cyan)
+  shown = "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"
+  puts Tui.paint(t('cli.preview_label', url: shown), :cyan)
   puts_local_preview_hint(site_path)
+  # The code the draft dialog shows, here too (#80): the translation's page
+  # is the one a person wants to look at on a phone, and the address is as
+  # long as the draft's own. Only where it can do its job -- a draft, in a
+  # terminal, on a site with a real address.
+  if props_qr_available?(post) && (qr = QrCode.render(shown))
+    puts
+    puts qr
+    puts Tui.paint(t('cli.qr_hint'), :dim)
+  end
   puts
 end
 
