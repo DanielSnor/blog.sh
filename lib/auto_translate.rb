@@ -282,3 +282,5 @@ module AutoTranslate
 
   ADAPTERS['command'] = ->(env) { CommandAdapter.new(env['TRANSLATOR_COMMAND'], AutoTranslate.seconds(env)) }
 end
+
+require_relative 'auto_translate_http'
