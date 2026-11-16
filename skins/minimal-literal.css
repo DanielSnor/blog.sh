@@ -2922,7 +2922,7 @@ article .share { margin-top: 14px; padding-top: 0; border-top: 0; }
 .comments-reply-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
 .comments-reply-form input {
   font: inherit; font-size: 14px; color: inherit; background: none;
-  padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; min-width: 14em;
+  padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; width: 21em; max-width: 100%;
 }
 .comments-reply-form button {
   font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: 0.05em; text-transform: lowercase;
