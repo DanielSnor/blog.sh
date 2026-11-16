@@ -621,6 +621,8 @@ cli:
   wizard_continue_prompt: "Beliebige Taste zum Fortfahren…"
   qr_hint: "Mit dem Handy scannen, um die Vorschau zu öffnen."
   announcing: "Kündige an"
+  adding_comments: "Füge der Seite den Kommentarverlauf hinzu"
+  announce_waits_for_deploy: "⚠️  „%{slug}“ ist veröffentlicht, aber das Deployment ist fehlgeschlagen, daher ist er noch NICHT angekündigt: ein Toot würde auf eine Seite zeigen, die es noch nicht gibt. Der nächste geplante Lauf, dessen Deployment durchgeht, kündigt ihn an; selbst: Deployment ausführen und danach ./blog.sh toot."
   preview_serving: "public.nosync läuft auf %{url} -- Ctrl-C beendet."
   preview_bad_port: "❌ \"%{value}\" ist keine Portnummer. Schreibe etwa `./blog.sh preview 8000` oder lass den Port weg."
   preview_port_taken: "❌ Auf Port %{port} läuft schon etwas -- vielleicht eine Vorschau in einem anderen Fenster. Versuch einen anderen Port: ./blog.sh preview %{other}"
@@ -1034,7 +1036,8 @@ cron:
   announce_failed: "⚠️  '%{slug}' ist veröffentlicht, aber die Ankündigung schlug fehl -- der Beitrag ist öffentlich, ohne dass etwas darauf zeigt, und es wird kein zweiter Versuch unternommen. Prüfe das Token und kündige ihn von Hand an: ./blog.sh toot (oder ./blog.sh bluesky)."
   unreadable_post: "⚠️  Überspringe unlesbare Beitragsdatei %{path}: %{error}"
   retrying_deploy: "Wiederhole das Deployment, das zuletzt nicht durchlief"
-  deploy_will_retry: "⚠️  Das Deployment ist fehlgeschlagen. In diesem Lauf veröffentlichte Beiträge sind angekündigt, aber noch nicht auf der Website -- der nächste Lauf wiederholt das Deployment von selbst."
+  deploy_will_retry: "⚠️  Das Deployment ist fehlgeschlagen. In diesem Lauf veröffentlichte Beiträge sind noch nicht auf der Website und nicht angekündigt -- der nächste Lauf wiederholt das Deployment und kündigt sie an, sobald es durchgeht."
+  adding_comments: "Füge den Seiten die Kommentarverläufe hinzu"
 
 import:
   menu_hint: "↑↓ bewegen · Enter wählen · 1-%{count} Schnellwahl · Esc zurück"

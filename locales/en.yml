@@ -629,6 +629,8 @@ cli:
   wizard_continue_prompt: "Press any key to continue…"
   qr_hint: "Scan with your phone to open the preview."
   announcing: "Announcing"
+  adding_comments: "Adding the comment thread to the page"
+  announce_waits_for_deploy: "⚠️  '%{slug}' is published, but the deploy failed, so it is NOT announced yet: a toot would point at a page that is not there. The next scheduled run that gets a deploy through announces it; to do it yourself, run the deploy and then ./blog.sh toot."
   preview_serving: "Serving public.nosync at %{url} -- Ctrl-C stops it."
   preview_bad_port: "❌ \"%{value}\" is not a port number. Write something like `./blog.sh preview 8000`, or leave the port out."
   preview_port_taken: "❌ Something is already listening on port %{port} -- a preview left running in another window, perhaps. Try another port: ./blog.sh preview %{other}"
@@ -1046,7 +1048,8 @@ cron:
   announce_failed: "⚠️  '%{slug}' is published, but announcing it failed -- the post is public with nothing pointing at it, and nothing will try again. Check the token, then announce it by hand with ./blog.sh toot (or ./blog.sh bluesky)."
   unreadable_post: "⚠️  Skipping unreadable post file %{path}: %{error}"
   retrying_deploy: "Retrying the deploy that did not finish last time"
-  deploy_will_retry: "⚠️  The deploy failed. Posts published in this run are announced but not on the site yet -- the next run retries the deploy on its own."
+  deploy_will_retry: "⚠️  The deploy failed. Posts published in this run are not on the site yet and are not announced -- the next run retries the deploy and announces them once it goes through."
+  adding_comments: "Adding the comment threads to the pages"
 
 # ./import.sh -- the import wizard (scripts/import.rb).
 import:

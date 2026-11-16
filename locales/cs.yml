@@ -608,6 +608,8 @@ cli:
   wizard_continue_prompt: "Stiskni klávesu pro pokračování…"
   qr_hint: "Naskenuj telefonem a náhled se otevře."
   announcing: "Oznamuji"
+  adding_comments: "Přidávám na stránku vlákno komentářů"
+  announce_waits_for_deploy: "⚠️  „%{slug}“ je publikovaný, ale deploy selhal, takže NENÍ zatím oznámený: toot by vedl na stránku, která tam není. Oznámí ho další plánovaný běh, kterému deploy projde; sám to uděláš deployem a pak ./blog.sh toot."
   preview_serving: "Servíruji public.nosync na %{url} — Ctrl-C ukončí."
   preview_bad_port: "❌ „%{value}“ není číslo portu. Napiš třeba `./blog.sh preview 8000`, nebo port vynech."
   preview_port_taken: "❌ Na portu %{port} už něco běží — třeba náhled puštěný v jiném okně. Zkus jiný port: ./blog.sh preview %{other}"
@@ -1021,7 +1023,8 @@ cron:
   announce_failed: "⚠️  '%{slug}' je publikovaný, ale oznámení selhalo — příspěvek je venku a nic na něj neodkazuje, a samo se to znovu nepokusí. Zkontroluj token a oznam ho ručně: ./blog.sh toot (nebo ./blog.sh bluesky)."
   unreadable_post: "⚠️  Přeskakuji nečitelný soubor příspěvku %{path}: %{error}"
   retrying_deploy: "Opakuji deploy, který minule nedoběhl"
-  deploy_will_retry: "⚠️  Deploy selhal. Příspěvky publikované v tomto běhu jsou oznámené, ale ještě nejsou na webu — další běh deploy zopakuje sám."
+  deploy_will_retry: "⚠️  Deploy selhal. Příspěvky publikované v tomto běhu ještě nejsou na webu a nejsou oznámené — další běh deploy zopakuje a oznámí je, jakmile projde."
+  adding_comments: "Přidávám na stránky vlákna komentářů"
 
 # ./import.sh -- průvodce importem (scripts/import.rb).
 import:

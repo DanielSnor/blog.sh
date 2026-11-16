@@ -1129,7 +1129,7 @@ end
 # raises: a failed announcement must not block publishing the post
 # itself. Composition and dispatch live in lib/publishing.rb, shared
 # with the scheduled-publish cron.
-def announce_post(post, year:, date:, force: false)
+def announce_post(post, year:, date:, force: false, defer: false)
   # An unlisted post is not announced, and force does not open this door the
   # way it opens the backdating one. The whole point of `unlisted` is a post
   # that exists at its address for the handful of people you send the link
@@ -1169,7 +1169,11 @@ def announce_post(post, year:, date:, force: false)
     return nil
   end
 
-  Tui.spinner(t('cli.announcing')) { Publishing.announce(post, year: year) }
+  # defer: everything above has been asked and checked, and what is handed
+  # back is the sending itself -- for publish, which sends it once the page
+  # is live (see Publishing::ANNOUNCE_PENDING).
+  sending = -> { Tui.spinner(t('cli.announcing')) { Publishing.announce(post, year: year) } }
+  defer ? sending : sending.call
 end
 
 # --- commands ------------------------------------------------------------
@@ -2200,7 +2204,7 @@ def prompt_and_schedule(path, post, raw: nil)
   true
 end
 
-def announce_on_publish(post, year, date, ask: true)
+def announce_on_publish(post, year, date, ask: true, defer: false)
   # Before everything else, the record on the post itself: an announcement
   # that already exists is never repeated from here -- not by publish, not
   # by the standalone toot/bluesky commands, which all arrive through this
@@ -2251,7 +2255,7 @@ def announce_on_publish(post, year, date, ask: true)
     force = true
   end
 
-  announce_post(post, year: year, date: date, force: force)
+  announce_post(post, year: year, date: date, force: force, defer: defer)
 end
 
 # `path:` names the exact post when the caller already has it. The queue
@@ -2329,11 +2333,10 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # "check your section header" advice under every publish said otherwise
   # (second trial, 25. 9. 2026). An explicit toot or bluesky still says it.
   announce &&= !SiteConfig.comment_network.nil?
-  fields = announce ? announce_on_publish(updated, new_year, date, ask: asked) : nil
-  if fields
-    updated.merge!(fields)
-    AtomicWrite.write_json(new_path, updated)
-  end
+  # Asked and checked now, while the person is here; SENT once the page is
+  # live, so the address in the toot never leads to a page that is not there
+  # yet (Publishing::ANNOUNCE_PENDING). What this holds is the sending.
+  send_announcement = announce ? announce_on_publish(updated, new_year, date, ask: asked, defer: true) : nil
 
   puts t('cli.published_label', path: new_path)
   # The path is the answer, deployed or not: add <file> reads back the
@@ -2341,7 +2344,15 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # on a terminal it waited for an answer, with the post already
   # published and announced -- and under --json it wrote the question
   # where the answer should have been.
-  return new_path unless rebuild_and_deploy(t('cli.publishing'))
+  unless rebuild_and_deploy(t('cli.publishing'))
+    # Not announced: the page is not there. The debt is written down, and
+    # the next tick of the publishing cron that gets a deploy through sends it.
+    if send_announcement
+      Publishing.owe_announcement(new_path)
+      warn t('cli.announce_waits_for_deploy', slug: slug)
+    end
+    return new_path
+  end
   # No extra `puts` before "Done:" -- rebuild_and_deploy ended with a blank
   # line after its own "Done: uploaded...", same doubling as
   # draft_decision_loop above.
@@ -2349,7 +2360,23 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   puts_local_preview_hint(published_path(slug, new_year, page: PostAddress.page?(updated)))
   puts t('cli.backdated_note') unless untouched
   puts
+  announce_after_deploy(send_announcement, new_path, updated)
   new_path
+end
+
+# The announcement, now that the page is live: sent, written onto the post,
+# and put on the page by a second build -- the page draws its comment thread
+# from the toot's address. That build is quick (the cache holds all but this
+# one post); if it fails the site is marked as owing a deploy, as for any
+# other, and the toot is already right: its link works.
+def announce_after_deploy(sending, path, post)
+  return unless sending
+
+  fields = sending.call
+  return unless fields
+
+  AtomicWrite.write_json(path, post.merge!(fields))
+  rebuild_and_deploy(t('cli.adding_comments'))
 end
 
 # The answer sticks for the rest of the run. publish/edit/delete resolve

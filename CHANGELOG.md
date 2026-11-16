@@ -16,8 +16,7 @@ prints what an installation is running.
 NOTES, not the final text: set down as the work is done, to be rewritten into the shape of the other
 entries before the tag. The suffix and the date come off at the tag.
 
-Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from zero) and the announcement that
-leaves before the post is on the site.
+Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from zero).
 
 ### Added
 
@@ -66,6 +65,15 @@ leaves before the post is on the site.
   (`.net` is `#net`), and tags that come to the same hashtag are said once. The tag's own page on the site keeps its
   address. Upgrading: new announcements go out under the new hashtags; toots already sent stay where they are, so a
   tag like `hudba dana` is `#hudbadana` on the old toots and `#hudba_dana` on the new.
+
+- **The announcement goes out after the page is live, not before** (the author's, 30 October). A post was announced
+  first because the page draws its comment thread from the toot's address; so for as long as the build and the
+  deploy took -- three minutes on a cold disk, longer on a large archive -- the link in the toot led to a 404, and
+  followers wrote to say so. Now publishing builds and deploys the page, sends the toot, and puts the toot's address on
+  the page with a second build (measured on 13 500 posts: about ten seconds for a build after one post changed). If the
+  deploy fails, nothing is announced: the post goes into `.announce-pending` and the next run of the publishing cron
+  that gets a deploy through sends the toot. By hand the same order holds, and `--no-announce` still announces nothing.
+  Upgrading: nothing to do; a toot owed by a run that was interrupted is in `.announce-pending`.
 
 ### Security
 

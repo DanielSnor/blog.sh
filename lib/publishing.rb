@@ -469,6 +469,86 @@ module Publishing
   # The next cron tick reads this and finishes the job.
   DEPLOY_PENDING = File.join(ROOT, '.deploy-pending')
 
+  # The announcements a post is owed once its page is live. The toot used to
+  # go out BEFORE the build and the deploy, because the page draws its
+  # comment thread from the toot's address and so needed it first -- and for
+  # as long as the build and the deploy took (a minute or two on a quiet
+  # machine, three on a cold disk, more on a large archive) the address in
+  # the toot led to a 404, which followers saw and said. Now the page goes
+  # out first, the toot after it, and the address it brings is put on the
+  # page by a second, quick build.
+  #
+  # This file is the record of the toots still to send: a path under the
+  # content directory to a line. A line is written when a post is published
+  # and read when the deploy has gone through -- by the same run, or, when
+  # the deploy failed, by the next tick of the publishing cron, which is why
+  # it is a file and not a variable. A post whose deploy failed is not
+  # announced: a link to a page that is not there is the failure this exists
+  # to prevent.
+  ANNOUNCE_PENDING = File.join(ROOT, '.announce-pending')
+
+  def owed_announcements
+    File.readlines(ANNOUNCE_PENDING, chomp: true, encoding: 'utf-8').map(&:strip).reject(&:empty?).uniq
+  rescue SystemCallError
+    []
+  end
+
+  def owe_announcement(path)
+    rel = path.to_s.sub(%r{\A#{Regexp.escape(CONTENT_DIR)}/?}, '')
+    list = owed_announcements
+    return if list.include?(rel)
+
+    AtomicWrite.write(ANNOUNCE_PENDING, "#{(list + [rel]).join("\n")}\n")
+  end
+
+  def settle_announcement(path)
+    rel = path.to_s.sub(%r{\A#{Regexp.escape(CONTENT_DIR)}/?}, '')
+    left = owed_announcements - [rel]
+    if left.empty?
+      File.delete(ANNOUNCE_PENDING) if File.exist?(ANNOUNCE_PENDING)
+    else
+      AtomicWrite.write(ANNOUNCE_PENDING, "#{left.join("\n")}\n")
+    end
+  rescue SystemCallError
+    nil
+  end
+
+  # Sends every owed announcement whose post is still published, still
+  # unannounced and still announceable, and writes what came back onto the
+  # post. Returns [sent, failed]. A failure is not retried: the post is out,
+  # a second toot would stand beside the first if the network had only been
+  # slow to say so, and `./blog.sh toot` is there for a person to try again.
+  # The caller rebuilds when `sent` is not zero -- that build is what puts
+  # the toot's address on the page.
+  def send_owed_announcements
+    sent = 0
+    failed = 0
+    owed_announcements.each do |rel|
+      path = File.join(CONTENT_DIR, rel)
+      post = begin
+        JSON.parse(File.read(path, encoding: 'utf-8'))
+      rescue SystemCallError, JSON::ParserError
+        nil
+      end
+      if post.nil? || post['state'] != 'published' || announced?(post) || unlisted?(post)
+        settle_announcement(path)
+        next
+      end
+
+      fields = announce(post, year: File.basename(File.dirname(path)))
+      case fields
+      when Hash
+        AtomicWrite.write_json(path, post.merge(fields))
+        sent += 1
+      when false
+        failed += 1
+        warn I18n.t('cron.announce_failed', slug: post['slug'])
+      end
+      settle_announcement(path)
+    end
+    [sent, failed]
+  end
+
   # The scheduler's heartbeat. Its MTIME is the whole content -- the file
   # says nothing except "something ran the queue at this moment".
   SCHEDULER_HEARTBEAT = File.join(ROOT, '.last-scheduled-run')

@@ -2472,11 +2472,17 @@ anything is serving the queue at all, and it is what `./blog.sh doctor`
 reads to tell a queue that is simply waiting from one whose cron was
 never set up.
 
-A post is announced before the site is rebuilt, so the toot and the page
-it links to come from the same build. If the deploy then fails, the job
-leaves a `.deploy-pending` marker and the next run retries the deploy on
-its own, even with nothing due -- so an announcement never keeps pointing
-at a page that was never uploaded. A post that cannot be published (a slug
+A post is announced **after** the site is rebuilt and deployed, so the
+address in the toot never leads to a page that is not there yet -- as long
+as a build and a deploy take, which is minutes on a large archive or a cold
+disk, followers used to find a 404. The toot brings an address the page
+draws its comment thread from, and a second build, quick because the cache
+holds all but that one post, puts it there. If the deploy fails, nothing is
+announced: the job leaves a `.deploy-pending` marker and writes the post
+into `.announce-pending`, and the next run retries the deploy on its own,
+even with nothing due, and sends the toot once it goes through. The same
+order holds when you publish by hand: page first, toot, then the second
+build (`--no-announce` skips the last two). A post that cannot be published (a slug
 the target year already owns, a malformed date) is reported by name and
 skipped; the rest of the batch still publishes.
 
@@ -2542,7 +2548,8 @@ it a device is "not seen yet" until its next request), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still
-owes the target a deploy; see [Deploying](#deploying)) and
+owes the target a deploy; see [Deploying](#deploying)), `.announce-pending`
+(the posts whose toot waits for a deploy to go through) and
 `.last-scheduled-run` (the scheduled-publish heartbeat above) with
 `.last-sidebar-run` (the same for the sidebar's cron). The
 wizards' `config/site.yml.bak` and `env.sh.bak` are not needed either --
