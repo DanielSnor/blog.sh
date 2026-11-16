@@ -1467,6 +1467,8 @@ doctor:
   scheduler_overdue_fix: "Bei diesen Beiträgen scheitert jeder Tick. Führe `ruby scripts/publish_scheduled.rb` von Hand aus und lies die Meldung -- es wird bis zur Behebung wiederholt."
   deploy_pending: "Die Site schuldet ein Deployment (seit %{ago}): Eine Änderung, die hinausgehen sollte, ist nicht hinausgegangen."
   deploy_pending_fix: "Führe `./blog.sh rebuild` aus -- hält es an, ist der genannte Grund auch der Grund für diese Schuld. Mit eingerichtetem Planer-Cron versucht es der nächste Tick selbst."
+  announce_pending: "%{count} Beitrag/Beiträge sind veröffentlicht, aber noch nicht angekündigt: ihr Toot wartet auf ein Deployment, das nicht durchging (%{slugs})."
+  announce_pending_fix: "Zuerst deployen (`./blog.sh rebuild`), dann jeden mit `./blog.sh toot <slug>` (oder `bluesky`) senden. Mit eingerichtetem Planer-Cron erledigt das der nächste Tick, dessen Deployment durchgeht."
   scheduler_fix: "Plane scripts/publish-scheduled.sh ein -- alle fünfzehn Minuten, davon gehen die Zeiten des Assistenten aus (*/15 * * * * /pfad/zum/blog/scripts/publish-scheduled.sh). Bei gehosteten Installationen ist der Cron-Bereich der Verwaltung der richtige Ort; prüfe, dass der Pfad auf DIESES Blog zeigt und nicht auf ein anderes."
   age_minutes: "%{count} Minute(n)"
   age_hours: "%{count} Stunde(n)"

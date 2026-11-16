@@ -2523,6 +2523,8 @@ def cmd_toot(slug)
   end
 
   AtomicWrite.write_json(path, post.merge(fields))
+  # A toot a failed deploy left owed (Publishing::ANNOUNCE_PENDING) is paid.
+  Publishing.settle_announcement(path)
   puts t('cli.tooted', url: fields['mastodon_url'])
   puts
 end
@@ -2597,6 +2599,7 @@ def cmd_bluesky(slug)
   end
 
   AtomicWrite.write_json(path, post.merge(fields))
+  Publishing.settle_announcement(path)
   puts t('cli.bluesky_posted', url: fields['bluesky_url'])
   puts
 end

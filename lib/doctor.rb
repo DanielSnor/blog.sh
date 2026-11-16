@@ -185,6 +185,7 @@ module Doctor
     findings.concat(of(:publishing, check_publishing(data)))
     findings.concat(of(:scheduler, check_scheduler))
     findings.concat(of(:deploy_pending, check_deploy_pending))
+    findings.concat(of(:announce_pending, check_announce_pending))
     findings.concat(of(:media_location, check_media_location(root)))
     findings.concat(of(:tag_icons, check_tag_icons(data)))
     findings.concat(of(:social_icons, check_social_icons(data)))
@@ -1167,6 +1168,37 @@ module Doctor
       File.mtime(marker)
     end
     [error(t('deploy_pending', ago: humanize_age(Time.now - since)), t('deploy_pending_fix'))]
+  end
+
+  # Toots a failed deploy left owed (Publishing::ANNOUNCE_PENDING): a post is
+  # announced only once its page is live, so a deploy that did not go
+  # through leaves its toot waiting -- for the next scheduled run, which on an
+  # install without that cron does not exist. Only what is still owed is
+  # said: a line whose post is gone, back in drafts, unlisted or already
+  # announced (by hand, with `toot`) is a debt that no longer is one.
+  # Read here from the files themselves, not through Publishing (see the note
+  # at the top of this file).
+  def check_announce_pending
+    marker = File.join(ROOT, '.announce-pending')
+    return [] unless File.exist?(marker)
+
+    owed = File.readlines(marker, chomp: true, encoding: 'utf-8').map(&:strip).reject(&:empty?).uniq.filter_map do |rel|
+      post = begin
+        JSON.parse(File.read(File.join(content_dir, rel), encoding: 'utf-8'))
+      rescue StandardError
+        nil
+      end
+      next unless post.is_a?(Hash) && post['state'] == 'published'
+      next if %w[mastodon_url bluesky_url bluesky_uri].any? { |field| !post[field].to_s.strip.empty? }
+      next if %w[true yes 1].include?(post['unlisted'].to_s.strip.downcase)
+
+      post['slug'].to_s
+    end
+    return [] if owed.empty?
+
+    [warn(t('announce_pending', count: owed.size, slugs: owed.first(5).join(', ')), t('announce_pending_fix'))]
+  rescue SystemCallError
+    []
   end
 
   def check_scheduler

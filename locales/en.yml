@@ -1484,6 +1484,8 @@ doctor:
   scheduler_overdue_fix: "Something fails on those posts on every tick. Run `ruby scripts/publish_scheduled.rb` by hand and read what it says -- it keeps retrying until you fix it."
   deploy_pending: "The site owes a deploy (since %{ago} ago): a change that should have gone out did not."
   deploy_pending_fix: "Run `./blog.sh rebuild` -- if it stops, the reason it gives is why this one did too. With the scheduler cron set up, the next tick tries on its own."
+  announce_pending: "%{count} post(s) are published but not announced yet: their toot waits for a deploy that did not go through (%{slugs})."
+  announce_pending_fix: "Deploy first (`./blog.sh rebuild`), then send each with `./blog.sh toot <slug>` (or `bluesky`). With the scheduler cron set up, the next tick that gets a deploy through does it on its own."
   scheduler_fix: "Schedule scripts/publish-scheduled.sh -- every fifteen minutes is what the wizard's times assume (*/15 * * * * /path/to/blog/scripts/publish-scheduled.sh). On a hosted install the panel's own cron section is the place; check that its path points at THIS blog and not another one."
   age_minutes: "%{count} minute(s)"
   age_hours: "%{count} hour(s)"

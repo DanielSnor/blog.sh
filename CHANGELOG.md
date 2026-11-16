@@ -73,7 +73,9 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   the page with a second build (measured on 13 500 posts: about ten seconds for a build after one post changed). If the
   deploy fails, nothing is announced: the post goes into `.announce-pending` and the next run of the publishing cron
   that gets a deploy through sends the toot. By hand the same order holds, and `--no-announce` still announces nothing.
-  Upgrading: nothing to do; a toot owed by a run that was interrupted is in `.announce-pending`.
+  `doctor` warns of a toot that waits for a deploy (naming the posts, and what to do: deploy, then `./blog.sh toot <slug>`),
+  and a toot sent by hand pays the debt. Upgrading: nothing to do; a toot owed by a run that was interrupted is in
+  `.announce-pending`.
 
 ### Security
 
