@@ -11,6 +11,58 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.12.pre -- 2026-11-16
+
+NOTES, not the final text: set down as the work is done, to be rewritten into the shape of the other
+entries before the tag. The suffix and the date come off at the tag.
+
+Planned for 1.12 and not yet in this file: Pavel's #75 (a reader replies to the announcement from their own
+instance), limako's #78 (a series numbered from zero), hashtags that keep a space, a dot and a hyphen as `_`,
+and the announcement that leaves before the post is on the site.
+
+### Added
+
+- **`translate <slug> --lang <code> --auto`: a translator the author names writes the first draft** (#68, built
+  on Pavel's `scripts/auto-translate.sh`, PR #69). The result is a file in `tmp/` that says `edits:`, `base:` and
+  `lang:`, for the person to read, mend and `add` -- through the door a text from an app uses, so a post that changed
+  in the meantime is refused instead of overwritten. Nothing is saved or published by the command, and there is no
+  `--publish`: a machine translation nobody has read is not something to put on a site. Without a slug it takes the
+  newest post that is out; `--force` replaces a language already written.
+- **The translator is a setting, not a provider.** In `env.sh`: `TRANSLATOR_COMMAND` -- any program that reads the
+  instructions and the post on standard input and writes the translation to standard output (`claude -p`, a
+  Gemini or Codex command line, `ollama run`, a script of one's own), started without a shell -- or
+  `TRANSLATOR=openai|anthropic|gemini` with `TRANSLATOR_MODEL` and `TRANSLATOR_KEY` (`TRANSLATOR_URL` points the
+  OpenAI-style one at Mistral, OpenRouter, Ollama, LM Studio or any server by its address). Plain `Net::HTTP`, no gem.
+  Never in `config/site.yml`, which travels with the site and must not be able to name a program the engine runs.
+- **It checks what a translator is known to damage.** Web addresses, names of pictures, the numbers, and the count
+  of headings, paragraphs and `//--more--//` lines are compared with the original; a difference is a warning,
+  not a refusal. The `slug:` line is always left empty. An answer without the header, an empty one, one that ran
+  out of room (`TRANSLATOR_MAX_TOKENS`) and one the model declined are not saved.
+- **What a provider says when it will not is said as what it is**: a key it does not accept, no credit left, a
+  model the plan leaves out, too many requests, a server in trouble, a post too long for the model, a model that
+  does not exist -- each a code for a program and a sentence for a person that names the setting to change.
+  A key is sent over https or to this machine only, and never appears in what the engine says.
+- **At the terminal** a language with nothing written offers `[a]`: the editor then holds the machine's text, with
+  what looked wrong with it and the original as `//` notes. Closing it unchanged asks once before saving.
+- **For the apps**: `translate --json` carries an `auto` block (`available`, and when not, a `problem` and a
+  `message`), and `translate --auto --json` returns the translated text and the warnings without saving.
+
+### Security
+
+- **A paired device may ask for a translation only when the server says so** (`TRANSLATOR_REMOTE=allow` in
+  `env.sh`; off unless set). A translation is paid for by someone and the text of the post is sent to someone:
+  a lost phone must not be able to spend the owner's money or send the owner's drafts anywhere. At a terminal it is
+  always allowed. `translate` in the whitelist of `scripts/remote.rb` now takes `--auto` and `--force`.
+
+### Not done / to settle before the tag
+
+- Not run against the providers' own servers, only against a stand-in on this machine; the request shapes come
+  from their documentation and our other app's live tests. The docs therefore name no "verified" models.
+- DeepL and LibreTranslate are not covered: they take no instructions and would need the post cut into paragraphs
+  first. "Translated from" and a list of departures written by the model are likewise left out.
+- No `doctor` check of a half-set translator yet (`translate --json` says it to the apps).
+
+
 ## 1.11.1 -- 2026-11-15
 
 A bug-fix release. Five of its fixes came from Pavel's week of everyday writing on 1.11 before its
