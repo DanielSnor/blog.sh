@@ -84,6 +84,12 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   nothing at `[d]`, where `[s]` says the flag cannot reach the cron -- a plan that is kept announces when its date
   comes; `[d]` says so too.
 
+- **Pictorial no longer cuts the first eight characters off a link's title** (found by the fleet over 1.11.1). A link in
+  a tile that has a title of its own, in a post whose own title is a different one, read "article" for "Another article":
+  the rule that hides `https://` on the left of a link drawn by its address took the title for an address. The build now
+  marks a link block drawn by its address (`link-block link-block--address`) and Pictorial shifts only that one. The
+  HTML of such a link block changes by one class, in every skin.
+
 ### Security
 
 - **A paired device may ask for a translation only when the server says so** (`TRANSLATOR_REMOTE=allow` in

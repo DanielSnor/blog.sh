@@ -151,11 +151,13 @@ main > .post-list-item .content > p.link-block:has(> a > strong) br { display: n
    out of a text, but in a monospace it can count: "https://" is eight
    characters and "http://" seven, so the line is drawn that far to the
    left and what runs off the edge is not shown. This holds because the
-   engine writes a bare address here only when the link has no title of its
-   own -- a link with one gives it to the post, and this line is not made. */
+   engine marks a bare address (`link-block--address`) and only that: a link
+   WITH a title, in a post that has a title of its own, stands in the same
+   markup, and the left shift took the first eight characters of it
+   ("Another article" read "article"). */
 main > .post-list-item .content > p.link-block:has(> a > strong) > a { display: block; overflow: hidden; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
-main > .post-list-item .content > p.link-block > a[href^="https://"]:has(> strong) { text-indent: -8ch; }
-main > .post-list-item .content > p.link-block > a[href^="http://"]:has(> strong) { text-indent: -7ch; }
+main > .post-list-item .content > p.link-block--address > a[href^="https://"]:has(> strong) { text-indent: -8ch; }
+main > .post-list-item .content > p.link-block--address > a[href^="http://"]:has(> strong) { text-indent: -7ch; }
 main > .post-list-item .content > p.link-block:has(> a > strong) + p { display: -webkit-box; order: 2; margin: 0 0 8px; overflow: hidden; color: var(--ink); font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 
 /* -------------------------------------------------------------- the lead

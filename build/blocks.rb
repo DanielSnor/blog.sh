@@ -412,7 +412,13 @@ module Blocks
         # none has nothing left to draw at all.
         description.empty? ? '' : %(<p class="link-block">#{description}</p>)
       else
-        %(<p class="link-block"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
+        # `link-block--address` where the link has no title and so is drawn by
+        # its address: the one case a skin may treat the text as an address
+        # (Pictorial cuts `https://` off the left of it) -- and not a title that
+        # happens to sit in the same markup, which lost its first eight
+        # characters to that rule.
+        bare = block['title'].to_s.strip.empty? ? ' link-block--address' : ''
+        %(<p class="link-block#{bare}"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
       end
     else
       # Escaped. architecture.md promises an unknown type renders "as its
