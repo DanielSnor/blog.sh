@@ -57,6 +57,8 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   `skins/classic.css` and the Minimal family (`skins/minimal.css`, the variants rebuilt).
 - **doctor no longer takes `comments.reply_from_own_server` for a misspelled `approval`**: a `comments:` section
   holding only that key was reported as "every reply is published, unmoderated".
+  It also reads the key's value now: true or false (on, off, yes and no work too) and nothing else, named in an
+  error before the build stops on it.
 
 - **An announcement's hashtags keep a tag's words together**. A tag
   with a dot, a hyphen or a space was announced as a shorter one: `blog.sh` as `#blog.sh`, which Mastodon and Bluesky read

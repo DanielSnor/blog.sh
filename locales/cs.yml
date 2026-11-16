@@ -1456,6 +1456,8 @@ doctor:
   deploy_pending_fix: "Spusť `./blog.sh rebuild` — když se zastaví, důvod, který řekne, je i důvod tohohle dluhu. Když máš nastavený cron plánovače, zkusí to sám při dalším tiku."
   announce_pending: "Zveřejněné, ale ještě neoznámené příspěvky (počet: %{count}): jejich toot čeká na deploy, který neprošel (%{slugs})."
   announce_pending_fix: "Nejdřív nasaď (`./blog.sh rebuild`), pak každý pošli příkazem `./blog.sh toot <slug>` (nebo `bluesky`). S nastaveným cronem plánovače to udělá sám první tik, kterému deploy projde."
+  reply_own_unknown: "comments.reply_from_own_server je v config/site.yml %{value}, což není ani true, ani false — build na tom skončí."
+  reply_own_unknown_fix: "Napiš true, nebo false (platí i on a off): zda post oznámený na Mastodonu nabídne čtenáři odpověď z jeho vlastního serveru. Bez klíče je to zapnuté."
   scheduler_fix: "Naplánuj scripts/publish-scheduled.sh — každých patnáct minut, s tím počítají časy z průvodce (*/15 * * * * /cesta/k/blogu/scripts/publish-scheduled.sh). Na hostingu k tomu slouží sekce cron v panelu; zkontroluj, že cesta míří na TENHLE blog, ne na jiný."
   age_minutes: "%{count} min"
   age_hours: "%{count} h"

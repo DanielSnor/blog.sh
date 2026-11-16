@@ -569,6 +569,7 @@ module Doctor
                   end
     end
     findings.concat(check_comments(data, mastodon || bluesky, credentials: credentials))
+    findings.concat(check_reply_from_own_server(data))
     findings
   end
 
@@ -635,6 +636,25 @@ module Doctor
     # question: by looking for evidence the thing has run.
     findings << warn(t('approval_needs_cron'), t('approval_needs_cron_fix')) unless sidebar_ran_recently?
     findings
+  end
+
+  # comments.reply_from_own_server says whether the reply link of a Mastodon
+  # post is joined by one to the READER'S own server. SiteConfig reads it the
+  # way a person writes it -- true or false, on or off, yes or no, which YAML
+  # turns into true and false before it gets here -- and refuses anything
+  # else, naming the key: the build stops. Said here too, before it does,
+  # for the same reason every other key doctor knows is: the sentence that
+  # explains it should not be a build that will not run.
+  def check_reply_from_own_server(data)
+    value = dig(data, 'comments', 'reply_from_own_server')
+    return [] if value.nil? || value == true || value == false
+
+    text = value.to_s.strip.downcase
+    return [] if text.empty? || %w[true on yes false off no].include?(text)
+
+    # .inspect, for the reason approval's message has it: an invisible
+    # character at the end of a value is only visible between quotes.
+    [error(t('reply_own_unknown', value: text.inspect), t('reply_own_unknown_fix'))]
   end
 
   # How long the sidebar refresh may be silent before its absence is worth

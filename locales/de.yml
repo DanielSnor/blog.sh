@@ -1469,6 +1469,8 @@ doctor:
   deploy_pending_fix: "Führe `./blog.sh rebuild` aus -- hält es an, ist der genannte Grund auch der Grund für diese Schuld. Mit eingerichtetem Planer-Cron versucht es der nächste Tick selbst."
   announce_pending: "%{count} Beitrag/Beiträge sind veröffentlicht, aber noch nicht angekündigt: ihr Toot wartet auf ein Deployment, das nicht durchging (%{slugs})."
   announce_pending_fix: "Zuerst deployen (`./blog.sh rebuild`), dann jeden mit `./blog.sh toot <slug>` (oder `bluesky`) senden. Mit eingerichtetem Planer-Cron erledigt das der nächste Tick, dessen Deployment durchgeht."
+  reply_own_unknown: "comments.reply_from_own_server steht in config/site.yml auf %{value}, das weder true noch false ist -- der Build bricht daran ab."
+  reply_own_unknown_fix: "Schreibe true oder false (on und off gehen auch): ob ein auf Mastodon angekündigter Beitrag dem Leser eine Antwort vom eigenen Server anbietet. Ohne den Schlüssel ist es an."
   scheduler_fix: "Plane scripts/publish-scheduled.sh ein -- alle fünfzehn Minuten, davon gehen die Zeiten des Assistenten aus (*/15 * * * * /pfad/zum/blog/scripts/publish-scheduled.sh). Bei gehosteten Installationen ist der Cron-Bereich der Verwaltung der richtige Ort; prüfe, dass der Pfad auf DIESES Blog zeigt und nicht auf ein anderes."
   age_minutes: "%{count} Minute(n)"
   age_hours: "%{count} Stunde(n)"
