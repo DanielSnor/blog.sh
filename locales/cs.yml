@@ -1454,7 +1454,7 @@ doctor:
   scheduler_overdue_fix: "Něco na těch příspěvcích padá při každém tiku. Pusť `ruby scripts/publish_scheduled.rb` ručně a přečti, co řekne — vydávání se opakuje, dokud to nespravíš."
   deploy_pending: "Web dluží nasazení (od %{ago}): změna, která měla odejít, neodešla."
   deploy_pending_fix: "Spusť `./blog.sh rebuild` — když se zastaví, důvod, který řekne, je i důvod tohohle dluhu. Když máš nastavený cron plánovače, zkusí to sám při dalším tiku."
-  announce_pending: "%{count} příspěvek/příspěvků je zveřejněných, ale ještě neoznámených: jejich toot čeká na deploy, který neprošel (%{slugs})."
+  announce_pending: "Zveřejněné, ale ještě neoznámené příspěvky (počet: %{count}): jejich toot čeká na deploy, který neprošel (%{slugs})."
   announce_pending_fix: "Nejdřív nasaď (`./blog.sh rebuild`), pak každý pošli příkazem `./blog.sh toot <slug>` (nebo `bluesky`). S nastaveným cronem plánovače to udělá sám první tik, kterému deploy projde."
   scheduler_fix: "Naplánuj scripts/publish-scheduled.sh — každých patnáct minut, s tím počítají časy z průvodce (*/15 * * * * /cesta/k/blogu/scripts/publish-scheduled.sh). Na hostingu k tomu slouží sekce cron v panelu; zkontroluj, že cesta míří na TENHLE blog, ne na jiný."
   age_minutes: "%{count} min"
