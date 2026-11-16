@@ -1947,17 +1947,8 @@ def draft_decision_loop(slug, path: nil, announce: true)
     # A post already scheduled is asked about as one (#71): "keep as draft"
     # and "schedule (the next free slot)" read as if it were a plain draft,
     # while Enter leaves its date as it is and [s] moves it.
-    scheduled_for = post['scheduled'] && (Time.parse(post['date'].to_s).getlocal rescue nil)
-    # A date already past is said to be, as the queue says it: "keep it
-    # scheduled for" a day gone by promised what had not happened, while
-    # the queue in the same run said nothing publishes it here (fleet
-    # over 1.11.1).
-    scheduled_label = scheduled_for && begin
-      date = scheduled_for.strftime(t('date_time_format'))
-      overdue = scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler'
-      scheduled_for <= Time.now ? "#{date} #{t(overdue)}" : date
-    end
-    prompt = if scheduled_for
+    scheduled_label = scheduled_label_of(post)
+    prompt = if scheduled_label
                t('cli.what_next_prompt_scheduled', date: scheduled_label, translate: offer)
              elsif slot
                t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format')), translate: offer)
@@ -1984,8 +1975,7 @@ def draft_decision_loop(slug, path: nil, announce: true)
       return if prompt_and_schedule(path, post, raw: raw) == true
     when 'd', ''
       puts
-      puts(scheduled_for ? t('cli.left_scheduled', date: scheduled_label)
-                         : t('cli.left_as_draft', slug: slug))
+      say_where_the_draft_stands(slug, path, post, announce)
       puts
       return
     when 'x'
@@ -2006,6 +1996,50 @@ def draft_decision_loop(slug, path: nil, announce: true)
       end
     else puts langs.empty? ? t('cli.unknown_choice_pde') : t('cli.unknown_choice_pdet')
     end
+  end
+end
+
+# How a scheduled draft is named in the dialog: its date, and when that date
+# is past, said to be -- "keep it scheduled for" a day gone by promised what
+# had not happened, while the queue in the same run said nothing publishes it
+# here (fleet over 1.11.1). nil for a draft that is not scheduled.
+def scheduled_label_of(post)
+  at = post['scheduled'] && (Time.parse(post['date'].to_s).getlocal rescue nil)
+  return nil unless at
+
+  date = at.strftime(t('date_time_format'))
+  overdue = scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler'
+  at <= Time.now ? "#{date} #{t(overdue)}" : date
+end
+
+# What [d] says on the way out of the dialog, from the post as it is NOW. The
+# copy this dialog was drawn from was read before the keypress, and the
+# scheduled-publish cron runs every fifteen minutes: "Still scheduled for ..."
+# was said of a post the cron had published while the prompt waited (fleet
+# over 1.11.1). A post that is no longer a draft is said to be published, one
+# whose plan was moved says its new date.
+#
+# And --no-announce, which cannot travel with a plan (the cron decides
+# silence from the post itself), is said not to have, here as [s] says it: a
+# plan that is kept announces when its date comes.
+def say_where_the_draft_stands(slug, path, shown, announce)
+  fresh = begin
+    where = File.exist?(path) ? path : find_post_path(slug, ask: false)
+    where ? JSON.parse(File.read(where, encoding: 'utf-8')) : shown
+  rescue JSON::ParserError, SystemCallError, SystemExit
+    shown
+  end
+  unless draft?(fresh)
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(fresh).year, page: PostAddress.page?(fresh)))
+    return
+  end
+
+  label = scheduled_label_of(fresh)
+  if label
+    puts t('cli.left_scheduled', date: label)
+    warn t('cli.no_announce_not_scheduled') unless announce
+  else
+    puts t('cli.left_as_draft', slug: slug)
   end
 end
 

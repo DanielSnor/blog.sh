@@ -77,6 +77,13 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   and a toot sent by hand pays the debt. Upgrading: nothing to do; a toot owed by a run that was interrupted is in
   `.announce-pending`.
 
+- **`[d]` in the draft dialog of a scheduled post says what is true now, and that --no-announce does not reach the
+  plan** (found by the fleet over 1.11.1). It said "Still scheduled for ..." from the copy read before the keypress, so
+  a post the cron had published while the prompt waited was still called scheduled; it now reads the post again and
+  says it is published, or names the date the plan has now. And `publish --no-announce` on a scheduled post said
+  nothing at `[d]`, where `[s]` says the flag cannot reach the cron -- a plan that is kept announces when its date
+  comes; `[d]` says so too.
+
 ### Security
 
 - **A paired device may ask for a translation only when the server says so** (`TRANSLATOR_REMOTE=allow` in
