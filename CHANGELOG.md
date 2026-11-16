@@ -16,8 +16,8 @@ prints what an installation is running.
 NOTES, not the final text: set down as the work is done, to be rewritten into the shape of the other
 entries before the tag. The suffix and the date come off at the tag.
 
-Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from zero), hashtags that keep a
-space, a dot and a hyphen as `_`, and the announcement that leaves before the post is on the site.
+Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from zero) and the announcement that
+leaves before the post is on the site.
 
 ### Added
 
@@ -58,6 +58,14 @@ space, a dot and a hyphen as `_`, and the announcement that leaves before the po
   `skins/classic.css` and the Minimal family (`skins/minimal.css`, the variants rebuilt).
 - **doctor no longer takes `comments.reply_from_own_server` for a misspelled `approval`**: a `comments:` section
   holding only that key was reported as "every reply is published, unmoderated".
+
+- **An announcement's hashtags keep a tag's words together**. A tag
+  with a dot, a hyphen or a space was announced as a shorter one: `blog.sh` as `#blog.sh`, which Mastodon and Bluesky read
+  as `#blog`, `sean.cz` as `#sean`, `self-hosting` as `#self`, and `hudba dana`, its space dropped, as `#hudbadana`.
+  A run of spaces, dots and hyphens is now one `_` (`#blog_sh`, `#hudba_dana`), one at either end of the tag is dropped
+  (`.net` is `#net`), and tags that come to the same hashtag are said once. The tag's own page on the site keeps its
+  address. Upgrading: new announcements go out under the new hashtags; toots already sent stay where they are, so a
+  tag like `hudba dana` is `#hudbadana` on the old toots and `#hudba_dana` on the new.
 
 ### Security
 

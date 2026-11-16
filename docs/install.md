@@ -879,6 +879,16 @@ since a discussion split across two networks serves nobody. Without
 either section, everything else still works; publishing just skips the
 announcement (logged, not an error).
 
+The post's tags go out as hashtags, on both networks. Both end a hashtag
+at anything but a letter, a digit or `_`, so a run of spaces, dots and
+hyphens in a tag is announced as one `_`: `blog.sh` is `#blog_sh`,
+`hudba dana` is `#hudba_dana`, `self-hosting` is `#self_hosting` -- not
+`#blog`, `#hudbadana` and `#self`, which is what the network would make of
+them. A separator at the very start or end is dropped (`.net` is `#net`),
+and tags that come to the same hashtag are said once. The tag's page on
+your site keeps its address. Toots written before 1.12 stay under the
+hashtags they went out with.
+
 **Mastodon:**
 
 1. In `config/site.yml`, uncomment the `mastodon:` block -- the header

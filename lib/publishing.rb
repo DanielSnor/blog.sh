@@ -179,8 +179,25 @@ module Publishing
     "#{plain[0, limit - 1].sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
   end
 
+  # A tag as the hashtag it announces under. Mastodon and Bluesky end a
+  # hashtag at anything but a letter, a digit or `_`, so a tag that keeps a
+  # dot or a hyphen is announced as a shorter one: `blog.sh` became `#blog`,
+  # `sean.cz` `#sean`, `self-hosting` `#self` -- and `hudba dana`, with its
+  # space simply dropped, `#hudbadana`, which no reader of the site would
+  # search for. A run of spaces, dots and hyphens is one `_`, and one at the
+  # ends of the tag is nothing at all (`.net` is `#net`). The tag's own page
+  # keeps its address: Slug.slugify makes `_`, space, dot and hyphen the
+  # same `-`, so this changes what the announcement says and not where a tag
+  # lives.
+  def hashtag_for(tag)
+    word = tag.to_s.gsub(/\A[[:space:].\-]+|[[:space:].\-]+\z/, '').gsub(/[[:space:].\-]+/, '_')
+    word.empty? ? '' : "##{word}"
+  end
+
+  # Two tags that come to the same hashtag are announced once: `blog.sh` and
+  # `blog-sh` both say `#blog_sh`, and a hashtag is the same whatever its case.
   def hashtags_for(tags)
-    tags.map { |t| "##{t.to_s.gsub(/\s+/, '')}" }.join(' ')
+    tags.map { |t| hashtag_for(t) }.reject(&:empty?).uniq(&:downcase).join(' ')
   end
 
   # title/url/hashtags must never be truncated (a cut-off URL is a dead
