@@ -777,9 +777,10 @@ cli:
       ./blog.sh edit [<slug>] [--json]
                                      edits a post; without a slug, offers the last %{recent_count} posts to edit;
                                      --json hands the text out as data instead of opening an editor
-      ./blog.sh translate <slug> --lang <code> [--json]
+      ./blog.sh translate <slug> --lang <code> [--json] [--auto [--force]]
                                      writes that post's text in another language the site publishes;
-                                     --json hands the text out as data instead of opening an editor
+                                     --json hands the text out as data instead of opening an editor;
+                                     --auto has the translator named in env.sh write it into tmp/ for you to read and add
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a> [--kind <kind>]] [--rename <slug> --yes] [--versions] [--restore-version <name> --yes] [--rebuild]
                                      a post's state, its properties (series, tags, type, flags) and its actions;
                                      --json prints them as data, with the actions that apply to it

@@ -5374,7 +5374,20 @@ def translate_state(slug, lang)
                                                      'content' => LinkCard.split(post['content']).last }, nil),
                 'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
                 'preview' => PostAddress.path(post),
-                'base' => Digest::SHA256.hexdigest(raw) } }
+                'base' => Digest::SHA256.hexdigest(raw) },
+    'auto' => auto_availability }
+end
+
+# Whether `translate --auto` would run for whoever asks, said before the
+# asking: an app shows its button only where it works, and where it does
+# not says what to set. Nothing is run and nothing is sent to find out.
+def auto_availability
+  AutoTranslate.adapter
+  return { 'available' => true } if AutoTranslate.permitted?
+
+  { 'available' => false, 'problem' => 'translator_not_allowed', 'message' => t('cli.auto_translator_not_allowed').strip }
+rescue AutoTranslate::Error => e
+  { 'available' => false, 'problem' => e.code, 'message' => t("cli.auto_#{e.code}", detail: e.detail).strip }
 end
 
 # What a person is told of the differences `AutoTranslate.check` found.
@@ -5428,7 +5441,7 @@ def translate_auto_as_json(slug, lang, force: false)
   answer_json do
     state, result = auto_translation!(slug, lang, force: force)
     state['post']['text'] = result[:text]
-    state['auto'] = { 'warnings' => auto_warnings_json(result[:warnings]) }
+    state['auto'] = state['auto'].merge('warnings' => auto_warnings_json(result[:warnings]))
     state
   end
 end

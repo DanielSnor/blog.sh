@@ -769,9 +769,10 @@ cli:
       ./blog.sh edit [<slug>] [--json]
                                      bearbeitet einen Beitrag; ohne Slug werden die letzten %{recent_count} Beiträge angeboten;
                                      --json gibt den Text als Daten aus, statt einen Editor zu öffnen
-      ./blog.sh translate <slug> --lang <code> [--json]
+      ./blog.sh translate <slug> --lang <code> [--json] [--auto [--force]]
                                      schreibt den Text des Beitrags in einer weiteren Sprache der Website;
-                                     --json gibt den Text als Daten aus, statt einen Editor zu öffnen
+                                     --json gibt den Text als Daten aus, statt einen Editor zu öffnen;
+                                     --auto lässt den Übersetzer aus env.sh den Text nach tmp/ schreiben, zum Lesen und Hinzufügen
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a> [--kind <kind>]] [--rename <slug> --yes] [--versions] [--restore-version <Name> --yes] [--rebuild]
                                      Zustand eines Beitrags, seine Eigenschaften (Serie, Schlagwörter, Typ, Schalter) und Aktionen;
                                      --json gibt sie als Daten aus, mit den Aktionen, die auf ihn zutreffen

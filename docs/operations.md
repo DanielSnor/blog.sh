@@ -532,6 +532,75 @@ added with `edit` and referred to from a translation. `translate` refuses
 an attachment rather than putting a file in one language's copy of a post
 whose media the other languages share.
 
+### A first draft from a translator
+
+```bash
+./blog.sh translate my-post --lang de --auto
+```
+
+A program of your choosing translates the post and the result is written to
+`tmp/my-post.de.md`. **Nothing is saved or published by it**: you read the file,
+mend it, and `./blog.sh add tmp/my-post.de.md` saves it -- through the same door
+as a text sent from an app, so a post that changed in the meantime is refused
+instead of overwritten. A machine translation nobody has read is not something to
+put on a site. Without a post it takes the newest one that is out; `--force`
+replaces a language that is already written.
+
+In the wizard, a language with nothing written offers `[a]` before it opens the
+editor: the editor then holds the machine's text, with what looked wrong with it
+and the original as `//` notes, which are dropped on save as always.
+
+The engine does not know whose model answers. You name it in `env.sh` (never in
+`config/site.yml`, which travels with the site's content and must not be able to
+name a program the engine runs):
+
+```bash
+# Any program that reads the instructions and the post on standard input and
+# writes the translation to standard output. Started without a shell.
+export TRANSLATOR_COMMAND='claude -p --tools ""'
+export TRANSLATOR_COMMAND='ollama run mistral'
+
+# Or a service over the web: TRANSLATOR=openai (OpenAI and everything that speaks
+# its chat API: Mistral, OpenRouter, Ollama, LM Studio, any server by its address),
+# anthropic, or gemini.
+export TRANSLATOR=openai
+export TRANSLATOR_MODEL=<the model's name>
+export TRANSLATOR_KEY=<the provider's key>                 # not needed for a server on this machine
+export TRANSLATOR_URL=https://openrouter.ai/api/v1         # OpenAI-style: where its /v1 is
+export TRANSLATOR_MAX_TOKENS=16000                         # how long an answer may be
+export TRANSLATOR_TIMEOUT=300                              # seconds
+```
+
+A key goes over https, or over http to this machine; to any other host over http it
+is refused before anything is sent. A key never appears in what the engine says,
+even when a provider repeats it back.
+
+**Where the text goes.** The post's text is sent to whatever the translator talks
+to -- a web service, or a model on your own machine. Free plans of some providers
+use what they are sent to train their models; read the terms of the one you pick.
+The engine keeps no table of models and has not been run against the providers'
+own servers by its tests, only against a stand-in on this machine. Models differ
+much, most in the smaller languages: one wrote the number 36 out as words.
+
+**What it checks.** Before the file is written the engine compares the translation
+with the original in what a translator is known to damage and a reader does not
+notice: web addresses, the names of pictures, the numbers, and the count of
+headings, paragraphs and `//--more--//` lines. A difference is a warning, not a
+refusal -- a number may be written out in words with good reason -- and the
+`slug:` line is always left empty. An answer that does not begin with the header,
+that is empty, that ran out of room (raise `TRANSLATOR_MAX_TOKENS`) or that the
+model declined is not saved.
+
+**From an app.** `translate <slug> --lang <code> --auto --json` returns the
+translated text and the warnings and saves nothing; the app shows them and saves
+through `add` with `edits:`, `base:` and `lang:`, as for a hand-written one.
+`translate --json` carries an `auto` block -- `available`, and when it is not, a
+`problem` code and a `message` -- so an app shows its button only where it works.
+A paired device is refused (`translator_not_allowed`) unless the server says
+`TRANSLATOR_REMOTE=allow` in `env.sh`: a translation is paid for by someone and
+sent to someone, and a lost phone must not be able to spend your money or send your
+drafts anywhere. At a terminal it is always allowed.
+
 ## Writing from a phone
 
 The trick is that a bare filename in an image line resolves against the

@@ -756,9 +756,10 @@ cli:
       ./blog.sh edit [<slug>] [--json]
                                      edituje příspěvek, bez slugu nabídne posledních %{recent_count} příspěvků k editaci;
                                      --json vydá text jako data místo otevření editoru
-      ./blog.sh translate <slug> --lang <kód> [--json]
+      ./blog.sh translate <slug> --lang <kód> [--json] [--auto [--force]]
                                      napíše text toho příspěvku v dalším jazyce, který web publikuje;
-                                     --json vydá text jako data místo otevření editoru
+                                     --json vydá text jako data místo otevření editoru;
+                                     --auto nechá překladač z env.sh napsat text do tmp/, ať si ho přečteš a přidáš
       ./blog.sh props [<slug>] [--json] [--set k=v ...] [--drop-address <a> [--kind <kind>]] [--rename <slug> --yes] [--versions] [--restore-version <jméno> --yes] [--rebuild]
                                      stav příspěvku, jeho vlastnosti (série, štítky, typ, přepínače) a akce nad ním;
                                      --json je vypíše jako data, včetně akcí, které na něj platí

@@ -235,9 +235,10 @@ says what you are running.
                                # --untrusted refuses a picture reference that is not a bare filename
 ./blog.sh edit [<slug>] [--json]
                                # without a slug, offers the last 50 posts; --json hands the text out as data
-./blog.sh translate <slug> --lang <code> [--json]
+./blog.sh translate <slug> --lang <code> [--json] [--auto [--force]]
                                # writes the post's text in another language the site publishes;
-                               # --json hands the text out as data
+                               # --json hands the text out as data; --auto has the translator named in env.sh
+                               # write it into tmp/ for you to read and add
 ./blog.sh props [<slug>] [--json]
                                # a post's state and its actions; [e] changes what the post IS --
                                # its series and part, tags, type, and the unlisted/hero/toc flags;
