@@ -1558,6 +1558,20 @@ aside .card { margin-bottom: 1.5rem; }
 .comments { margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem; }
 
 .comments-reply { margin: 0 0 1rem; }
+.comments-reply-own, .comments-reply-other { margin-left: 1rem; }
+/* The field for replying from one's own server (comments.js): one row, in the
+   page's own type, quiet until it is opened. */
+.comments-reply-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 1rem; }
+.comments-reply-form input {
+  font: inherit; color: inherit; background: transparent;
+  padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; min-width: 14em;
+}
+.comments-reply-form button {
+  font: inherit; color: var(--accent); background: transparent; cursor: pointer;
+  padding: 0.35rem 0.8rem; border: 1px solid var(--border); border-radius: 4px;
+}
+.comments-reply-form button:hover, .comments-reply-form button:focus-visible { border-color: var(--accent); }
+.comments-reply-error { color: var(--accent); font-size: 0.85rem; }
 
 /* Only rendered where comments.approval is on -- it tells a reader that
    what follows is a selection, so an answer that isn't there doesn't read

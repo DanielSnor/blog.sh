@@ -982,6 +982,33 @@ Worth knowing before switching it on:
   where the thread stays public and this site still links to it. Block,
   mute and report remain the tools for that.
 
+**Replying from the reader's own server (Mastodon).** The link under a
+post, "Reply on Mastodon", opens the announcement on YOUR instance, where
+most readers are not signed in. Beside it the page offers "Reply from
+another server...": the reader types the server they are on -- `mastodon.social`,
+`@me@mastodon.social` and an address copied from the bar all do -- and it opens
+`https://<their server>/authorize_interaction?uri=<the announcement>`, which
+a Mastodon server answers by taking a signed-in visitor to its own copy of
+that toot, where reply, boost and favourite are one click. The server is
+remembered in the reader's browser (the same memory the share row uses, so
+a reader who told one is not asked by the other); the next visit shows a link
+straight to it. It is done in the browser alone: nothing about the reader
+reaches your site, and without JavaScript the page has the one link it always
+had.
+
+It is on by default for a post announced on Mastodon, and never on a Bluesky
+one. To turn it off:
+
+```yaml
+comments:
+  reply_from_own_server: false
+```
+
+Mastodon and the servers built like it answer that address; other servers (GoToSocial,
+Pixelfed and the rest) may not, and the engine does not know which. A reader
+sent to one that does not is no worse off than before: the link beside it still
+goes where it always went.
+
 ## 9. Updating the engine
 
 ```bash

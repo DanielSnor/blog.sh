@@ -535,6 +535,9 @@ COMMENT_NETWORK = SiteConfig.comment_network
 # :fav means cron prepares the comments and the page reads them from this
 # origin, so the markup, the policy and the client all change together.
 COMMENTS_APPROVAL = SiteConfig.comments_approval
+# Whether the reply link of a Mastodon post is joined by one to the reader's
+# own server (assets/js/comments.js, #75).
+COMMENTS_REMOTE_REPLY = SiteConfig.comments_reply_from_own_server
 
 # The color palette and the generated stylesheet live in
 # lib/colors_css.rb, shared with ./style.sh -- its palette preview must
@@ -1623,12 +1626,22 @@ def post_stats_html(post)
   end
 end
 
+# The words of the reader's-own-server reply, in this page's language, as the
+# JSON assets/js/comments.js reads off the container. In an attribute and not
+# in BLOG_I18N, which is inline on every page: see the script's header.
+def remote_reply_words
+  JSON.generate('elsewhere' => t('js.reply_elsewhere'), 'from' => t('js.reply_from'),
+                'label' => t('js.reply_server_label'), 'placeholder' => t('js.reply_server_placeholder'),
+                'open' => t('js.reply_server_open'), 'invalid' => t('js.reply_server_invalid'))
+end
+
 def comments_attrs(post)
   # data-moderated switches the client from reading the live thread to
   # reading /comments.json -- see the header of assets/js/comments.js.
   moderated = COMMENTS_APPROVAL ? ' data-moderated' : ''
   if post['mastodon_url']
-    %( data-toot-url="#{h(post['mastodon_url'])}"#{moderated})
+    remote = COMMENTS_REMOTE_REPLY ? %( data-remote-reply="#{h(remote_reply_words)}") : ''
+    %( data-toot-url="#{h(post['mastodon_url'])}"#{moderated}#{remote})
   elsif post['bluesky_uri']
     %( data-bluesky-uri="#{h(post['bluesky_uri'])}" data-bluesky-url="#{h(post['bluesky_url'])}"#{moderated})
   end

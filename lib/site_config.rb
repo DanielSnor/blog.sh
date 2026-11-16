@@ -434,4 +434,21 @@ module SiteConfig
 
     abort("❌ Unknown comments.approval #{value.inspect} in #{PATH} -- expected \"fav\" or \"off\".")
   end
+
+  # Whether a post's reply link is joined by one that goes to the READER'S
+  # own Mastodon server (#75). On unless the author says otherwise: it is a
+  # courtesy to readers and sends nothing anywhere, so the default is the one
+  # that helps. YAML reads `off` and `no` as false and `on` and `yes` as true,
+  # which is what an author who typed them meant.
+  def comments_reply_from_own_server
+    value = get('comments', 'reply_from_own_server')
+    return true if value.nil? || value == true
+    return false if value == false
+
+    text = value.to_s.strip.downcase
+    return true if text.empty? || %w[true on yes].include?(text)
+    return false if %w[false off no].include?(text)
+
+    abort("❌ Unknown comments.reply_from_own_server #{text.inspect} in #{PATH} -- expected true or false.")
+  end
 end

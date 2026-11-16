@@ -195,6 +195,145 @@
     return '<p class="comments-reply"><a href="' + esc(url) + '" target="_blank" rel="noopener">' + esc(label) + '</a></p>';
   }
 
+  // --- Replying from the reader's own server (#75) ------------------------
+  //
+  // "Reply on Mastodon" opens the toot on the BLOG's instance, where most
+  // readers are not signed in. Every Mastodon server answers
+  // /authorize_interaction?uri=<toot> by taking a signed-in visitor to its
+  // own copy of that toot, where reply, boost and favourite are one click --
+  // so the reader says which server is theirs, once, and this builds the
+  // address. Entirely in the browser: nothing about the reader is sent to the
+  // blog, and the server is remembered in this browser alone.
+  //
+  // The memory is share.js's: a reader who has already told the share row
+  // which instance they are on is not asked again, and one who answers here
+  // is not asked there. So is the rule for what an answer may look like --
+  // `instanceHost` is share.js's `host`, and the two must stay identical
+  // character for character, being one rule written twice.
+  //
+  // What this adds to the page is two things next to the existing link, which
+  // stays exactly as it was: a link to the reader's own server when one is
+  // remembered, and a link that opens a one-field form when none is, or for
+  // another one. Only where the build wrote data-remote-reply on the
+  // container (comments.reply_from_own_server, on unless the author says
+  // false), and only for Mastodon.
+  //
+  // The attribute carries the words as well, as JSON in the page's language,
+  // rather than BLOG_I18N doing it: that script is inline on every page, and
+  // six strings in it would rewrite the whole archive of every site on the
+  // upgrade -- where an attribute on the comments container changes only the
+  // posts that have one, which change for this anyway.
+  var INSTANCE_KEY = 'blogsh:mastodon-instance';
+
+  function instanceHost(answer) {
+    var value = String(answer || '').trim().replace(/^https?:\/\//i, '').replace(/\/.*$/, '');
+    var at = value.lastIndexOf('@');
+    if (at !== -1) { value = value.slice(at + 1); }
+    if (!value || value.indexOf(' ') !== -1) { return null; }
+    return /^[^\s.:\/@]+(\.[^\s.:\/@]+)+(:\d{1,5})?$/.test(value) ? value : null;
+  }
+
+  function rememberedInstance() {
+    try {
+      return instanceHost(window.localStorage.getItem(INSTANCE_KEY));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function rememberInstance(value) {
+    try {
+      window.localStorage.setItem(INSTANCE_KEY, value);
+    } catch (e) { /* the reader is asked again next time, which costs a field */ }
+  }
+
+  function authorizeUrl(server, tootUrl) {
+    return 'https://' + server + '/authorize_interaction?uri=' + encodeURIComponent(tootUrl);
+  }
+
+  function replyWords(container) {
+    try {
+      var words = JSON.parse(container.getAttribute('data-remote-reply'));
+      return words && typeof words === 'object' ? words : null;
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function addOwnServerReply(container, tootUrl, words) {
+    var line = container.querySelector('.comments-reply');
+    if (!line || line.querySelector('.comments-reply-other')) return;
+    function replyFrom(server) {
+      return String(words.from || '').replace('%{server}', function () { return server; });
+    }
+
+    var known = rememberedInstance();
+    var own = known
+      ? ' <a class="comments-reply-own" href="' + esc(authorizeUrl(known, tootUrl)) + '" target="_blank" rel="noopener">' +
+        esc(replyFrom(known)) + '</a>'
+      : '';
+    line.insertAdjacentHTML('beforeend', own +
+      ' <a class="comments-reply-other" href="#" role="button" aria-expanded="false">' + esc(words.elsewhere) + '</a>');
+
+    var form = document.createElement('form');
+    form.className = 'comments-reply-form';
+    form.hidden = true;
+    form.noValidate = true;
+    form.innerHTML =
+      '<input type="text" name="server" inputmode="url" autocapitalize="off" autocomplete="off" spellcheck="false"' +
+        ' placeholder="' + esc(words.placeholder) + '" aria-label="' + esc(words.label) + '">' +
+      '<button type="submit">' + esc(words.open) + '</button>' +
+      '<span class="comments-reply-error" role="alert" hidden>' + esc(words.invalid) + '</span>';
+    line.parentNode.insertBefore(form, line.nextSibling);
+
+    var toggle = line.querySelector('.comments-reply-other');
+    var input = form.querySelector('input');
+    var error = form.querySelector('.comments-reply-error');
+
+    toggle.addEventListener('click', function (event) {
+      event.preventDefault();
+      form.hidden = !form.hidden;
+      toggle.setAttribute('aria-expanded', form.hidden ? 'false' : 'true');
+      if (!form.hidden) input.focus();
+    });
+
+    form.addEventListener('submit', function (event) {
+      event.preventDefault();
+      var server = instanceHost(input.value);
+      if (!server) {
+        error.hidden = false;
+        input.setAttribute('aria-invalid', 'true');
+        return;
+      }
+      error.hidden = true;
+      input.removeAttribute('aria-invalid');
+      rememberInstance(server);
+      var url = authorizeUrl(server, tootUrl);
+      // A new tab, as the link beside it opens one. A browser that refuses
+      // the tab is not left with a button that does nothing: the reader goes
+      // there in this one.
+      var tab = window.open(url, '_blank');
+      if (tab) {
+        try { tab.opener = null; } catch (e) { /* cross-origin already */ }
+      } else {
+        window.location.href = url;
+      }
+    });
+  }
+
+  // The reply link is written afresh every time the container's contents
+  // are (live thread, approved list, a failed fetch), so the additions are
+  // made whenever it appears rather than at each of those places.
+  function watchReply(container, tootUrl) {
+    var words = replyWords(container);
+    if (!words) return;
+    function run() { addOwnServerReply(container, tootUrl, words); }
+    if (typeof MutationObserver === 'function') {
+      new MutationObserver(run).observe(container, { childList: true });
+    }
+    run();
+  }
+
   // The note is not decoration. Someone who replies and then finds
   // nothing under the article concludes the site is broken and replies
   // again -- so the page has to say that what it shows is a selection and
@@ -383,6 +522,8 @@
     var tootUrl = container.getAttribute('data-toot-url');
     var bskyUri = container.getAttribute('data-bluesky-uri');
     var moderated = container.hasAttribute('data-moderated');
+
+    if (tootUrl && container.hasAttribute('data-remote-reply')) watchReply(container, tootUrl);
 
     if (tootUrl && moderated) {
       loadApproved(container, tootUrl, replyLinkHtml(tootUrl, i18n.reply_on_mastodon));

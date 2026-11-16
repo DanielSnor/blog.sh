@@ -590,8 +590,11 @@ module Doctor
     # the empty check below, which would otherwise swallow it.
     if approval.empty?
       section = dig(data, 'comments')
-      if section.is_a?(Hash) && section.any?
-        return [error(t('approval_key_unknown', keys: section.keys.join(', ')),
+      # `reply_from_own_server` is the other key this engine reads here; a
+      # section holding only that one is not a misspelled `approval`.
+      unknown = section.is_a?(Hash) ? section.keys.map(&:to_s) - %w[reply_from_own_server] : []
+      if unknown.any?
+        return [error(t('approval_key_unknown', keys: unknown.join(', ')),
                       t('approval_key_unknown_fix'))]
       end
     end

@@ -16,9 +16,8 @@ prints what an installation is running.
 NOTES, not the final text: set down as the work is done, to be rewritten into the shape of the other
 entries before the tag. The suffix and the date come off at the tag.
 
-Planned for 1.12 and not yet in this file: Pavel's #75 (a reader replies to the announcement from their own
-instance), limako's #78 (a series numbered from zero), hashtags that keep a space, a dot and a hyphen as `_`,
-and the announcement that leaves before the post is on the site.
+Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from zero), hashtags that keep a
+space, a dot and a hyphen as `_`, and the announcement that leaves before the post is on the site.
 
 ### Added
 
@@ -46,6 +45,19 @@ and the announcement that leaves before the post is on the site.
   what looked wrong with it and the original as `//` notes. Closing it unchanged asks once before saving.
 - **For the apps**: `translate --json` carries an `auto` block (`available`, and when not, a `problem` and a
   `message`), and `translate --auto --json` returns the translated text and the warnings without saving.
+
+- **A reader can reply to the announcement from their own Mastodon server** (#75, Pavel). The link "Reply on
+  Mastodon" opens the toot on the blog's instance, where most readers are not signed in. Beside it a link opens a
+  one-field form; the server typed there (`mastodon.social`, `@me@mastodon.social` or an address copied from the
+  bar) becomes `https://<server>/authorize_interaction?uri=<toot>`, which takes a signed-in reader to their own
+  copy to reply, boost or favourite. It is remembered in the reader's browser -- under the key the share row
+  already uses, so one answer serves both -- and the next visit shows a link straight there. Browser only: nothing
+  about the reader reaches the site. On for a Mastodon post unless `comments.reply_from_own_server: false`; a
+  Bluesky post never gets it. The words travel in a `data-remote-reply` attribute on the comments container, not
+  in the script that is inline on every page, so the upgrade rewrites only the posts that carry a toot. Looks:
+  `skins/classic.css` and the Minimal family (`skins/minimal.css`, the variants rebuilt).
+- **doctor no longer takes `comments.reply_from_own_server` for a misspelled `approval`**: a `comments:` section
+  holding only that key was reported as "every reply is published, unmoderated".
 
 ### Security
 
