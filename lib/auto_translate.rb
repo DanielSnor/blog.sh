@@ -251,9 +251,16 @@ module AutoTranslate
 
     private
 
+    # The time limit is the whole run's, not the first program's: a
+    # translator that starts something in the background and leaves it
+    # holding its output (a model server, a helper) used to keep this
+    # waiting long after the limit, for as long as that something lived. And
+    # Ctrl-C stops the translator with everything it started, instead of
+    # leaving the engine waiting for it and then leaving it running.
     def run(input)
       out = err = nil
       status = nil
+      deadline = Time.now + @seconds
       Open3.popen3(*@argv, pgroup: true) do |stdin, stdout, stderr, waiter|
         feeder = Thread.new do
           stdin.write(input)
@@ -263,9 +270,16 @@ module AutoTranslate
           stdin.close unless stdin.closed?
         end
         readers = [Thread.new { stdout.read }, Thread.new { stderr.read }]
-        if waiter.join(@seconds).nil?
+        ([feeder] + readers).each { |thread| thread.report_on_exception = false }
+        begin
+          finished = waiter.join(left(deadline)) && readers.all? { |reader| reader.join(left(deadline)) }
+          unless finished
+            stop(waiter)
+            raise Error.new('translator_timeout', @seconds)
+          end
+        rescue Interrupt
           stop(waiter)
-          raise Error.new('translator_timeout', @seconds)
+          raise
         end
         feeder.join(1)
         out, err = readers.map(&:value)
@@ -282,9 +296,17 @@ module AutoTranslate
       raise Error.new('translator_failed', "#{@argv.first}: not allowed to run it")
     end
 
+    def left(deadline)
+      [deadline - Time.now, 0].max
+    end
+
+    # The whole group, not only the program that was started: TERM, a few
+    # seconds to finish, then KILL for whatever in it is still there --
+    # whether or not the program itself has gone.
     def stop(waiter)
       Process.kill('TERM', -waiter.pid)
-      waiter.join(5) || Process.kill('KILL', -waiter.pid)
+      waiter.join(5)
+      Process.kill('KILL', -waiter.pid)
     rescue Errno::ESRCH, Errno::EPERM
       nil
     end
