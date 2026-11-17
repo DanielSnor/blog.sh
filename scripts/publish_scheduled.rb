@@ -222,7 +222,9 @@ live = deployed
 # is their address, which the pages draw their comment threads from: a
 # second build puts it there.
 if live
-  sent, announce_failures = Publishing.send_owed_announcements
+  # Only what this build saw: a post published by hand while it ran is owed
+  # from a moment after it started, and its page is not in this deploy.
+  sent, announce_failures = Publishing.send_owed_announcements(built_since: Publishing.last_build_started)
   failures += announce_failures
   deployed = Publishing.rebuild_and_deploy(I18n.t('cron.adding_comments')) if sent.positive?
 end

@@ -1238,7 +1238,9 @@ module Doctor
     marker = File.join(ROOT, '.announce-pending')
     return [] unless File.exist?(marker)
 
-    owed = File.readlines(marker, chomp: true, encoding: 'utf-8').map(&:strip).reject(&:empty?).uniq.filter_map do |rel|
+    # A line is the path, a tab and when it was owed (the time is the cron's).
+    lines = File.readlines(marker, chomp: true, encoding: 'utf-8').map { |line| line.scrub.split("\t", 2).first.to_s.strip }
+    owed = lines.reject(&:empty?).uniq.filter_map do |rel|
       post = begin
         JSON.parse(File.read(File.join(content_dir, rel), encoding: 'utf-8'))
       rescue StandardError

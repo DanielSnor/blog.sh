@@ -487,30 +487,87 @@ module Publishing
   # to prevent.
   ANNOUNCE_PENDING = File.join(ROOT, '.announce-pending')
 
-  def owed_announcements
-    File.readlines(ANNOUNCE_PENDING, chomp: true, encoding: 'utf-8').map(&:strip).reject(&:empty?).uniq
+  # A line is `<path under content>\t<when it was owed>`. The time is what
+  # lets a run tell its own debts from somebody else's: a build that started
+  # before a post was published did not put its page on the server, so that
+  # run must not send its toot (the 404 this file exists to prevent, by a
+  # different road: a manual publish while the cron's build was running).
+  # A line with no time (written by 1.12 before this) is payable by anybody.
+  def owed_entries
+    File.readlines(ANNOUNCE_PENDING, chomp: true, encoding: 'utf-8').filter_map do |line|
+      rel, stamp = line.scrub.strip.split("\t", 2)
+      next if rel.to_s.empty?
+
+      [rel, (Time.iso8601(stamp) rescue nil)]
+    end.uniq { |rel, _| rel }
   rescue SystemCallError
     []
   end
 
-  def owe_announcement(path)
-    rel = path.to_s.sub(%r{\A#{Regexp.escape(CONTENT_DIR)}/?}, '')
-    list = owed_announcements
-    return if list.include?(rel)
+  def owed_announcements
+    owed_entries.map(&:first)
+  end
 
-    AtomicWrite.write(ANNOUNCE_PENDING, "#{(list + [rel]).join("\n")}\n")
+  def relative_to_content(path)
+    path.to_s.sub(%r{\A#{Regexp.escape(CONTENT_DIR)}/?}, '')
+  end
+
+  # Owed from now: a post owed again (published, taken down, published
+  # again) is owed from the later moment.
+  def owe_announcement(path)
+    rel = relative_to_content(path)
+    rest = owed_entries.reject { |owed, _| owed == rel }
+    write_owed(rest + [[rel, Time.now]])
   end
 
   def settle_announcement(path)
-    rel = path.to_s.sub(%r{\A#{Regexp.escape(CONTENT_DIR)}/?}, '')
-    left = owed_announcements - [rel]
-    if left.empty?
-      File.delete(ANNOUNCE_PENDING) if File.exist?(ANNOUNCE_PENDING)
-    else
-      AtomicWrite.write(ANNOUNCE_PENDING, "#{left.join("\n")}\n")
-    end
+    rel = relative_to_content(path)
+    write_owed(owed_entries.reject { |owed, _| owed == rel })
   rescue SystemCallError
     nil
+  end
+
+  # Takes the debt off the list and says whether it was there: the one who
+  # takes it sends the toot. A manual publish and the cron can both reach
+  # the same post (the cron paying what a manual run left owed while that
+  # run is still going); whoever claims it first sends, the other does not.
+  def claim_announcement(path)
+    rel = relative_to_content(path)
+    entries = owed_entries
+    return false unless entries.any? { |owed, _| owed == rel }
+
+    write_owed(entries.reject { |owed, _| owed == rel })
+    true
+  end
+
+  def write_owed(entries)
+    if entries.empty?
+      File.delete(ANNOUNCE_PENDING) if File.exist?(ANNOUNCE_PENDING)
+    else
+      AtomicWrite.write(ANNOUNCE_PENDING, entries.map { |rel, at| at ? "#{rel}\t#{at.iso8601(3)}" : rel }.join("\n") + "\n")
+    end
+  end
+
+  # When the last rebuild_and_deploy of this process started reading the
+  # archive -- what send_owed_announcements is told, so that it pays only
+  # the debts that build could see.
+  def last_build_started
+    @last_build_started
+  end
+
+  # The fields an announcement brought, written onto the post as it is NOW
+  # on disk. The copy the sender read is minutes old by the time the toot
+  # comes back (a build and a deploy lie between them on a manual publish),
+  # and writing that copy back undid whatever was saved in between -- an
+  # `edit` made during the deploy, said to be saved, quietly gone.
+  def record_announcement(path, fields, fallback)
+    current = begin
+      JSON.parse(File.read(path, encoding: 'utf-8'))
+    rescue SystemCallError, JSON::ParserError
+      fallback
+    end
+    AtomicWrite.write_json(path, current.merge(fields))
+    current.merge(fields)
   end
 
   # Sends every owed announcement whose post is still published, still
@@ -520,10 +577,16 @@ module Publishing
   # slow to say so, and `./blog.sh toot` is there for a person to try again.
   # The caller rebuilds when `sent` is not zero -- that build is what puts
   # the toot's address on the page.
-  def send_owed_announcements
+  #
+  # built_since: when the build that just went live started. A debt owed
+  # after that moment is a post that build did not see: it stays owed, for
+  # the run that published it or the next tick.
+  def send_owed_announcements(built_since: nil)
     sent = 0
     failed = 0
-    owed_announcements.each do |rel|
+    owed_entries.each do |rel, owed_at|
+      next if built_since && owed_at && owed_at > built_since
+
       path = File.join(CONTENT_DIR, rel)
       post = begin
         JSON.parse(File.read(path, encoding: 'utf-8'))
@@ -534,17 +597,17 @@ module Publishing
         settle_announcement(path)
         next
       end
+      next unless claim_announcement(path)
 
       fields = announce(post, year: File.basename(File.dirname(path)))
       case fields
       when Hash
-        AtomicWrite.write_json(path, post.merge(fields))
+        record_announcement(path, fields, post)
         sent += 1
       when false
         failed += 1
         warn I18n.t('cron.announce_failed', slug: post['slug'])
       end
-      settle_announcement(path)
     end
     [sent, failed]
   end
@@ -636,6 +699,7 @@ module Publishing
     # Noted before the build reads a single file, so a marker written after
     # this instant is somebody else's debt and survives our success.
     started = Time.now
+    @last_build_started = started
     puts
     puts "#{reason}…"
     build = [File.join(ROOT, 'build', 'build_blog.rb')]

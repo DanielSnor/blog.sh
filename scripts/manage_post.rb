@@ -2380,6 +2380,19 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # live, so the address in the toot never leads to a page that is not there
   # yet (Publishing::ANNOUNCE_PENDING). What this holds is the sending.
   send_announcement = announce ? announce_on_publish(updated, new_year, date, ask: asked, defer: true) : nil
+  # Owed BEFORE the build, for the same reason the deploy marker above is:
+  # a run stopped during the build or the deploy (Ctrl-C, a closed SSH
+  # session, a kill) must leave the debt behind for the cron to pay once the
+  # page is out. Written only after a failed deploy, it was lost with the
+  # run, and the post stayed unannounced with nothing saying so.
+  # --no-announce is a decision about this publication: a debt left by an
+  # earlier one (a deploy that failed, then unpublish) is dropped with it.
+  if send_announcement
+    Publishing.owe_announcement(new_path)
+  else
+    Publishing.settle_announcement(path)
+    Publishing.settle_announcement(new_path)
+  end
 
   puts t('cli.published_label', path: new_path)
   # The path is the answer, deployed or not: add <file> reads back the
@@ -2390,10 +2403,7 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   unless rebuild_and_deploy(t('cli.publishing'))
     # Not announced: the page is not there. The debt is written down, and
     # the next tick of the publishing cron that gets a deploy through sends it.
-    if send_announcement
-      Publishing.owe_announcement(new_path)
-      warn t('cli.announce_waits_for_deploy', slug: slug)
-    end
+    warn t('cli.announce_waits_for_deploy', slug: slug) if send_announcement
     return new_path
   end
   # No extra `puts` before "Done:" -- rebuild_and_deploy ended with a blank
@@ -2412,13 +2422,18 @@ end
 # from the toot's address. That build is quick (the cache holds all but this
 # one post); if it fails the site is marked as owing a deploy, as for any
 # other, and the toot is already right: its link works.
+#
+# Claimed first: if the cron already paid this debt while the deploy ran,
+# the toot is out and a second one would stand beside it. Written onto the
+# post as it is now on disk, not the copy read before the build.
 def announce_after_deploy(sending, path, post)
   return unless sending
+  return unless Publishing.claim_announcement(path)
 
   fields = sending.call
   return unless fields
 
-  AtomicWrite.write_json(path, post.merge!(fields))
+  post.replace(Publishing.record_announcement(path, fields, post))
   rebuild_and_deploy(t('cli.adding_comments'))
 end
 
@@ -3924,6 +3939,9 @@ end
 # Returns the path and the announcement addresses that could NOT be
 # deleted and so stay on the post.
 def unpublish_post(path, post, slug)
+  # A toot still owed for this publication is owed no more: the post is a
+  # draft, and a later publish decides about its own announcement.
+  Publishing.settle_announcement(path)
   toot_gone, skeet_gone = retract_announcements(post)
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
