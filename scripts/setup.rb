@@ -976,10 +976,16 @@ def ask_translator(env)
       say('')
       return
     end
+    # Another provider: the address and the key of the one before are not
+    # its. Kept, they sent the new provider's requests -- and the old key --
+    # to the old address, and Enter at the key kept a key the new provider
+    # does not know.
+    switched = chosen != now
     env.set('TRANSLATOR', chosen)
     env.set('TRANSLATOR_MODEL', model.strip)
+    env.unset('TRANSLATOR_URL') if switched
     if chosen == 'openai'
-      url = ask(t('q_translator_url'), ENV['TRANSLATOR_URL'].to_s, hint: t('h_translator_url'))
+      url = ask(t('q_translator_url'), switched ? '' : ENV['TRANSLATOR_URL'].to_s, hint: t('h_translator_url'))
       env.set('TRANSLATOR_URL', url.strip) unless url.to_s.strip.empty?
     end
     puts t('translator_key_where')
@@ -987,11 +993,18 @@ def ask_translator(env)
     puts unless Tui.interactive? # see the note by the Mastodon token above
     acknowledge_secret(key)
     puts
-    env.set('TRANSLATOR_KEY', key) unless key.empty?
+    if !key.empty?
+      env.set('TRANSLATOR_KEY', key)
+    elsif switched
+      env.unset('TRANSLATOR_KEY')
+    end
   end
 
   # What the default is, and what saying no costs: see lib/auto_translate.rb.
-  if Wizard.confirm(t('q_translator_remote'), default: true)
+  # Enter keeps what is set: a server that said deny says it still.
+  remote = ENV['TRANSLATOR_REMOTE'].to_s.strip.downcase
+  allowed_now = remote.empty? || %w[allow on yes true 1].include?(remote)
+  if Wizard.confirm(t('q_translator_remote'), default: allowed_now)
     env.unset('TRANSLATOR_REMOTE')
   else
     env.set('TRANSLATOR_REMOTE', 'deny')
