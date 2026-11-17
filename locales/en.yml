@@ -753,6 +753,7 @@ cli:
   enter_number: "Number (anything else cancels): "
   cancelled_empty: "Cancelled.\n\n"
   no_posts_to_pick: "No posts to choose from."
+  recent_only: "Showing the %{shown} newest of %{total} posts. Type a slug for an older one, or search them all in the Archive."
   no_drafts_to_publish: "No draft ready to publish."
   no_published_posts: "No published post available."
   trash_empty: "Trash is empty."

@@ -99,6 +99,10 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   in a terminal, for a draft, on a site with a real address.
 - **The properties screen says what it means** (#81, Pavel). The Czech hint began "Typ, štítky ...", which reads as
   "tip"; it now begins with the tags, and all three languages name the command as it is typed, `./blog.sh edit`.
+- **A list cut at the 50 newest says so** (#82, Pavel). The list the wizard's Post entry, `edit` and `delete` offer
+  without a slug ends where the Archive goes on; with more than 50 posts it now says "Showing the 50 newest of N
+  posts" and that an older one is reached by its slug or by searching in the Archive. Both entries stay: Post is the
+  quick way to the latest posts, the Archive the way to search all of them.
 
 ### Security
 

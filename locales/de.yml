@@ -745,6 +745,7 @@ cli:
   enter_number: "Nummer (alles andere bricht ab): "
   cancelled_empty: "Abgebrochen.\n\n"
   no_posts_to_pick: "Keine Beiträge zur Auswahl."
+  recent_only: "Gezeigt werden die %{shown} neuesten von %{total} Beiträgen. Ältere per Slug eingeben oder im Archiv in allen suchen."
   no_drafts_to_publish: "Kein Entwurf bereit zur Veröffentlichung."
   no_published_posts: "Kein veröffentlichter Beitrag vorhanden."
   trash_empty: "Der Papierkorb ist leer."

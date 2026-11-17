@@ -8220,7 +8220,13 @@ end
 # Lets `edit`/`delete` be called with no slug: shows the RECENT_LIST_COUNT
 # most recent posts regardless of state.
 def pick_slug_interactively
-  pick_from_list(recent_posts(RECENT_LIST_COUNT), t('cli.no_posts_to_pick'))
+  recent = recent_posts(RECENT_LIST_COUNT)
+  # A list that ends before the archive does says so, and where the rest
+  # is: older posts are reached by their slug here or by searching in the
+  # Archive.
+  total = recent.length == RECENT_LIST_COUNT ? load_posts_summary.length : recent.length
+  puts t('cli.recent_only', shown: recent.length, total: total) if total > recent.length
+  pick_from_list(recent, t('cli.no_posts_to_pick'))
 end
 
 # Lets `publish` be called with no slug: publishing an already-published post

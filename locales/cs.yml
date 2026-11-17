@@ -732,6 +732,7 @@ cli:
   enter_number: "Číslo (cokoliv jiného zruší): "
   cancelled_empty: "Zrušeno.\n\n"
   no_posts_to_pick: "Žádné příspěvky k výběru."
+  recent_only: "Ukázáno %{shown} nejnovějších z %{total} příspěvků. Starší zadej slugem, nebo hledej ve všech v Archivu."
   no_drafts_to_publish: "Není připravený žádný koncept, který bychom mohli publikovat."
   no_published_posts: "Žádný publikovaný příspěvek k dispozici."
   trash_empty: "Koš je prázdný."
