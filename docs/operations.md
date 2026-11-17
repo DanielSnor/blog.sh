@@ -580,7 +580,11 @@ to -- a web service, or a model on your own machine. Free plans of some provider
 use what they are sent to train their models; read the terms of the one you pick.
 The engine keeps no table of models and has not been run against the providers'
 own servers by its tests, only against a stand-in on this machine. Models differ
-much, most in the smaller languages: one wrote the number 36 out as words.
+much, most in the smaller languages: one wrote the number 36 out as words, and a
+small one that otherwise translated a short text correctly put a Czech noun in the
+wrong case ("Druhý odstavce"). The checks above compare addresses, numbers and shape,
+not grammar -- read a translation before it is saved, and try a model on a post you
+can judge before you trust it with the rest.
 
 **What it checks.** Before the file is written the engine compares the translation
 with the original in what a translator is known to damage and a reader does not

@@ -40,6 +40,11 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   model the plan leaves out, too many requests, a server in trouble, a post too long for the model, a model that
   does not exist -- each a code for a program and a sentence for a person that names the setting to change.
   A key is sent over https or to this machine only, and never appears in what the engine says.
+- **Which model is the author's choice, and the quality of the language is the model's.** Run by hand on 16 November
+  against Anthropic (`claude-haiku-5-5`) and Gemini (`gemini-3.5-flash-lite`): both kept the Markdown, the link and the
+  numbers; the Gemini one put a Czech noun in the wrong case ("Druhý odstavce"), which no check of the engine can see,
+  as it compares addresses, numbers and shape, not grammar. OpenAI was reached and said so when the account had no
+  credit. `docs/operations.md` says to read a translation before saving it and to try a model on a post one can judge.
 - **At the terminal** a language with nothing written offers `[a]`: the editor then holds the machine's text, with
   what looked wrong with it and the original as `//` notes. Closing it unchanged asks once before saving.
 - **For the apps**: `translate --json` carries an `auto` block (`available`, and when not, a `problem` and a
