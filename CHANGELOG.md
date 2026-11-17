@@ -83,6 +83,13 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   `doctor` warns of a toot that waits for a deploy (naming the posts, and what to do: deploy, then `./blog.sh toot <slug>`),
   and a toot sent by hand pays the debt. Upgrading: nothing to do; a toot owed by a run that was interrupted is in
   `.announce-pending`.
+  Found by the fleet over 1.12 and fixed before the release: the debt is written BEFORE the build (it was written
+  only when the deploy returned a failure, so a publish stopped by Ctrl-C, a closed SSH session or a kill lost its
+  toot for good); the toot's address is written onto the post as it is on disk after the deploy (an `edit` saved
+  during the deploy was undone); `unpublish` and `publish --no-announce` drop a debt an earlier failed deploy left
+  (the cron announced a post its author had said not to); each line carries the moment it was owed, and the cron
+  pays only the debts its own build saw (a post published by hand while the cron built was announced before its
+  page was out); whoever claims a debt first sends the toot, the other does not.
 
 - **`[d]` in the draft dialog of a scheduled post says what is true now, and that --no-announce does not reach the
   plan** (found by the fleet over 1.11.1). It said "Still scheduled for ..." from the copy read before the keypress, so
@@ -108,6 +115,14 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   without a slug ends where the Archive goes on; with more than 50 posts it now says "Showing the 50 newest of N
   posts" and that an older one is reached by its slug or by searching in the Archive. Both entries stay: Post is the
   quick way to the latest posts, the Archive the way to search all of them.
+
+- **The translator program is stopped when its time is up or on Ctrl-C, with everything it started** (fleet over
+  1.12). `TRANSLATOR_TIMEOUT` waited only for the program itself, so one that left something in the background holding
+  its output kept the engine waiting as long as that lived; Ctrl-C left the engine waiting and a second one left the
+  translator running. After TERM the whole group now gets KILL.
+- **`./setup.sh --translator` on a change of provider drops the old address and key, and Enter keeps a `deny`**
+  (fleet over 1.12). Kept, the old `TRANSLATOR_URL` sent the new provider's requests and key to the old address;
+  and the question about the apps defaulted to yes, so an Enter undid `TRANSLATOR_REMOTE=deny`.
 
 ### Security
 
