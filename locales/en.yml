@@ -1358,6 +1358,8 @@ doctor:
   base_url_placeholder_fix: "Fine while you are only looking at it locally. Set the real one before you deploy, or every link the site publishes about itself points at example.com."
   base_url_shape: "The site's address (%{value}) is not a URL."
   base_url_shape_fix: "It has to start with http:// or https:// and carry a host name."
+  base_url_path: "The site's address (%{value}) has a path in it (%{path}): blog.sh builds a site for the root of a domain, so its pages would ask for their stylesheet, scripts, search and feeds at the root of the domain, not under %{path}."
+  base_url_path_fix: "Give the site the root of a domain or a subdomain of its own (e.g. https://blog.example.com)."
   base_url_slash: "The site's address (%{value}) ends with a slash, which produces doubled slashes in generated links."
   base_url_slash_fix: "Drop the trailing slash."
   page_size: "site.page_size is %{value}; it has to be a whole number greater than zero."

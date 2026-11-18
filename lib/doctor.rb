@@ -398,6 +398,13 @@ module Doctor
       findings << warn(t('base_url_placeholder'), t('base_url_placeholder_fix'))
     elsif !base.match?(%r{\Ahttps?://[^/\s]+})
       findings << error(t('base_url_shape', value: base), t('base_url_shape_fix'))
+    elsif (path = base[%r{\Ahttps?://[^/\s]+(/.*[^/])/?\z}, 1])
+      # A site under a path (https://example.com/blog) is not one this engine
+      # builds: its pages ask for /assets/..., the search and the feeds from
+      # the root of the domain, so they come out unstyled, or styled by
+      # whatever lives at the root -- and nothing said so (the shape check
+      # above only looks at the start).
+      findings << warn(t('base_url_path', value: base, path: path), t('base_url_path_fix'))
     elsif base.end_with?('/')
       findings << warn(t('base_url_slash', value: base), t('base_url_slash_fix'))
     end

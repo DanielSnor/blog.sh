@@ -183,6 +183,11 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   right (sent as an empty tag, "a heading with `code`" came back from DeepL as "a heading with a picture"); an ending
   the service hangs on them ("s `code`m") is dropped. Run by hand against DeepL on 18 November (Free, into Czech):
   the Markdown came back whole, and the check said that "3" had become a word. LibreTranslate: stand-ins only.
+- **`doctor` says when the site's address has a path in it** (`https://example.com/blog`). The engine builds a site
+  for the root of a domain -- its pages ask for `/assets/...`, the search and the feeds from the root -- so under a
+  path they came out unstyled, or styled by whatever lives at the root, and doctor, whose check of the address
+  looked only at its start, said nothing. Serving a site under a path is still not done; the advice is a domain or
+  a subdomain of its own.
 - **`nano` that is really `pico` (macOS from 2026) is opened as pico, with `-w`.** Pico knows none of GNU nano's
   long switches and does not fail on them: it took `--atblanks` for the name of a file, so with no `$EDITOR` set the
   post was written into a file of that name in the current directory and `add` read the post's own file back empty.

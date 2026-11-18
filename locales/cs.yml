@@ -1328,6 +1328,8 @@ doctor:
   base_url_placeholder_fix: "Dokud se na web díváš jen lokálně, nevadí to. Před nasazením nastav skutečnou, jinak každý odkaz, který web sám o sobě zveřejní, míří na example.com."
   base_url_shape: "Adresa webu (%{value}) není URL."
   base_url_shape_fix: "Musí začínat na http:// nebo https:// a obsahovat jméno serveru."
+  base_url_path: "Adresa webu (%{value}) obsahuje cestu (%{path}): blog.sh staví web pro kořen domény, takže by jeho stránky hledaly styly, skripty, hledání a feedy v kořeni domény, ne pod %{path}."
+  base_url_path_fix: "Dej webu kořen vlastní domény nebo subdomény (např. https://blog.example.com)."
   base_url_slash: "Adresa webu (%{value}) končí lomítkem, takže v generovaných odkazech vzniknou dvojitá lomítka."
   base_url_slash_fix: "Smaž koncové lomítko."
   page_size: "site.page_size je %{value}; musí to být celé číslo větší než nula."
