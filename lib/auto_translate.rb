@@ -121,9 +121,13 @@ module AutoTranslate
   # that wrapped it in a code fence is forgiven; one that did not start
   # with the header is not.
   def clean(answer)
-    text = answer.to_s.dup.force_encoding(Encoding::UTF_8).sub(/\A﻿/, '').strip
+    text = answer.to_s.dup.force_encoding(Encoding::UTF_8)
+    # Checked before anything else reads it: every string method after this
+    # raises on bytes that are not UTF-8, and the error said nothing.
+    raise Error.new('translator_bad_output', text.scrub[0, 200]) unless text.valid_encoding?
+
+    text = text.sub(/\A﻿/, '').strip
     raise Error.new('translator_empty') if text.empty?
-    raise Error.new('translator_bad_output', text[0, 200]) unless text.valid_encoding?
 
     if text.match?(/\A```[^\n]*\n/) && text.end_with?('```')
       text = text.sub(/\A```[^\n]*\n/, '').sub(/\n?```\z/, '').strip
@@ -140,7 +144,10 @@ module AutoTranslate
   def no_slug(header)
     lines = header.split("\n", -1)
     at = lines.index { |line| line.match?(/\Aslug[ \t]*:/) }
-    at ? lines[at] = 'slug:' : lines << 'slug:'
+    # Every one of them: the header is read with the last of a repeated key
+    # winning, so a second `slug:` emptied only in the first was the address.
+    lines.reject! { |line| line.match?(/\Aslug[ \t]*:/) }
+    at ? lines.insert(at, 'slug:') : lines << 'slug:'
     lines.join("\n")
   end
 
@@ -237,6 +244,15 @@ module AutoTranslate
   # its own, so that a translator that outlives its time is stopped with
   # everything it started.
   class CommandAdapter
+    # The engine's own secrets, which a translator never needs: env.sh is
+    # exported whole to the engine, and the program -- often an AI agent
+    # with tools of its own, reading a post that may be somebody else's
+    # words -- was handed the tokens to deploy the site and to post as its
+    # owner. The program's OWN key (ANTHROPIC_API_KEY and the like) is not
+    # the engine's and stays.
+    SECRETS = %w[TRANSLATOR_KEY MASTODON_ACCESS_TOKEN BLUESKY_APP_PASSWORD SURFER_PASSWORD SURFER_TOKEN
+                 LJ_PASSWORD TUMBLR_API_KEY BLOG_SH_AUTHORIZED_KEYS].freeze
+
     def initialize(command, seconds)
       @argv = Shellwords.split(command.to_s)
       @seconds = seconds
@@ -261,7 +277,7 @@ module AutoTranslate
       out = err = nil
       status = nil
       deadline = Time.now + @seconds
-      Open3.popen3(*@argv, pgroup: true) do |stdin, stdout, stderr, waiter|
+      Open3.popen3(SECRETS.to_h { |name| [name, nil] }, *@argv, pgroup: true) do |stdin, stdout, stderr, waiter|
         feeder = Thread.new do
           stdin.write(input)
         rescue SystemCallError, IOError
@@ -311,8 +327,12 @@ module AutoTranslate
       nil
     end
 
+    # What the program said last, as text whatever its bytes were: the
+    # fallback read the raw bytes again, and a short message that was not
+    # UTF-8 ended the run with an encoding error instead of saying it.
     def tail(text)
-      text.to_s.force_encoding(Encoding::UTF_8).scrub.strip[-300..] || text.to_s.strip
+      words = text.to_s.dup.force_encoding(Encoding::UTF_8).scrub.strip
+      words.length > 300 ? words[-300..] : words
     end
   end
 

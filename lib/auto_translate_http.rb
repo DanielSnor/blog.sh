@@ -23,6 +23,7 @@ require 'json'
 require 'uri'
 require 'timeout'
 require 'openssl'
+require 'zlib'
 
 module AutoTranslate
   class HttpAdapter
@@ -75,12 +76,14 @@ module AutoTranslate
 
     def send_request(uri, request)
       Timeout.timeout(@seconds) do
-        Net::HTTP.start(uri.host, uri.port, use_ssl: uri.scheme == 'https', open_timeout: [15, @seconds].min,
+        # hostname, not host: an IPv6 literal is `[::1]` in the address and
+        # `::1` to the network.
+        Net::HTTP.start(uri.hostname, uri.port, use_ssl: uri.scheme == 'https', open_timeout: [15, @seconds].min,
                                             read_timeout: @seconds) { |http| http.request(request) }
       end
     rescue Timeout::Error, Net::OpenTimeout, Net::ReadTimeout
       raise Error.new('translator_timeout', @seconds)
-    rescue SocketError, SystemCallError, IOError, OpenSSL::SSL::SSLError, Net::HTTPBadResponse, EOFError => e
+    rescue SocketError, SystemCallError, IOError, OpenSSL::SSL::SSLError, Net::HTTPBadResponse, EOFError, Zlib::Error => e
       raise Error.new('translator_network', scrub("#{e.class}: #{e.message}"))
     end
 
@@ -94,12 +97,20 @@ module AutoTranslate
     # do something about it. A key never appears in what is said.
     def problem(status, reply, response)
       error = reply.is_a?(Hash) && reply['error'].is_a?(Hash) ? reply['error'] : {}
-      message = scrub((error['message'] || response.body).to_s[0, 300])
-      type = (error['type'] || error['code'] || error['status']).to_s
+      # Scrubbed whole, then cut: cut first, a key echoed across the cut was
+      # no longer the key the scrub looked for, and its start stayed.
+      message = scrub((error['message'] || response.body).to_s)[0, 300]
+      # The first of them that is a word: Gemini's `code` is the number 400,
+      # and its `status` (INVALID_ARGUMENT) is the one that says what it was.
+      type = [error['type'], error['status'], error['code']].find { |v| v.is_a?(String) && !v.empty? }.to_s
       low = message.downcase
       code = if (status == 403 && low.include?('subscription tier')) || (status == 429 && response['x-ratelimit-limit-req-minute'] == '0')
                'translator_not_in_plan'
-             elsif [401, 403].include?(status) then 'translator_invalid_key'
+             elsif status == 401 then 'translator_invalid_key'
+             # A refusal is not always the key: a country the provider does
+             # not serve, an API not switched on for the project, a key
+             # without the right to this model. Said as what it is.
+             elsif status == 403 then 'translator_forbidden'
              elsif status == 402 || (status == 429 && (type == 'insufficient_quota' || low.include?('quota') || low.include?('billing')))
                'translator_no_credit'
              elsif status == 429 then 'translator_rate_limited'
@@ -155,7 +166,13 @@ module AutoTranslate
                  when 'content_filter' then :refused
                  end
       finished = :refused if message.is_a?(Hash) && message['refusal'].is_a?(String)
-      need_text(message.is_a?(Hash) ? message['content'] : nil, finished)
+      content = message.is_a?(Hash) ? message['content'] : nil
+      # Some servers (Mistral's reasoning models) answer with blocks: the
+      # text is in the ones that are text, the thinking is not the answer.
+      if content.is_a?(Array)
+        content = content.select { |b| b.is_a?(Hash) && b['type'] == 'text' }.map { |b| b['text'].to_s }.join
+      end
+      need_text(content, finished)
     end
   end
 

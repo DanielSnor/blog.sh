@@ -124,6 +124,40 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   (fleet over 1.12). Kept, the old `TRANSLATOR_URL` sent the new provider's requests and key to the old address;
   and the question about the apps defaulted to yes, so an Enter undid `TRANSLATOR_REMOTE=deny`.
 
+- **The rest of what the fleet over 1.12 found, fixed before the release** (nothing of it was in 1.11.1 but the
+  last item):
+  - *The translator*: an answer or an error message that is not UTF-8 is said as `translator_bad_output` /
+    `translator_failed`, not a Ruby error; every `slug:` line the model writes is emptied, not only the first;
+    `http://[::1]` connects; a key echoed back by a server is hidden before the message is cut, not after; a broken
+    gzip body is a network error; Gemini's own "API key not valid" is `translator_invalid_key`; a 403 is
+    `translator_forbidden` ("the key, the account, the country, or an API not switched on"), not "the key"; an
+    answer in blocks (Mistral's reasoning models) is read from its text blocks.
+  - *`translate --auto`*: "Translating into ..." is said once the post, the language and the translator are known
+    to be in order; a post with neither a title nor text is not sent (`nothing_to_translate`); a file in `tmp/` from
+    an earlier run, not saved yet, is not replaced without `--force` (`pending_exists`).
+  - *Announcements*: a cron stopped between the network's answer and writing the address does not announce the post
+    again (the debt is taken before the toot is sent); a site with no network owes no toot; the message about a toot
+    that waits names `./blog.sh rebuild`, then `toot` or `bluesky` by the site's network, and no longer says the
+    deploy failed when it may only have waited for the lock; a file of debts with bytes that are not UTF-8 stops
+    neither the cron nor doctor.
+  - *Hashtags*: every character a hashtag cannot hold is a `_` like a dot (`R&D` is `#R_D`, `don't` `#don_t`), and
+    none is left at an end (`kytara 🎸` is `#kytara`); invisible marks are taken out; a tag of only punctuation or an
+    emoji is no hashtag; `é` typed two ways is one hashtag; a hashtag is at most 64 graphemes, Bluesky's limit,
+    cut where a `_` is.
+  - *doctor*: a `TRANSLATOR_COMMAND` whose program is not found is a warning, not "set up"; an unreadable
+    `TRANSLATOR_TIMEOUT` or `TRANSLATOR_MAX_TOKENS` is said with the default used instead.
+  - *setup*: `./setup.sh --translator` writes its lines beside the others and leaves the examples in env.sh's
+    explanation alone (they no longer read as commented-out settings).
+  - *Terminal*: the reply links that wrap to a second line on a phone start at the edge, not 16px in.
+  - *The program a translator is*: it is no longer handed the engine's own secrets from env.sh (the Mastodon token,
+    the Bluesky and Surfer passwords, `TRANSLATOR_KEY`, the paired keys); its own key (`ANTHROPIC_API_KEY` and the
+    like) it keeps.
+  - *Two translations of one post*, already so in 1.11.1: saving one made the other "changed", because `base:` was
+    the hash of the whole file. It is the hash of what a translation is made from now -- the original and that
+    language's own text -- and a `base:` of the whole file, as a program from before 1.12 sends it, is still read.
+- README names the `TRANSLATOR_*` settings, and the `--json` table in `docs/operations.md` has the `auto` block and
+  `translate --auto --json` with its codes.
+
 ### Security
 
 - **A paired device may ask for a translation unless the server says `TRANSLATOR_REMOTE=deny`** in `env.sh` (the
@@ -140,8 +174,10 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
 
 ### Not done / to settle before the tag
 
-- Not run against the providers' own servers, only against a stand-in on this machine; the request shapes come
-  from their documentation and our other app's live tests. The docs therefore name no "verified" models.
+- The suite runs the translators only against a stand-in on this machine; the request shapes come from the
+  providers' documentation and our other app's live tests. By hand (see "Which model is the author's choice")
+  Anthropic and Gemini translated and OpenAI answered "no credit"; an OpenAI translation itself is not tried yet.
+  The docs therefore name no "verified" models.
 - DeepL and LibreTranslate are not covered: they take no instructions and would need the post cut into paragraphs
   first. "Translated from" and a list of departures written by the model are likewise left out.
 

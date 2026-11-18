@@ -135,6 +135,11 @@ aside h3, footer h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* The reply links are spaced by the row's gap, not by a margin each: a
+   margin on an inline-block went along to the start of the next line, so
+   the second and third began 16px in on a phone. */
+.comments-reply-own, .comments-reply-other { margin-left: 0; }
+
 /* A button is a word in square brackets. */
 .pagination a,
 .series-nav a,

@@ -189,9 +189,27 @@ module Publishing
   # keeps its address: Slug.slugify makes `_`, space, dot and hyphen the
   # same `-`, so this changes what the announcement says and not where a tag
   # lives.
+  #
+  # Every other character a hashtag cannot hold is the same as a dot (fleet
+  # over 1.12): `R&D` was `#R`, `C++` `#C`, `don't` `#don`, and a space
+  # beside an emoji left `#kytara_`. Invisible marks (a soft hyphen, a
+  # zero-width space) are taken out rather than made a `_`; the text is
+  # composed first (NFC), so `é` typed two ways is one hashtag; and a
+  # hashtag is at most HASHTAG_GRAPHEMES long -- Bluesky's limit for a tag,
+  # past which the whole post is refused -- cut where a `_` is, if one is.
+  HASHTAG_GRAPHEMES = 64
+
   def hashtag_for(tag)
-    word = tag.to_s.gsub(/\A[[:space:].\-]+|[[:space:].\-]+\z/, '').gsub(/[[:space:].\-]+/, '_')
+    text = tag.to_s.dup.force_encoding(Encoding::UTF_8).scrub('')
+    word = text.unicode_normalize(:nfc).gsub(/\p{Cf}/, '').gsub(/[^[:word:]]+/, '_').gsub(/\A_+|_+\z/, '')
+    word = cut_hashtag(word) if grapheme_length(word) > HASHTAG_GRAPHEMES
     word.empty? ? '' : "##{word}"
+  end
+
+  def cut_hashtag(word)
+    kept = word.scan(/\X/).first(HASHTAG_GRAPHEMES).join
+    at = kept.rindex('_')
+    (at && at.positive? ? kept[0, at] : kept).sub(/_+\z/, '')
   end
 
   # Two tags that come to the same hashtag are announced once: `blog.sh` and

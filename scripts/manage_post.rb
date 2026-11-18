@@ -1683,9 +1683,13 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
   # and a change made elsewhere in the meantime would be overwritten in
   # silence. The save rebuilds and deploys, as `edit` does at the desk.
   refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty? && !draft?(post)
-  if !base.empty? && base != Digest::SHA256.hexdigest(original_raw)
-    refuse('changed', t('cli.edit_from_changed', slug: slug))
-  end
+  # A translation may name what it was made from (translation_base) or, as
+  # programs that asked before 1.12 do, the whole file.
+  # A `lang:` naming no language is refused below as what it is, not here.
+  lang_named = meta['lang'].to_s.strip.delete("'\"")
+  same = base == Digest::SHA256.hexdigest(original_raw) ||
+         (meta.key?('lang') && (lang_named.empty? || base == translation_base(post, lang_named)))
+  refuse('changed', t('cli.edit_from_changed', slug: slug)) if !base.empty? && !same
   # `lang:` makes it a translation: the words of one language, not the post.
   # The LINE makes it one, not what the line holds: `lang:` with nothing
   # after it was read as no line at all, and what a program had written as
@@ -2403,7 +2407,10 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   unless rebuild_and_deploy(t('cli.publishing'))
     # Not announced: the page is not there. The debt is written down, and
     # the next tick of the publishing cron that gets a deploy through sends it.
-    warn t('cli.announce_waits_for_deploy', slug: slug) if send_announcement
+    if send_announcement
+      command = SiteConfig.comment_network == :bluesky ? 'bluesky' : 'toot'
+      warn t('cli.announce_waits_for_deploy', slug: slug, command: command)
+    end
     return new_path
   end
   # No extra `puts` before "Done:" -- rebuild_and_deploy ended with a blank
@@ -5465,8 +5472,18 @@ def translate_state(slug, lang)
                                                      'content' => LinkCard.split(post['content']).last }, nil),
                 'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
                 'preview' => PostAddress.path(post),
-                'base' => Digest::SHA256.hexdigest(raw) },
+                'base' => translation_base(post, lang) },
     'auto' => auto_availability }
+end
+
+# What a translation is made from, as `base:` names it: the post's own title
+# and text, and what this language has now. Not the whole file: the hash of
+# all of it changed when ANOTHER language was saved, or a tag, so the second
+# of two translations made side by side was refused as "changed" -- and with
+# --auto, made again at a cost. What it must catch it still does: the
+# original rewritten, or this language saved from somewhere else meanwhile.
+def translation_base(post, lang)
+  Digest::SHA256.hexdigest(JSON.generate([post['title'].to_s, post['content'], post.dig('translations', lang)]))
 end
 
 # Whether `translate --auto` would run for whoever asks, said before the
@@ -5514,13 +5531,19 @@ def auto_translation(slug, lang, force:)
   post = state['post']
   refuse(post['problem'], t('cli.auto_not_editable', slug: slug).strip) unless post['editable']
   refuse('already_written', t('cli.auto_already_written', slug: slug, lang: lang).strip) if post['written'] && !force
+  # A post with neither a title nor words has nothing a translator could be
+  # paid to translate.
+  if AutoTranslate.body(post['original']).strip.empty? && post['original'][/^title:[ \t]*(\S.*)$/, 1].nil?
+    refuse('nothing_to_translate', t('cli.auto_nothing_to_translate', slug: slug).strip)
+  end
+  yield state if block_given?
   [state, AutoTranslate.translate(post['original'], lang_name: language_name(lang), lang_code: lang)]
 end
 
 # The same, said as the command line says things: a refusal whose words
 # are the locale's.
-def auto_translation!(slug, lang, force:)
-  auto_translation(slug, lang, force: force)
+def auto_translation!(slug, lang, force:, &before)
+  auto_translation(slug, lang, force: force, &before)
 rescue AutoTranslate::Error => e
   refuse(e.code, t("cli.auto_#{e.code}", detail: e.detail).strip)
 end
@@ -5542,11 +5565,17 @@ end
 # published and nothing is added: a translation nobody has read is not
 # something to put on a site.
 def cmd_translate_auto(slug, lang, force: false)
-  puts t('cli.auto_working', language: language_name(lang), seconds: AutoTranslate.seconds)
-  state, result = auto_translation!(slug, lang, force: force)
   dir = File.join(ROOT, 'tmp')
-  FileUtils.mkdir_p(dir)
   target = File.join(dir, "#{slug}.#{lang}.md")
+  # Said once everything is known to be in order, and only then: the post,
+  # the language, the translator. It used to be said first, over refusals.
+  state, result = auto_translation!(slug, lang, force: force) do
+    # A file from an earlier run not saved yet is the person's work -- read,
+    # perhaps corrected by hand. Not replaced without being told to.
+    refuse('pending_exists', t('cli.auto_pending_exists', path: "tmp/#{File.basename(target)}").strip) if File.exist?(target) && !force
+    puts t('cli.auto_working', language: language_name(lang), seconds: AutoTranslate.seconds)
+  end
+  FileUtils.mkdir_p(dir)
   AtomicWrite.write(target, AutoTranslate.as_file(result[:text], slug: slug, base: state['post']['base'], lang: lang))
   shown = "tmp/#{File.basename(target)}"
   puts t('cli.auto_saved', path: shown)

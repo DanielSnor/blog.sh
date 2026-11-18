@@ -176,7 +176,8 @@ due.each do |path, _snapshot, _date|
   # Owed, not sent: the toot goes out once the page is live, below -- an
   # address that answers 404 for the minutes a build and a deploy take is
   # what followers used to find (Publishing::ANNOUNCE_PENDING).
-  Publishing.owe_announcement(new_path) unless silent
+  # A site that announces nowhere owes nothing (doctor said it owed a toot).
+  Publishing.owe_announcement(new_path) unless silent || SiteConfig.comment_network.nil?
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
   # One line, not three: a post can be all of unlisted, backdated and

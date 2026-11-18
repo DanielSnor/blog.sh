@@ -188,7 +188,7 @@ module Doctor
     findings.concat(of(:publishing, check_publishing(data)))
     findings.concat(of(:scheduler, check_scheduler))
     findings.concat(of(:deploy_pending, check_deploy_pending))
-    findings.concat(of(:announce_pending, check_announce_pending))
+    findings.concat(of(:announce_pending, check_announce_pending(data)))
     findings.concat(of(:translator, check_translator))
     findings.concat(of(:media_location, check_media_location(root)))
     findings.concat(of(:tag_icons, check_tag_icons(data)))
@@ -1218,7 +1218,25 @@ module Doctor
           else
             "#{kind}, #{ENV['TRANSLATOR_MODEL'].to_s.strip}"
           end
+    # The program, found the way it will be run: by name on PATH, or by its
+    # path. A missing one -- `claude` or `ollama` not on the PATH of this
+    # shell, or of the one the apps arrive in -- was "set up" until the first
+    # translation said otherwise.
+    if kind.empty? || kind == 'command'
+      program = how
+      found = program.include?('/') ? File.file?(program) && File.executable?(program) : find_program(program)
+      return [warn(t('translator_program_missing', program: program), t('translator_program_missing_fix'))] unless found
+    end
     findings = [ok(t(AutoTranslate.remote_allowed?(ENV) ? 'translator_ok' : 'translator_ok_denied', how: how))]
+    # A number the engine cannot read is replaced by its default without a
+    # word; said here, where somebody who wanted a longer limit will look.
+    { 'TRANSLATOR_TIMEOUT' => AutoTranslate::DEFAULT_SECONDS, 'TRANSLATOR_MAX_TOKENS' => 16_000 }.each do |name, default|
+      value = ENV[name].to_s.strip
+      next if value.empty? || (value.match?(/\A\d+\z/) && value.to_i.positive?)
+
+      findings << warn(t('translator_number_unread', name: name, value: value.inspect, default: default),
+                       t('translator_number_unread_fix', name: name))
+    end
     said = ENV['TRANSLATOR_REMOTE'].to_s.strip.downcase
     unless said.empty? || %w[allow on yes true 1 deny off no false 0 never].include?(said)
       findings << warn(t('translator_remote_unknown', value: said.inspect), t('translator_remote_unknown_fix'))
@@ -1234,9 +1252,13 @@ module Doctor
   # announced (by hand, with `toot`) is a debt that no longer is one.
   # Read here from the files themselves, not through Publishing (see the note
   # at the top of this file).
-  def check_announce_pending
+  def check_announce_pending(data = {})
     marker = File.join(ROOT, '.announce-pending')
     return [] unless File.exist?(marker)
+
+    # A site that announces nowhere owes no toot, whatever the file says.
+    bluesky = !dig(data, 'bluesky', 'handle').to_s.strip.empty?
+    return [] unless bluesky || !dig(data, 'mastodon', 'instance').to_s.strip.empty?
 
     # A line is the path, a tab and when it was owed (the time is the cron's).
     lines = File.readlines(marker, chomp: true, encoding: 'utf-8').map { |line| line.scrub.split("\t", 2).first.to_s.strip }
@@ -1254,7 +1276,8 @@ module Doctor
     end
     return [] if owed.empty?
 
-    [warn(t('announce_pending', count: owed.size, slugs: owed.first(5).join(', ')), t('announce_pending_fix'))]
+    [warn(t('announce_pending', count: owed.size, slugs: owed.first(5).join(', ')),
+          t('announce_pending_fix', command: bluesky && dig(data, 'mastodon', 'instance').to_s.strip.empty? ? 'bluesky' : 'toot'))]
   rescue SystemCallError
     []
   end
