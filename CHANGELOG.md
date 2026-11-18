@@ -178,8 +178,11 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   translator. DeepL: `TRANSLATOR_KEY`, a free key (`…:fx`) goes to api-free.deepl.com; English is `EN-US` and
   Portuguese `PT-PT` unless `TRANSLATOR_DEEPL_EN` / `TRANSLATOR_DEEPL_PT` say otherwise; 403 is a refused key, 456
   used-up characters. LibreTranslate: `TRANSLATOR_URL` (a server of one's own, http on this machine too), a key only
-  where the server wants one. `./setup.sh --translator` offers both, `doctor` knows them. Run against stand-ins
-  only, not against the services themselves.
+  where the server wants one. `./setup.sh --translator` offers both, `doctor` knows them. A code span and an
+  address go with their words, in a tag the service is told not to translate, so the sentence around them reads
+  right (sent as an empty tag, "a heading with `code`" came back from DeepL as "a heading with a picture"); an ending
+  the service hangs on them ("s `code`m") is dropped. Run by hand against DeepL on 18 November (Free, into Czech):
+  the Markdown came back whole, and the check said that "3" had become a word. LibreTranslate: stand-ins only.
 - **`nano` that is really `pico` (macOS from 2026) is opened as pico, with `-w`.** Pico knows none of GNU nano's
   long switches and does not fail on them: it took `--atblanks` for the name of a file, so with no `$EDITOR` set the
   post was written into a file of that name in the current directory and `add` read the post's own file back empty.

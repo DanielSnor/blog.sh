@@ -15,7 +15,12 @@
 # - inside the text, whatever must come back unchanged -- a code span, the
 #   `](address)` of a link or a picture, a bare address, an HTML tag, the
 #   `**` and `_` of emphasis -- is replaced by a tag the service is told to
-#   keep (`<x i="3"/>`), and put back from the answer.
+#   keep (`<x i="3"/>`), and put back from the answer. A code span and an
+#   address stand where a word of the sentence stands, so they go WITH their
+#   words, in a tag the service is told not to translate
+#   (`<x i="0">code</x>`): sent as an empty tag, "a heading with `code`"
+#   came back as "a heading with a picture `code`" -- the service guessed a
+#   noun for the gap.
 #
 # What comes out is checked like any other translation
 # (AutoTranslate.check): an address or a number that did not survive is a
@@ -36,6 +41,8 @@ module AutoTranslate
     # bullet or a number.
     PREFIX = /\A(\s*(?:>[ \t]?)*\s*(?:\#{1,6}[ \t]+|[-*+][ \t]+|\d+[.)][ \t]+)?)(.*?)([ \t]{2,}|\\)?\z/m
     # Kept as they are inside the text, in this order.
+    # Which of KEEP go with their words (a code span, an address).
+    WORDED = [0, 3, 4].freeze
     KEEP = [
       /`+[^`]*`+/,                         # a code span
       /\]\([^)]*\)/,                       # `](address "title")` of a link or a picture
@@ -99,25 +106,35 @@ module AutoTranslate
     # The text as it is sent (`sent`) and what each tag stands for (`kept`).
     def mask(text, tag)
       kept = []
+      glued = []
       sent = +''
       rest = text
       until rest.empty?
-        found = KEEP.filter_map { |re| (m = rest.match(re)) && [m.begin(0), m] }.min_by(&:first)
+        found = KEEP.each_with_index.filter_map { |re, n| (m = rest.match(re)) && [m.begin(0), m, n] }.min_by(&:first)
         unless found
           sent << escape(rest)
           break
         end
-        at, match = found
+        at, match, kind = found
         sent << escape(rest[0, at])
-        sent << placeholder(kept.length, tag)
+        sent << placeholder(kept.length, tag, WORDED.include?(kind) ? match[0].delete('`<>') : nil)
         kept << match[0]
         rest = rest[(at + match[0].length)..]
+        glued << rest.match?(/\A[[:alpha:]]/)
       end
-      { sent: sent, kept: kept }
+      { sent: sent, kept: kept, glued: glued }
     end
 
-    def placeholder(index, tag)
-      tag == :html ? %(<x i="#{index}"></x>) : %(<x i="#{index}"/>)
+    # Empty, or holding the words it stands for, kept from translation:
+    # DeepL by `ignore_tags`, LibreTranslate by `translate="no"`.
+    def placeholder(index, tag, words = nil)
+      if tag == :html
+        %(<x i="#{index}" translate="no">#{escape(words.to_s)}</x>)
+      elsif words
+        %(<x i="#{index}">#{escape(words)}</x>)
+      else
+        %(<x i="#{index}"/>)
+      end
     end
 
     # The translation with every tag put back. A tag the service lost is a
@@ -125,7 +142,16 @@ module AutoTranslate
     # check against the original says what went.
     def unmask(translated, masked)
       kept = masked[:kept]
-      text = translated.to_s.gsub(%r{<x\s+i="(\d+)"\s*/?>(?:\s*</x>)?}) { kept[Regexp.last_match(1).to_i].to_s }
+      put = ->(m) { kept[m.to_i].to_s }
+      # A language that declines its nouns hangs an ending on the kept words
+      # ("s `code`m"): letters stuck to the tag that the original did not
+      # have there are the service's, and go.
+      text = translated.to_s.gsub(%r{<x\s+i="(\d+)"[^>/]*>.*?</x>([[:alpha:]]*)}m) do
+        at = Regexp.last_match(1)
+        ending = Regexp.last_match(2)
+        put.call(at) + (masked[:glued].to_a[at.to_i] ? ending : '')
+      end
+      text = text.gsub(%r{<x\s+i="(\d+)"[^>]*/>}) { put.call(Regexp.last_match(1)) }
       unescape(text.gsub(%r{</?x\b[^>]*>}, ''))
     end
 
