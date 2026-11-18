@@ -170,6 +170,13 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   - *A link block whose title is empty or only spaces* is drawn by its address, not as an empty, invisible link.
   - *The cron on a site with an announcement and no `site.base_url`* says that, not "check the token" (the build
     refuses such a site first today, so this is said only should that change).
+- **`nano` that is really `pico` (macOS from 2026) is opened as pico, with `-w`.** Pico knows none of GNU nano's
+  long switches and does not fail on them: it took `--atblanks` for the name of a file, so with no `$EDITOR` set the
+  post was written into a file of that name in the current directory and `add` read the post's own file back empty.
+  The engine tells pico by where the link leads (it never runs it to ask) and starts it with `-w` -- no lines broken
+  as they are typed, which GNU nano reads the same way, and which is now also the fallback for an old GNU nano.
+  `doctor` says when `nano` is pico (a paragraph is not wrapped on the screen there) and how to get GNU nano, and
+  when there is no editor at all. The setup wizard's own editor step opens `nano -w` too.
 - README names the `TRANSLATOR_*` settings, and the `--json` table in `docs/operations.md` has the `auto` block and
   `translate --auto --json` with its codes.
 

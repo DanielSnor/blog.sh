@@ -122,9 +122,11 @@ cd myblog
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
 
-The system nano is as old as the system Ruby -- if the editor step
-complains about options, set your own: `export EDITOR=vim` (or `code -w`,
-or plain `nano`).
+On a current macOS `nano` is really `pico`: the engine notices and opens
+it with `-w`, so a paragraph stays one line, but pico does not wrap it on
+the screen. `brew install nano` gives GNU nano, which does; or set your
+own editor: `export EDITOR=vim` (or `code -w`). `./blog.sh doctor` says
+which one you have.
 
 **An icon instead of `cd myblog && ./blog.sh`.** On a Mac `./setup.sh`
 ends by offering to put a launcher in Applications: an icon, named after

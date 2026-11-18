@@ -806,12 +806,16 @@ def editor_round_trip(initial_content, hint_comment)
     # no words and the post's own file was run as the command (fleet over
     # 1.11.1).
     own = [ENV['EDITOR'], ENV['VISUAL']].map { |e| e.to_s.strip }.find { |e| !e.empty? }
-    editor = own || 'nano --softwrap --atblanks --trimblanks'
+    # Which nano it is decides the switches (lib/default_editor.rb): pico,
+    # which macOS now calls nano, took the GNU ones for file names.
+    require_relative '../lib/default_editor'
+    editor = own || DefaultEditor.argv.join(' ')
     ok = system(*Shellwords.split(editor), path)
-    # The default nano flags postdate the 2007-vintage nano Apple still
-    # ships -- when the *default* editor rejects them, retry bare nano
-    # before giving up. A user's own $EDITOR gets no second-guessing.
-    ok ||= own.nil? && system('nano', path)
+    # The long switches postdate the old GNU nano Apple shipped for years --
+    # when the *default* editor rejects them, retry with the one switch every
+    # nano knows (-w: do not break lines), and only then bare nano. A user's
+    # own $EDITOR gets no second-guessing.
+    ok ||= own.nil? && (system(*DefaultEditor::PLAIN, path) || system('nano', path))
     unless ok
       abort(t('cli.editor_failed', editor: editor))
     end

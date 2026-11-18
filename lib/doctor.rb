@@ -190,6 +190,7 @@ module Doctor
     findings.concat(of(:deploy_pending, check_deploy_pending))
     findings.concat(of(:announce_pending, check_announce_pending(data)))
     findings.concat(of(:translator, check_translator))
+    findings.concat(of(:editor, check_editor))
     findings.concat(of(:media_location, check_media_location(root)))
     findings.concat(of(:tag_icons, check_tag_icons(data)))
     findings.concat(of(:social_icons, check_social_icons(data)))
@@ -1201,6 +1202,25 @@ module Doctor
   # out at the first translation, in the middle of writing. Read by
   # AutoTranslate itself, from the environment this run was given (the wrapper
   # sources env.sh): the settings mean what the translator takes them to mean.
+  # The editor `add`, `edit` and the wizard open when nobody has named one.
+  # macOS now ships pico under the name nano: it works (the engine starts it
+  # with -w, lib/default_editor.rb), but it does not wrap a long line on the
+  # screen, so a paragraph runs off to the right -- worth knowing, and one
+  # command away from GNU nano. Nothing is said when $EDITOR or $VISUAL is
+  # set: that is somebody's own choice.
+  def check_editor
+    return [] unless [ENV['EDITOR'], ENV['VISUAL']].all? { |e| e.to_s.strip.empty? }
+
+    require_relative 'default_editor'
+    if DefaultEditor.nano_path.nil?
+      [warn(t('editor_missing'), t('editor_missing_fix'))]
+    elsif DefaultEditor.pico?
+      [warn(t('editor_pico', path: DefaultEditor.nano_path), t('editor_pico_fix'))]
+    else
+      []
+    end
+  end
+
   def check_translator
     kind = ENV['TRANSLATOR'].to_s.strip.downcase
     command = ENV['TRANSLATOR_COMMAND'].to_s.strip
