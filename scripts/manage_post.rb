@@ -8241,7 +8241,11 @@ def pick_from_list(posts, empty_message)
   # letters falls back to entering a slug). Piped input keeps the
   # numbered list exactly as before.
   if Tui.interactive?
-    choice = Tui.menu(posts.map { |p| summary_row(p) },
+    # Numbered as the piped list is: a typed number picks that row of the
+    # whole list, and with fifty rows and no numbers "35" was a guess
+    # (Pavel, #82).
+    width = posts.size.to_s.length
+    choice = Tui.menu(posts.each_with_index.map { |p, i| "#{(i + 1).to_s.rjust(width)}) #{summary_row(p)}" },
                       hint: t('cli.menu_hint'), allow_text: true,
                       text_prompt: t('cli.enter_number_or_slug'))
     abort t('cli.cancelled_empty') if choice.nil?
