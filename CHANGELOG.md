@@ -155,6 +155,21 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   - *Two translations of one post*, already so in 1.11.1: saving one made the other "changed", because `base:` was
     the hash of the whole file. It is the hash of what a translation is made from now -- the original and that
     language's own text -- and a `base:` of the whole file, as a program from before 1.12 sends it, is still read.
+- **What the fleet over 1.12 found that was already so in 1.11.1, fixed with the rest:**
+  - *A site deployed nowhere is not announced* ("built locally and goes nowhere"): its page is on no server, so a
+    toot pointed at nothing. It says so, with `./blog.sh toot <slug>` (or `bluesky`) for when the site is online.
+    Upgrading: a site that serves `public.nosync` itself, with no deploy target set, announces by hand from now on.
+  - *A toot past 500 characters even without a perex* (many tags, a long title) went out as it was and Mastodon
+    refused it, so the post was not announced: tags now yield from the end, then the title on a word, as on Bluesky.
+  - *`translate ... --json` with a mistake in its words* (no language, an unknown word, `--force` without `--auto`,
+    no slug) answers an object and a zero, with `needs_language`, `unknown_args`, `force_needs_auto`, `needs_slug`,
+    `no_locales`.
+  - *The field for one's own server* (and the share button's, the same check) refuses what a browser does not take
+    for a host -- a port past 65535, `a<b.c`, `evil.com#.mastodon.social` -- instead of a button that did nothing or
+    opened somewhere else than it said; a server is remembered only once its tab opened.
+  - *A link block whose title is empty or only spaces* is drawn by its address, not as an empty, invisible link.
+  - *The cron on a site with an announcement and no `site.base_url`* says that, not "check the token" (the build
+    refuses such a site first today, so this is said only should that change).
 - README names the `TRANSLATOR_*` settings, and the `--json` table in `docs/operations.md` has the `auto` block and
   `translate --auto --json` with its codes.
 

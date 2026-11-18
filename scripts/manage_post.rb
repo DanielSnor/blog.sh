@@ -160,10 +160,7 @@ end
 # it -- looked up by name it was nothing, and a publish that had just
 # uploaded said the site went nowhere (fleet, 26. 9. 2026).
 def deploys_somewhere?
-  require_relative '../lib/deploy_backend'
-  name = ENV['DEPLOY_BACKEND'].to_s
-  backend = name.empty? ? DeployBackend::Surfer : DeployBackend::BACKENDS[name]
-  !backend.nil? && backend.configured?
+  Publishing.deploys_somewhere?
 end
 
 # --- frontmatter ------------------------------------------------------
@@ -2384,6 +2381,14 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # live, so the address in the toot never leads to a page that is not there
   # yet (Publishing::ANNOUNCE_PENDING). What this holds is the sending.
   send_announcement = announce ? announce_on_publish(updated, new_year, date, ask: asked, defer: true) : nil
+  # A site that goes nowhere is not announced: its page is built here and is
+  # on no server, so the toot would point at nothing (fleet over 1.12, 03/5;
+  # so since 1.0). Said, with the command for when it is online.
+  if send_announcement && !deploys_somewhere?
+    send_announcement = nil
+    command = SiteConfig.comment_network == :bluesky ? 'bluesky' : 'toot'
+    warn t('cli.announce_goes_nowhere', slug: slug, command: command)
+  end
   # Owed BEFORE the build, for the same reason the deploy marker above is:
   # a run stopped during the build or the deploy (Ctrl-C, a closed SSH
   # session, a kill) must leave the debt behind for the cron to pay once the
@@ -9143,22 +9148,31 @@ begin
       json = !args.delete('--json').nil?
       auto = !args.delete('--auto').nil?
       force = !args.delete('--force').nil?
+      # Under --json a mistake in the words is an answer like any other: an
+      # object and a zero, not prose on a stderr a phone's shortcut throws
+      # away (fleet over 1.12, 02/7).
+      stop = lambda do |code, message|
+        abort message unless json
+
+        puts JSON.generate('ok' => false, 'error' => code, 'message' => message.to_s.strip)
+        exit 0
+      end
       lang = args.find { |arg| arg.start_with?('--lang=') }&.delete_prefix('--lang=')
       args.reject! { |arg| arg.start_with?('--lang=') }
       if lang.nil? && (at = args.index('--lang'))
         lang = args[at + 1]
         args.slice!(at, 2)
       end
-      abort t('cli.translate_json_needs_slug') if json && (args.empty? || args.first.to_s.start_with?('--'))
+      stop.call('needs_slug', t('cli.translate_json_needs_slug')) if json && (args.empty? || args.first.to_s.start_with?('--'))
       slug = args.shift || (auto ? newest_published_slug : pick_slug_interactively)
-      abort t('cli.auto_no_post') if auto && slug.to_s.empty?
+      stop.call('not_found', t('cli.auto_no_post')) if auto && slug.to_s.empty?
       lang ||= args.shift unless args.first.to_s.start_with?('--')
       # 🪤 Whatever is still here was not asked for: a typo in `--lang`, a
       # second `--lang`, a stray word. Swallowing it silently is how a
       # translation ends up in a language nobody typed -- and the one
       # message that came out named the typo as the language, which sent
       # the reader to site.locales to add it.
-      abort t('cli.translate_unknown_args', args: args.join(' ')) unless args.empty?
+      stop.call('unknown_args', t('cli.translate_unknown_args', args: args.join(' '))) unless args.empty?
       lang = nil if lang.to_s.start_with?('--')
       if lang.to_s.strip.empty?
         # Named from what THIS site publishes: the sentence used to say
@@ -9167,13 +9181,13 @@ begin
         own = SiteConfig.get('site', 'lang', default: 'en').to_s
         others = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
         others = others.reject { |code| code.empty? || code == own }.uniq
-        abort t('cli.translate_needs_locales') if others.empty?
-        abort t('cli.translate_needs_language', lang: others.first, langs: others.join(', '))
+        stop.call('no_locales', t('cli.translate_needs_locales')) if others.empty?
+        stop.call('needs_language', t('cli.translate_needs_language', lang: others.first, langs: others.join(', ')))
       end
       if auto
         json ? translate_auto_as_json(slug, lang.to_s.strip, force: force) : cmd_translate_auto(slug, lang.to_s.strip, force: force)
       else
-        abort t('cli.translate_force_needs_auto') if force
+        stop.call('force_needs_auto', t('cli.translate_force_needs_auto')) if force
         json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
       end
     when 'edit'

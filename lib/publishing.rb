@@ -231,6 +231,21 @@ module Publishing
     fixed_length += LINK_LENGTH - url.length unless url.to_s.strip.empty?
     budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
 
+    # Past the limit even without a perex, Mastodon refuses the whole toot
+    # and the post goes out unannounced -- what Bluesky's composer has been
+    # spared since 1.4. What yields is the same here: tags from the end
+    # until the title has room, then the title on a word. The address never.
+    if budget.negative?
+      linked = ->(list) { [url, hashtags_for(list)].reject { |p| p.to_s.strip.empty? }.join("\n\n").length + LINK_LENGTH - url.length }
+      tag_list = Array(tags).dup
+      tag_list.pop while !tag_list.empty? && TOOT_LENGTH - linked.call(tag_list) - 2 < MIN_TITLE_GRAPHEMES
+      hashtags = hashtags_for(tag_list)
+      room = TOOT_LENGTH - linked.call(tag_list) - 2
+      title = trim_to_graphemes(title.to_s, room)
+      fixed_length = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length + LINK_LENGTH - url.length
+      budget = TOOT_LENGTH - fixed_length - 2
+    end
+
     [title, perex_for(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
   end
 
@@ -624,10 +639,21 @@ module Publishing
         sent += 1
       when false
         failed += 1
-        warn I18n.t('cron.announce_failed', slug: post['slug'])
+        # Without base_url nothing was sent, and the token is not the reason.
+        warn I18n.t(base_url.empty? ? 'cron.announce_failed_base_url' : 'cron.announce_failed', slug: post['slug'])
       end
     end
     [sent, failed]
+  end
+
+  # An unset DEPLOY_BACKEND is Surfer, as DeployBackend.pick and doctor read
+  # it -- looked up by name it was nothing, and a publish that had just
+  # uploaded said the site went nowhere (fleet, 26. 9. 2026).
+  def deploys_somewhere?
+    require_relative 'deploy_backend'
+    name = ENV['DEPLOY_BACKEND'].to_s
+    backend = name.empty? ? DeployBackend::Surfer : DeployBackend::BACKENDS[name]
+    !backend.nil? && backend.configured?
   end
 
   # The scheduler's heartbeat. Its MTIME is the whole content -- the file

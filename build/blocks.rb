@@ -404,7 +404,10 @@ module Blocks
       end.join
       %(<dl class="chat">#{rows}</dl>)
     when 'link'
-      title = CGI.escapeHTML((block['title'] || block['url']).to_s)
+      # A title of nothing but spaces is no title: the address is drawn, as
+      # for one with none -- it was an empty, invisible link (fleet over 1.12,
+      # 05/3; a hand-made JSON or a Tumblr import can carry "title": "").
+      title = CGI.escapeHTML((block['title'].to_s.strip.empty? ? block['url'] : block['title']).to_s)
       description = CGI.escapeHTML(block['description'].to_s)
       if title_lifted
         # The title is the post's heading now, and the heading is the link.

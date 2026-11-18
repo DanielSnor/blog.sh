@@ -230,7 +230,18 @@
     var at = value.lastIndexOf('@');
     if (at !== -1) { value = value.slice(at + 1); }
     if (!value || value.indexOf(' ') !== -1) { return null; }
-    return /^[^\s.:\/@]+(\.[^\s.:\/@]+)+(:\d{1,5})?$/.test(value) ? value : null;
+    if (!/^[^\s.:\/@<>"'`%?#\\]+(\.[^\s.:\/@<>"'`%?#\\]+)+(:\d{1,5})?$/.test(value)) { return null; }
+    // And a name the browser itself takes for a host: what it cannot open
+    // (a port past 65535, a character no host may hold) made window.open
+    // throw, the button did nothing, and the value was kept and shown as
+    // "Reply from ..." (fleet over 1.12, 05/1). Same as share.js `host`.
+    try {
+      var url = new URL('https://' + value + '/');
+      if (url.pathname !== '/' || url.search || url.hash || url.username || url.password) { return null; }
+    } catch (e) {
+      return null;
+    }
+    return value;
   }
 
   function rememberedInstance() {
@@ -305,14 +316,21 @@
         input.setAttribute('aria-invalid', 'true');
         return;
       }
-      error.hidden = true;
-      input.removeAttribute('aria-invalid');
-      rememberInstance(server);
       var url = authorizeUrl(server, tootUrl);
       // A new tab, as the link beside it opens one. A browser that refuses
       // the tab is not left with a button that does nothing: the reader goes
-      // there in this one.
-      var tab = window.open(url, '_blank');
+      // there in this one. Remembered only once it opened.
+      var tab;
+      try {
+        tab = window.open(url, '_blank');
+      } catch (e) {
+        error.hidden = false;
+        input.setAttribute('aria-invalid', 'true');
+        return;
+      }
+      error.hidden = true;
+      input.removeAttribute('aria-invalid');
+      rememberInstance(server);
       if (tab) {
         try { tab.opener = null; } catch (e) { /* cross-origin already */ }
       } else {
