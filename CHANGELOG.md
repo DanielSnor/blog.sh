@@ -170,6 +170,16 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   - *A link block whose title is empty or only spaces* is drawn by its address, not as an empty, invisible link.
   - *The cron on a site with an announcement and no `site.base_url`* says that, not "check the token" (the build
     refuses such a site first today, so this is said only should that change).
+- **DeepL and LibreTranslate as translators** (`TRANSLATOR=deepl` / `libretranslate`, 18 November). They take no
+  instructions, so the post is sent paragraph by paragraph -- each heading, list item and quoted line on its own --
+  with what must come back unchanged kept aside as tags the service leaves alone: code (a code block is not sent at
+  all), the address of a link or a picture, bare addresses, HTML, the marks of emphasis and of the line itself. The
+  text of a link and a picture's description are translated; the check against the original runs as for any
+  translator. DeepL: `TRANSLATOR_KEY`, a free key (`…:fx`) goes to api-free.deepl.com; English is `EN-US` and
+  Portuguese `PT-PT` unless `TRANSLATOR_DEEPL_EN` / `TRANSLATOR_DEEPL_PT` say otherwise; 403 is a refused key, 456
+  used-up characters. LibreTranslate: `TRANSLATOR_URL` (a server of one's own, http on this machine too), a key only
+  where the server wants one. `./setup.sh --translator` offers both, `doctor` knows them. Run against stand-ins
+  only, not against the services themselves.
 - **`nano` that is really `pico` (macOS from 2026) is opened as pico, with `-w`.** Pico knows none of GNU nano's
   long switches and does not fail on them: it took `--atblanks` for the name of a file, so with no `$EDITOR` set the
   post was written into a file of that name in the current directory and `add` read the post's own file back empty.
@@ -200,8 +210,7 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   providers' documentation and our other app's live tests. By hand (see "Which model is the author's choice")
   Anthropic and Gemini translated and OpenAI answered "no credit"; an OpenAI translation itself is not tried yet.
   The docs therefore name no "verified" models.
-- DeepL and LibreTranslate are not covered: they take no instructions and would need the post cut into paragraphs
-  first. "Translated from" and a list of departures written by the model are likewise left out.
+- "Translated from" and a list of departures written by the model are left out.
 
 
 ## 1.11.1 -- 2026-11-15

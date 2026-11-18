@@ -37,10 +37,10 @@ module AutoTranslate
       @base = (env['TRANSLATOR_URL'].to_s.strip.empty? ? self.class::DEFAULT_URL : env['TRANSLATOR_URL'].to_s.strip).sub(%r{/+\z}, '')
       value = env['TRANSLATOR_MAX_TOKENS'].to_s.strip
       @tokens = value.match?(/\A\d+\z/) && value.to_i.positive? ? value.to_i : DEFAULT_TOKENS
-      raise Error.new('translator_missing_setting', 'TRANSLATOR_MODEL') if @model.empty?
+      raise Error.new('translator_missing_setting', 'TRANSLATOR_MODEL') if @model.empty? && needs_model?
 
       uri = address(@base)
-      raise Error.new('translator_missing_setting', 'TRANSLATOR_KEY') if @key.empty? && !loopback?(uri)
+      raise Error.new('translator_missing_setting', 'TRANSLATOR_KEY') if @key.empty? && !loopback?(uri) && needs_key?
     end
 
     def translate(instructions, document)
@@ -57,6 +57,17 @@ module AutoTranslate
     end
 
     private
+
+    # A model is named for every language model; DeepL and LibreTranslate
+    # have none (lib/auto_translate_segments.rb).
+    def needs_model?
+      true
+    end
+
+    # Off this machine a key, except where a server of one's own wants none.
+    def needs_key?
+      true
+    end
 
     # The web address, or an Error: http and https only, a host in it, and
     # http only where nothing leaves the machine.
@@ -246,3 +257,5 @@ module AutoTranslate
   ADAPTERS['anthropic'] = ->(env) { AnthropicAdapter.new(env, AutoTranslate.seconds(env)) }
   ADAPTERS['gemini'] = ->(env) { GeminiAdapter.new(env, AutoTranslate.seconds(env)) }
 end
+
+require_relative 'auto_translate_segments'

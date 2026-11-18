@@ -569,7 +569,24 @@ export TRANSLATOR_KEY=<the provider's key>                 # not needed for a se
 export TRANSLATOR_URL=https://openrouter.ai/api/v1         # OpenAI-style: where its /v1 is
 export TRANSLATOR_MAX_TOKENS=16000                         # how long an answer may be
 export TRANSLATOR_TIMEOUT=300                              # seconds
+
+# Or a translation service, which takes no instructions and no model:
+export TRANSLATOR=deepl                                    # TRANSLATOR_KEY; a free key (…:fx) goes to api-free.deepl.com
+export TRANSLATOR_DEEPL_EN=EN-GB                           # English is EN-US unless said; Portuguese PT-PT (TRANSLATOR_DEEPL_PT)
+export TRANSLATOR=libretranslate                           # TRANSLATOR_URL of your server (http on this machine too);
+                                                           # TRANSLATOR_KEY only if it wants one (libretranslate.com does)
 ```
+
+**DeepL and LibreTranslate** translate text, not instructions, so the post is
+not handed to them whole: it is sent paragraph by paragraph -- each heading,
+list item and line of a quote on its own -- with everything that must come back
+unchanged kept aside as a tag the service is told to leave alone: code (a code
+block is not sent at all), the address of a link or a picture, a bare address,
+an HTML tag, the marks of emphasis, and the `## `, `- `, `1. ` or `> ` in front
+of a line. The text of a link and a picture's description are translated. A
+tag the service drops is a piece of Markdown missing, and the check below says
+which. Being sent in pieces, a sentence that runs over a line break is
+translated as two.
 
 A key goes over https, or over http to this machine; to any other host over http it
 is refused before anything is sent. A key never appears in what the engine says,

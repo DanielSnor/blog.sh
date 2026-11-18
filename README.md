@@ -331,7 +331,7 @@ export GIT_PAGES_REMOTE=...        # git backend (+ optional GIT_PAGES_BRANCH/_C
 export RCLONE_TARGET=...           # rclone backend (+ optional RCLONE_ARGS)
 export SFTP_TARGET=...             # sftp backend (+ optional SFTP_REMOTE_DIR/SFTP_ARGS)
 export TRANSLATOR_COMMAND=...      # machine translation by a program (optional) -- or:
-export TRANSLATOR=...              # openai | anthropic | gemini, with TRANSLATOR_MODEL, TRANSLATOR_KEY
+export TRANSLATOR=...              # openai | anthropic | gemini (TRANSLATOR_MODEL) | deepl | libretranslate, TRANSLATOR_KEY
                                    # (+ optional TRANSLATOR_URL, TRANSLATOR_TIMEOUT, TRANSLATOR_MAX_TOKENS,
                                    # TRANSLATOR_REMOTE=deny); ./setup.sh --translator asks for them
 ```

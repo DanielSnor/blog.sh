@@ -1236,7 +1236,7 @@ module Doctor
     how = if kind.empty? || kind == 'command'
             Shellwords.split(command).first.to_s
           else
-            "#{kind}, #{ENV['TRANSLATOR_MODEL'].to_s.strip}"
+            [kind, ENV['TRANSLATOR_MODEL'].to_s.strip].reject(&:empty?).join(', ')
           end
     # The program, found the way it will be run: by name on PATH, or by its
     # path. A missing one -- `claude` or `ollama` not on the PATH of this

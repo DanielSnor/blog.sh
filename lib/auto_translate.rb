@@ -227,6 +227,9 @@ module AutoTranslate
   # what looks wrong with it. { text:, warnings: }.
   def translate(original_document, lang_name:, lang_code:, env: ENV)
     translator = adapter(env)
+    # A translator that takes no instructions (DeepL, LibreTranslate) is told
+    # the language by its code.
+    translator.lang = lang_code if translator.respond_to?(:lang=)
     answer = translator.translate(instructions(lang_name, lang_code), original_document)
     text = clean(answer)
     { text: text, warnings: check(original_document, text) }

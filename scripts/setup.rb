@@ -926,7 +926,7 @@ end
 # post away -- so it is asked for by name, and the questions of the main run
 # stay as they were.
 TRANSLATORS = [%w[none translator_none], %w[command translator_command], %w[openai translator_openai],
-               %w[anthropic translator_anthropic], %w[gemini translator_gemini]].freeze
+               %w[anthropic translator_anthropic], %w[gemini translator_gemini], %w[deepl translator_deepl], %w[libretranslate translator_libretranslate]].freeze
 
 def ask_translator(env)
   say(t('section_translator'), :bold)
@@ -968,10 +968,16 @@ def ask_translator(env)
     env.unset('TRANSLATOR')
     env.set('TRANSLATOR_COMMAND', command.strip)
   else
-    model = ask_valid(t('q_translator_model'), ENV['TRANSLATOR_MODEL'].to_s, hint: t('h_translator_model')) do |answer|
-      t('e_translator_model') if answer.to_s.strip.empty?
-    end
-    if model.to_s.strip.empty?
+    # DeepL and LibreTranslate are not language models: there is no model to name.
+    modelless = %w[deepl libretranslate].include?(chosen)
+    model = if modelless
+              ''
+            else
+              ask_valid(t('q_translator_model'), ENV['TRANSLATOR_MODEL'].to_s, hint: t('h_translator_model')) do |answer|
+                t('e_translator_model') if answer.to_s.strip.empty?
+              end
+            end
+    if model.to_s.strip.empty? && !modelless
       say(t('e_translator_model'), :yellow)
       say('')
       return
@@ -982,10 +988,11 @@ def ask_translator(env)
     # does not know.
     switched = chosen != now
     env.set('TRANSLATOR', chosen)
-    env.set('TRANSLATOR_MODEL', model.strip)
+    modelless ? env.unset('TRANSLATOR_MODEL') : env.set('TRANSLATOR_MODEL', model.strip)
     env.unset('TRANSLATOR_URL') if switched
-    if chosen == 'openai'
-      url = ask(t('q_translator_url'), switched ? '' : ENV['TRANSLATOR_URL'].to_s, hint: t('h_translator_url'))
+    if %w[openai libretranslate].include?(chosen)
+      which = chosen == 'openai' ? 'q_translator_url' : 'q_translator_url_libre'
+      url = ask(t(which), switched ? '' : ENV['TRANSLATOR_URL'].to_s, hint: t(chosen == 'openai' ? 'h_translator_url' : 'h_translator_url_libre'))
       env.set('TRANSLATOR_URL', url.strip) unless url.to_s.strip.empty?
     end
     puts t('translator_key_where')
