@@ -132,6 +132,8 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
     gzip body is a network error; Gemini's own "API key not valid" is `translator_invalid_key`; a 403 is
     `translator_forbidden` ("the key, the account, the country, or an API not switched on"), not "the key"; an
     answer in blocks (Mistral's reasoning models) is read from its text blocks.
+  - *`translate --auto`* of a language already written shows the address that language has in `slug:`, as
+    `translate --json` does; it came back empty, which read as "no address" (the address itself was kept on save).
   - *`translate --auto`*: "Translating into ..." is said once the post, the language and the translator are known
     to be in order; a post with neither a title nor text is not sent (`nothing_to_translate`); a file in `tmp/` from
     an earlier run, not saved yet, is not replaced without `--force` (`pending_exists`).

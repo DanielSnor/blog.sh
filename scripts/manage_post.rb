@@ -5546,7 +5546,16 @@ def auto_translation(slug, lang, force:)
     refuse('nothing_to_translate', t('cli.auto_nothing_to_translate', slug: slug).strip)
   end
   yield state if block_given?
-  [state, AutoTranslate.translate(post['original'], lang_name: language_name(lang), lang_code: lang)]
+  result = AutoTranslate.translate(post['original'], lang_name: language_name(lang), lang_code: lang)
+  # A language already written keeps its address: the translator may not
+  # invent one (its `slug:` is emptied), and the text handed back shows the
+  # one the language has, as `translate --json` does -- an empty line there
+  # read as "no address" to whoever looked (the iOS app's trial, 18. 11.).
+  kept = post['text'].to_s[/\A---[ \t]*\n.*?^slug:[ \t]*(\S[^\n]*)$/m, 1].to_s.strip
+  unless kept.empty?
+    result[:text] = result[:text].sub(/\A(---[ \t]*\n.*?)^slug:[ \t]*$/m) { "#{Regexp.last_match(1)}slug: #{kept}" }
+  end
+  [state, result]
 end
 
 # The same, said as the command line says things: a refusal whose words
