@@ -1388,7 +1388,9 @@ main .post-list-item:last-child { margin-bottom: 0; }
   padding: 0.35rem 0.8rem; border: 1px solid var(--border); border-radius: 4px;
 }
 .comments-reply-form button:hover, .comments-reply-form button:focus-visible { border-color: var(--accent); }
-.comments-reply-error { color: var(--accent); font-size: 0.85rem; }
+/* In the text's colour, not the accent: in the links' blue it read as one
+   more link. */
+.comments-reply-error { color: var(--text); font-size: 0.85rem; }
 
 /* Only rendered where comments.approval is on -- it tells a reader that
    what follows is a selection, so an answer that isn't there doesn't read
