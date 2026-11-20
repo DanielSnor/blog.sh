@@ -214,6 +214,15 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   `env.sh.example` now shows both kinds of translator in full, and **`doctor`** says whether what is set is whole (and
   nothing at all of an installation that has set nothing).
 
+- **`doctor` and `check` say when the Ruby gets no security fixes** (the author's, 20 November). On 18 November Ruby
+  fixed a one-byte heap overflow in changing the case of a string, which a crafted string may turn into running code
+  (GHSA-34m4-m9fh-gqp5), in 3.3.14, 3.4.13 and 4.0.10; 3.2 and older get no fix. The engine is not known to be hit
+  by it, but it is often the reason Ruby is on the machine, and `blog.sh` and `setup.sh` checked only the floor of
+  2.7. A maintained branch below its fixed release, and a branch past its end of life, are now a warning first in
+  `doctor` and in `check` (kind `ruby`, in `--json` too) with what to update to. A warning: nothing exits 1 for it, and
+  an archive with nothing wrong is still said to be clear. `BLOG_SH_RUBY_VERSION` names the version judged in place
+  of the interpreter's, so that the test suite does not depend on the machine it runs on.
+
 ### Not done / to settle before the tag
 
 - The suite runs the translators only against a stand-in on this machine; the request shapes come from the

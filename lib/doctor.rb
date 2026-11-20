@@ -32,6 +32,7 @@ require_relative 'checker'
 # The translator's settings are read the way the translator reads them, by the
 # same code: two readings of one setting is how a doctor and an engine disagree.
 require_relative 'auto_translate'
+require_relative 'ruby_support'
 # NOT require_relative 'publishing': it pulls in the posters, which read
 # SiteConfig at LOAD time -- and this is the one command that has to run
 # on a config nothing else can load. Requiring it put the raw Psych
@@ -164,6 +165,9 @@ module Doctor
   # network, appearance, deploy.
   def run(online: false, root: ROOT)
     findings = []
+    # First: it holds whatever the config says, and a site.yml that cannot
+    # be read returns before the rest is asked.
+    findings.concat(of(:ruby, check_ruby))
     findings.concat(of(:env_sh, check_env_sh(root)))
 
     data, parse_findings = load_site_yml(root)
@@ -1215,6 +1219,21 @@ module Doctor
   # screen, so a paragraph runs off to the right -- worth knowing, and one
   # command away from GNU nano. Nothing is said when $EDITOR or $VISUAL is
   # set: that is somebody's own choice.
+  # A Ruby that no longer gets security fixes, or a maintained one below
+  # its fixed release (see lib/ruby_support.rb). A warning, not an error:
+  # the engine runs on it and is not known to be hit; the machine is.
+  def check_ruby
+    version = RubySupport.current
+    case RubySupport.status(version)
+    when :end_of_life
+      [warn(t('ruby_end_of_life', version: version), t('ruby_end_of_life_fix', fixed: RubySupport.fixed_list))]
+    when :unpatched
+      [warn(t('ruby_unpatched', version: version), t('ruby_unpatched_fix', fixed: RubySupport.fixed_for(version)))]
+    else
+      []
+    end
+  end
+
   def check_editor
     return [] unless [ENV['EDITOR'], ENV['VISUAL']].all? { |e| e.to_s.strip.empty? }
 

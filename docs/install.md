@@ -15,6 +15,10 @@ site on the internet.
 - **Ruby 2.7+** (3.x is what the real deployments run) -- standard
   library only, no gems, no Bundler. Check with `ruby -v`; `blog.sh`
   checks too and says exactly this if the interpreter is too old.
+  2.7 is what the code runs on, not what is safe to run: a Ruby that
+  still gets security fixes is 3.3.14, 3.4.13, 4.0.10 or newer (the fix
+  of 18 November 2026). `./blog.sh doctor` and `check` warn about any
+  other.
 - **bash** -- for the thin `blog.sh` / `deploy-web.sh` /
   `refresh-sidebar.sh` wrappers. (On Windows that means WSL2 -- see the
   quick start; there is no native cmd/PowerShell path.)
