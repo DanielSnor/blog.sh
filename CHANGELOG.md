@@ -13,247 +13,56 @@ prints what an installation is running.
 
 ## 1.12.pre -- 2026-11-16
 
-NOTES, not the final text: set down as the work is done, to be rewritten into the shape of the other
-entries before the tag. The suffix and the date come off at the tag.
-
-Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from zero).
+The translation release. `translate --auto` hands a post to a translator the author names -- a program of
+one's own, OpenAI, Anthropic, Gemini, DeepL or LibreTranslate -- and leaves a draft to read and save.
+Beside that, a reader can reply to a toot from their own Mastodon server, and a post is announced once
+its page is live.
+Nothing to migrate -- `git pull`, rebuild, deploy. Hashtags of tags with a dot, a hyphen or a space change
+shape, and a site with no deploy target is no longer announced.
 
 ### Added
 
-- **`translate <slug> --lang <code> --auto`: a translator the author names writes the first draft** (#68, built
-  on Pavel's `scripts/auto-translate.sh`, PR #69). The result is a file in `tmp/` that says `edits:`, `base:` and
-  `lang:`, for the person to read, mend and `add` -- through the door a text from an app uses, so a post that changed
-  in the meantime is refused instead of overwritten. Nothing is saved or published by the command, and there is no
-  `--publish`: a machine translation nobody has read is not something to put on a site. Without a slug it takes the
-  newest post that is out; `--force` replaces a language already written.
-- **The translator is a setting, not a provider.** In `env.sh`: `TRANSLATOR_COMMAND` -- any program that reads the
-  instructions and the post on standard input and writes the translation to standard output (`claude -p`, a
-  Gemini or Codex command line, `ollama run`, a script of one's own), started without a shell -- or
-  `TRANSLATOR=openai|anthropic|gemini` with `TRANSLATOR_MODEL` and `TRANSLATOR_KEY` (`TRANSLATOR_URL` points the
-  OpenAI-style one at Mistral, OpenRouter, Ollama, LM Studio or any server by its address). Plain `Net::HTTP`, no gem.
-  Never in `config/site.yml`, which travels with the site and must not be able to name a program the engine runs.
-- **It checks what a translator is known to damage.** Web addresses, names of pictures, the numbers, and the count
-  of headings, paragraphs and `//--more--//` lines are compared with the original; a difference is a warning,
-  not a refusal. The `slug:` line is always left empty. An answer without the header, an empty one, one that ran
-  out of room (`TRANSLATOR_MAX_TOKENS`) and one the model declined are not saved.
-- **What a provider says when it will not is said as what it is**: a key it does not accept, no credit left, a
-  model the plan leaves out, too many requests, a server in trouble, a post too long for the model, a model that
-  does not exist -- each a code for a program and a sentence for a person that names the setting to change.
-  A key is sent over https or to this machine only, and never appears in what the engine says.
-- **Which model is the author's choice, and the quality of the language is the model's.** Run by hand on 16 November
-  against Anthropic (`claude-haiku-5-5`) and Gemini (`gemini-3.5-flash-lite`): both kept the Markdown, the link and the
-  numbers; the Gemini one put a Czech noun in the wrong case ("Druhý odstavce"), which no check of the engine can see,
-  as it compares addresses, numbers and shape, not grammar. OpenAI was reached and said so when the account had no
-  credit. `docs/operations.md` says to read a translation before saving it and to try a model on a post one can judge.
-- **At the terminal** a language with nothing written offers `[a]`: the editor then holds the machine's text, with
-  what looked wrong with it and the original as `//` notes. Closing it unchanged asks once before saving.
-- **For the apps**: `translate --json` carries an `auto` block (`available`, and when not, a `problem` and a
-  `message`), and `translate --auto --json` returns the translated text and the warnings without saving.
+- **`translate <slug> --lang <code> --auto`** (#68, PR #69, Pavel). A translator writes the first draft into `tmp/`; `add` saves it.
+- **The translator is a setting in `env.sh`.** `TRANSLATOR_COMMAND`, or `TRANSLATOR=openai|anthropic|gemini|deepl|libretranslate` with a model and a key.
+- **DeepL and LibreTranslate.** Sent paragraph by paragraph; code, addresses and Markdown come back untouched.
+- **`./setup.sh --translator`.** Asks about the translator only and writes `env.sh`; `doctor` says whether the setting is whole.
+- **A translation is compared with the original.** Addresses, pictures, numbers and the count of headings and paragraphs; a difference is a warning.
+- **What a provider refuses is said as what it is.** A bad key, no credit, a model the plan leaves out -- a code and a sentence.
+- **`[a]` at the terminal** for a language with nothing written: the editor opens on the machine's draft.
+- **`translate --json` carries an `auto` block.** `translate --auto --json` returns the draft and its warnings without saving.
+- **A reader can reply from their own Mastodon server** (#75, Pavel). One field, remembered in the browser; `comments.reply_from_own_server: false` turns it off.
+- **A translation just saved ends on its preview address and QR code** (#80, Pavel), as a draft does.
+- **A list cut at the 50 newest posts says so** (#82, Pavel), and how to reach an older one.
+- **`doctor` says when the site's address has a path, a query or a fragment.** The engine builds a site for the root of a domain.
+- **`doctor` says when `nano` is pico**, and when there is no editor at all.
 
-- **A reader can reply to the announcement from their own Mastodon server** (#75, Pavel). The link "Reply on
-  Mastodon" opens the toot on the blog's instance, where most readers are not signed in. Beside it a link opens a
-  one-field form; the server typed there (`mastodon.social`, `@me@mastodon.social` or an address copied from the
-  bar) becomes `https://<server>/authorize_interaction?uri=<toot>`, which takes a signed-in reader to their own
-  copy to reply, boost or favourite. It is remembered in the reader's browser -- under the key the share row
-  already uses, so one answer serves both -- and the next visit shows a link straight there. Browser only: nothing
-  about the reader reaches the site. On for a Mastodon post unless `comments.reply_from_own_server: false`; a
-  Bluesky post never gets it. The words travel in a `data-remote-reply` attribute on the comments container, not
-  in the script that is inline on every page, so the upgrade rewrites only the posts that carry a toot. Looks:
-  `skins/classic.css` and the Minimal family (`skins/minimal.css`, the variants rebuilt).
-- **doctor no longer takes `comments.reply_from_own_server` for a misspelled `approval`**: a `comments:` section
-  holding only that key was reported as "every reply is published, unmoderated".
-  It also reads the key's value now: true or false (on, off, yes and no work too) and nothing else, named in an
-  error before the build stops on it.
+### Changed
 
-- **An announcement's hashtags keep a tag's words together**. A tag
-  with a dot, a hyphen or a space was announced as a shorter one: `blog.sh` as `#blog.sh`, which Mastodon and Bluesky read
-  as `#blog`, `sean.cz` as `#sean`, `self-hosting` as `#self`, and `hudba dana`, its space dropped, as `#hudbadana`.
-  A run of spaces, dots and hyphens is now one `_` (`#blog_sh`, `#hudba_dana`), one at either end of the tag is dropped
-  (`.net` is `#net`), and tags that come to the same hashtag are said once. The tag's own page on the site keeps its
-  address. Upgrading: new announcements go out under the new hashtags; toots already sent stay where they are, so a
-  tag like `hudba dana` is `#hudbadana` on the old toots and `#hudba_dana` on the new.
+- **A post is announced after its page is live** (#83, Pavel). A deploy that fails leaves the toot in `.announce-pending` for the next one.
+- **`doctor` names a toot that waits for a deploy**, or whose post is gone, with what to do.
+- **A hashtag keeps a tag's words together.** `blog.sh` is `#blog_sh`, not `#blog`; `C++` is `#Cplusplus`. Old toots keep theirs.
+- **A site with no deploy target is not announced.** Its page is on no server; `./blog.sh toot <slug>` once it is.
+- **`nano` that is really pico (macOS from 2026) is opened with `-w`.** It took `--atblanks` for a file and wrote the post there.
+- **The properties screen begins with the tags** (#81, Pavel). The Czech "Typ" read as "tip".
+- **A link block drawn by its address carries `link-block--address`.** One class more, in every skin.
 
-- **The announcement goes out after the page is live, not before** (the author's, 30 October). A post was announced
-  first because the page draws its comment thread from the toot's address; so for as long as the build and the
-  deploy took -- three minutes on a cold disk, longer on a large archive -- the link in the toot led to a 404, and
-  followers wrote to say so. Now publishing builds and deploys the page, sends the toot, and puts the toot's address on
-  the page with a second build (measured on 13 500 posts: about ten seconds for a build after one post changed). If the
-  deploy fails, nothing is announced: the post goes into `.announce-pending` and the next run of the publishing cron
-  that gets a deploy through sends the toot. By hand the same order holds, and `--no-announce` still announces nothing.
-  `doctor` warns of a toot that waits for a deploy (naming the posts, and what to do: deploy, then `./blog.sh toot <slug>`),
-  and a toot sent by hand pays the debt. Upgrading: nothing to do; a toot owed by a run that was interrupted is in
-  `.announce-pending`.
-  Found by the fleet over 1.12 and fixed before the release: the debt is written BEFORE the build (it was written
-  only when the deploy returned a failure, so a publish stopped by Ctrl-C, a closed SSH session or a kill lost its
-  toot for good); the toot's address is written onto the post as it is on disk after the deploy (an `edit` saved
-  during the deploy was undone); `unpublish` and `publish --no-announce` drop a debt an earlier failed deploy left
-  (the cron announced a post its author had said not to); each line carries the moment it was owed, and the cron
-  pays only the debts its own build saw (a post published by hand while the cron built was announced before its
-  page was out); whoever claims a debt first sends the toot, the other does not.
+### Fixed
 
-- **`[d]` in the draft dialog of a scheduled post says what is true now, and that --no-announce does not reach the
-  plan** (found by the fleet over 1.11.1). It said "Still scheduled for ..." from the copy read before the keypress, so
-  a post the cron had published while the prompt waited was still called scheduled; it now reads the post again and
-  says it is published, or names the date the plan has now. And `publish --no-announce` on a scheduled post said
-  nothing at `[d]`, where `[s]` says the flag cannot reach the cron -- a plan that is kept announces when its date
-  comes; `[d]` says so too.
-
-- **Pictorial no longer cuts the first eight characters off a link's title** (found by the fleet over 1.11.1). A link in
-  a tile that has a title of its own, in a post whose own title is a different one, read "article" for "Another article":
-  the rule that hides `https://` on the left of a link drawn by its address took the title for an address. The build now
-  marks a link block drawn by its address (`link-block link-block--address`) and Pictorial shifts only that one. The
-  HTML of such a link block changes by one class, in every skin.
-
-- **`add <file>` with `lang:` or `base:` and no `edits:` is refused** (#79, Pavel). It made a post of its own in the
-  language the file named, with a generated address -- an orphan beside the original, without a word. The refusal names
-  the missing `edits: <slug>` (code `needs_edits` for a program) and writes nothing.
-- **A translation just saved ends on its preview address and its QR code** (#80, Pavel), as the draft dialog does:
-  in a terminal, for a draft, on a site with a real address.
-- **The properties screen says what it means** (#81, Pavel). The Czech hint began "Typ, štítky ...", which reads as
-  "tip"; it now begins with the tags, and all three languages name the command as it is typed, `./blog.sh edit`.
-- **A list cut at the 50 newest says so** (#82, Pavel). The list the wizard's Post entry, `edit` and `delete` offer
-  without a slug ends where the Archive goes on; with more than 50 posts it now says "Showing the 50 newest of N
-  posts" and that an older one is reached by its slug or by searching in the Archive. Both entries stay: Post is the
-  quick way to the latest posts, the Archive the way to search all of them.
-
-- **The translator program is stopped when its time is up or on Ctrl-C, with everything it started** (fleet over
-  1.12). `TRANSLATOR_TIMEOUT` waited only for the program itself, so one that left something in the background holding
-  its output kept the engine waiting as long as that lived; Ctrl-C left the engine waiting and a second one left the
-  translator running. After TERM the whole group now gets KILL.
-- **`./setup.sh --translator` on a change of provider drops the old address and key, and Enter keeps a `deny`**
-  (fleet over 1.12). Kept, the old `TRANSLATOR_URL` sent the new provider's requests and key to the old address;
-  and the question about the apps defaulted to yes, so an Enter undid `TRANSLATOR_REMOTE=deny`.
-
-- **The rest of what the fleet over 1.12 found, fixed before the release** (nothing of it was in 1.11.1 but the
-  last item):
-  - *The translator*: an answer or an error message that is not UTF-8 is said as `translator_bad_output` /
-    `translator_failed`, not a Ruby error; every `slug:` line the model writes is emptied, not only the first;
-    `http://[::1]` connects; a key echoed back by a server is hidden before the message is cut, not after; a broken
-    gzip body is a network error; Gemini's own "API key not valid" is `translator_invalid_key`; a 403 is
-    `translator_forbidden` ("the key, the account, the country, or an API not switched on"), not "the key"; an
-    answer in blocks (Mistral's reasoning models) is read from its text blocks.
-  - *`translate --auto`* of a language already written shows the address that language has in `slug:`, as
-    `translate --json` does; it came back empty, which read as "no address" (the address itself was kept on save).
-  - *`translate --auto`*: "Translating into ..." is said once the post, the language and the translator are known
-    to be in order; a post with neither a title nor text is not sent (`nothing_to_translate`); a file in `tmp/` from
-    an earlier run, not saved yet, is not replaced without `--force` (`pending_exists`).
-  - *Announcements*: a cron stopped between the network's answer and writing the address does not announce the post
-    again (the debt is taken before the toot is sent); a site with no network owes no toot; the message about a toot
-    that waits names `./blog.sh rebuild`, then `toot` or `bluesky` by the site's network, and no longer says the
-    deploy failed when it may only have waited for the lock; a file of debts with bytes that are not UTF-8 stops
-    neither the cron nor doctor.
-  - *Hashtags*: every character a hashtag cannot hold is a `_` like a dot (`R&D` is `#R_D`, `don't` `#don_t`), and
-    none is left at an end (`kytara 🎸` is `#kytara`); invisible marks are taken out; a tag of only punctuation or an
-    emoji is no hashtag; `é` typed two ways is one hashtag; a hashtag is at most 64 graphemes, Bluesky's limit,
-    cut where a `_` is.
-  - *doctor*: a `TRANSLATOR_COMMAND` whose program is not found is a warning, not "set up"; an unreadable
-    `TRANSLATOR_TIMEOUT` or `TRANSLATOR_MAX_TOKENS` is said with the default used instead.
-  - *setup*: `./setup.sh --translator` writes its lines beside the others and leaves the examples in env.sh's
-    explanation alone (they no longer read as commented-out settings).
-  - *Terminal*: the reply links that wrap to a second line on a phone start at the edge, not 16px in.
-  - *The program a translator is*: it is no longer handed the engine's own secrets from env.sh (the Mastodon token,
-    the Bluesky and Surfer passwords, `TRANSLATOR_KEY`, the paired keys); its own key (`ANTHROPIC_API_KEY` and the
-    like) it keeps.
-  - *Two translations of one post*, already so in 1.11.1: saving one made the other "changed", because `base:` was
-    the hash of the whole file. It is the hash of what a translation is made from now -- the original and that
-    language's own text -- and a `base:` of the whole file, as a program from before 1.12 sends it, is still read.
-- **What the fleet over 1.12 found that was already so in 1.11.1, fixed with the rest:**
-  - *A site deployed nowhere is not announced* ("built locally and goes nowhere"): its page is on no server, so a
-    toot pointed at nothing. It says so, with `./blog.sh toot <slug>` (or `bluesky`) for when the site is online.
-    Upgrading: a site that serves `public.nosync` itself, with no deploy target set, announces by hand from now on.
-  - *A toot past 500 characters even without a perex* (many tags, a long title) went out as it was and Mastodon
-    refused it, so the post was not announced: tags now yield from the end, then the title on a word, as on Bluesky.
-  - *`translate ... --json` with a mistake in its words* (no language, an unknown word, `--force` without `--auto`,
-    no slug) answers an object and a zero, with `needs_language`, `unknown_args`, `force_needs_auto`, `needs_slug`,
-    `no_locales`.
-  - *The field for one's own server* (and the share button's, the same check) refuses what a browser does not take
-    for a host -- a port past 65535, `a<b.c`, `evil.com#.mastodon.social` -- instead of a button that did nothing or
-    opened somewhere else than it said; a server is remembered only once its tab opened.
-  - *A link block whose title is empty or only spaces* is drawn by its address, not as an empty, invisible link.
-  - *The cron on a site with an announcement and no `site.base_url`* says that, not "check the token" (the build
-    refuses such a site first today, so this is said only should that change).
-- **DeepL and LibreTranslate as translators** (`TRANSLATOR=deepl` / `libretranslate`, 18 November). They take no
-  instructions, so the post is sent paragraph by paragraph -- each heading, list item and quoted line on its own --
-  with what must come back unchanged kept aside as tags the service leaves alone: code (a code block is not sent at
-  all), the address of a link or a picture, bare addresses, HTML, the marks of emphasis and of the line itself. The
-  text of a link and a picture's description are translated; the check against the original runs as for any
-  translator. DeepL: `TRANSLATOR_KEY`, a free key (`…:fx`) goes to api-free.deepl.com; English is `EN-US` and
-  Portuguese `PT-PT` unless `TRANSLATOR_DEEPL_EN` / `TRANSLATOR_DEEPL_PT` say otherwise; 403 is a refused key, 456
-  used-up characters. LibreTranslate: `TRANSLATOR_URL` (a server of one's own, http on this machine too), a key only
-  where the server wants one. `./setup.sh --translator` offers both, `doctor` knows them. A code span and an
-  address go with their words, in a tag the service is told not to translate, so the sentence around them reads
-  right (sent as an empty tag, "a heading with `code`" came back from DeepL as "a heading with a picture"); an ending
-  the service hangs on them ("s `code`m") is dropped. Run by hand against DeepL on 18 November (Free, into Czech):
-  the Markdown came back whole, and the check said that "3" had become a word. LibreTranslate: stand-ins only.
-- **`doctor` says when the site's address has a path in it** (`https://example.com/blog`). The engine builds a site
-  for the root of a domain -- its pages ask for `/assets/...`, the search and the feeds from the root -- so under a
-  path they came out unstyled, or styled by whatever lives at the root, and doctor, whose check of the address
-  looked only at its start, said nothing. Serving a site under a path is still not done; the advice is a domain or
-  a subdomain of its own.
-- **`nano` that is really `pico` (macOS from 2026) is opened as pico, with `-w`.** Pico knows none of GNU nano's
-  long switches and does not fail on them: it took `--atblanks` for the name of a file, so with no `$EDITOR` set the
-  post was written into a file of that name in the current directory and `add` read the post's own file back empty.
-  The engine tells pico by where the link leads (it never runs it to ask) and starts it with `-w` -- no lines broken
-  as they are typed, which GNU nano reads the same way, and which is now also the fallback for an old GNU nano.
-  `doctor` says when `nano` is pico (a paragraph is not wrapped on the screen there) and how to get GNU nano, and
-  when there is no editor at all. The setup wizard's own editor step opens `nano -w` too.
-- **What a second, smaller fleet over 1.12 found (20 November), fixed before the release:**
-  - DeepL and LibreTranslate: a code block fenced with ```` that shows ``` inside was sent to be translated, and with
-    an odd number of them the rest of the post was not; a fence now closes as the parser closes it. A code span
-    `&lt;div&gt;` came back as `<div>` and a code span `<x>` not at all, even from an answer that changed nothing:
-    the service's text is cleaned before the kept pieces go back. Cutting the ending off a kept piece ("s `code`m")
-    cut the rest of a Japanese or Chinese sentence; only a short ending in a script with spaces goes now. A line that
-    begins with `<b>` or `<https://...>` is translated; only a block of HTML is kept, to its blank line. A tag the
-    service wrote its own way is still known; every batch is counted and every text owed an answer. A language that
-    names its variant (`pt-BR`, `en-GB`, `zh-Hant`) gets it from DeepL; LibreTranslate's traditional Chinese is `zt`.
-  - The owed toot follows a post renamed, moved to another year by an edit, or moved by a date set through
-    scheduling; before, the next run found no file there and the post went out unannounced. `delete` settles its own
-    line, and `doctor` names a line whose post is gone. A post deleted or renamed while a manual publish deployed is
-    not written back from the copy read before the build. A debt owed in the future (a clock that went back) is paid
-    rather than waited for on every tick. The cron no longer announces a scheduled post on a site with no deploy
-    target, as a manual publish has not since the first fleet.
-  - `C++` and `C#` are `#Cplusplus` and `#Csharp`, not both `#C`. `translate --auto` reads a language's address from
-    the header only, not from a `slug:` line in a code block. `doctor` reads the site's address whole: `/blog//` is a
-    path, a query or a fragment is said as such, a trailing space is the wrong shape. `./setup.sh --translator`
-    switched to another provider asks for the model afresh; the question about the apps no longer says "(Enter:
-    yes)" where Enter keeps a `deny`. A `nano` that reaches pico by a hard link or a script is pico too. JRuby and
-    TruffleRuby are not told to update to a CRuby release.
-- The classic skin lays the ways to reply (#75) out as a row that wraps whole links -- on a phone "Reply from
-  another / server..." broke in two -- and the field's error is in the text's colour, not the links'. Terminal stands
-  on classic and has it too.
-- README names the `TRANSLATOR_*` settings, and the `--json` table in `docs/operations.md` has the `auto` block and
-  `translate --auto --json` with its codes.
+- **`add <file>` with `lang:` or `base:` and no `edits:` made an orphan post** (#79, Pavel). It is refused.
+- **Saving one translation made the other one of the post "changed".** `base:` is the hash of what it is made from.
+- **`[d]` on a scheduled post said "Still scheduled" after the cron had published it.** It reads the post again.
+- **`publish --no-announce` said nothing at `[d]`** that the flag cannot reach the cron. It says so, as `[s]` does.
+- **Minimal Pictorial cut the first eight characters off a link's title.** Only an address is shifted.
+- **A link block with an empty title was an invisible link.** It is drawn by its address.
+- **The share button took what a browser does not take for a host.** A port past 65535, `evil.com#.mastodon.social`.
+- **Many tags or a long title took a toot past 500 characters, and Mastodon refused it.** Tags yield first.
+- **`translate --json` with a mistake in its words answered nothing a program reads.** An object and a code.
 
 ### Security
 
-- **A paired device may ask for a translation unless the server says `TRANSLATOR_REMOTE=deny`** in `env.sh` (the
-  owner's decision, 16 November: the translator is set up to be used, and the apps are where most of the writing is
-  done). A translation is paid for by someone and the text of the post is sent to someone: a paired device that is lost
-  can have translations made at the owner's cost until its key is revoked (`./blog.sh pair --revoke`); a server that
-  does not want that says `deny`. A word that is neither `allow` nor `deny` is read as a no, and doctor says so. At a
-  terminal it is always allowed. `translate` in the whitelist of `scripts/remote.rb` now takes `--auto` and `--force`.
-
-- **`./setup.sh --translator`** asks about the machine translator and nothing else -- a program, or a service by name
-  with its model and key, and whether the apps may ask -- and writes `env.sh` only. The main interview is as it was.
-  `env.sh.example` now shows both kinds of translator in full, and **`doctor`** says whether what is set is whole (and
-  nothing at all of an installation that has set nothing).
-
-- **`doctor` and `check` say when the Ruby gets no security fixes** (the author's, 20 November). On 18 November Ruby
-  fixed a one-byte heap overflow in changing the case of a string, which a crafted string may turn into running code
-  (GHSA-34m4-m9fh-gqp5), in 3.3.14, 3.4.13 and 4.0.10; 3.2 and older get no fix. The engine is not known to be hit
-  by it, but it is often the reason Ruby is on the machine, and `blog.sh` and `setup.sh` checked only the floor of
-  2.7. A maintained branch below its fixed release, and a branch past its end of life, are now a warning first in
-  `doctor` and in `check` (kind `ruby`, in `--json` too) with what to update to. A warning: nothing exits 1 for it, and
-  an archive with nothing wrong is still said to be clear. `BLOG_SH_RUBY_VERSION` names the version judged in place
-  of the interpreter's, so that the test suite does not depend on the machine it runs on.
-
-### Not done / to settle before the tag
-
-- The suite runs the translators only against a stand-in on this machine; the request shapes come from the
-  providers' documentation and our other app's live tests. By hand (see "Which model is the author's choice")
-  Anthropic and Gemini translated and OpenAI answered "no credit"; an OpenAI translation itself is not tried yet.
-  The docs therefore name no "verified" models.
-- "Translated from" and a list of departures written by the model are left out.
+- **A paired device may ask for a translation unless `TRANSLATOR_REMOTE=deny`.** Someone pays for it; a lost device until `pair --revoke`.
+- **The translator program does not get the engine's secrets from `env.sh`.** Its own key it keeps.
+- **`doctor` and `check` say when the Ruby gets no security fixes** (GHSA-34m4-m9fh-gqp5). 3.3.14, 3.4.13, 4.0.10 or newer; a warning.
 
 
 ## 1.11.1 -- 2026-11-15

@@ -41,10 +41,12 @@ ships belong to other people, and [NOTICE](NOTICE) says who.
 
 | Light | Dark |
 | --- | --- |
-| ![Homepage, light mode](docs/screenshot-light.png) | ![Homepage, dark mode](docs/screenshot-dark.png) |
+| ![blogsh.app in Minimal Terminal, light mode](docs/screenshot-light.png) | ![blogsh.app in Minimal Terminal, dark mode](docs/screenshot-dark.png) |
 
-*The default blue palette -- both modes come entirely from the 7-key
-`colors:` section in `config/site.yml` (see
+*[blogsh.app](https://blogsh.app) in the Minimal Terminal skin
+(`site.skin: minimal-terminal`). A site that names no skin wears classic;
+both modes of either come from the 7-key `colors:` section in
+`config/site.yml` (see [skinning.md](docs/skinning.md) and
 [install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)).*
 
 **Contents:** [Why this exists](#why-this-exists) ·
