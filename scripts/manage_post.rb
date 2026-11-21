@@ -2442,8 +2442,16 @@ end
 # Claimed first: if the cron already paid this debt while the deploy ran,
 # the toot is out and a second one would stand beside it. Written onto the
 # post as it is now on disk, not the copy read before the build.
+#
+# A post no longer at its path was deleted or renamed while the deploy ran:
+# deleted, it is not announced; renamed, its debt went with it and the next
+# run pays it at the new address (second fleet over 1.12, 02/3).
 def announce_after_deploy(sending, path, post)
   return unless sending
+  unless File.exist?(path)
+    Publishing.settle_announcement(path)
+    return
+  end
   return unless Publishing.claim_announcement(path)
 
   fields = sending.call
@@ -2929,6 +2937,7 @@ def write_in_year_of(path, updated, date, slug:)
     Publishing.relocate_media(slug, File.basename(File.dirname(path)), new_year)
     AtomicWrite.write_json(new_path, updated)
     File.delete(path)
+    Publishing.move_announcement(path, new_path)
   else
     AtomicWrite.write_json(new_path, updated)
   end
@@ -5233,6 +5242,7 @@ def rename_apply(path, post, new_slug)
                     to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, new_slug))
   AtomicWrite.write_json(new_path, updated)
   File.delete(path)
+  Publishing.move_announcement(path, new_path)
   new_path
 end
 
@@ -5551,9 +5561,15 @@ def auto_translation(slug, lang, force:)
   # invent one (its `slug:` is emptied), and the text handed back shows the
   # one the language has, as `translate --json` does -- an empty line there
   # read as "no address" to whoever looked (the iOS app's trial, 18. 11.).
-  kept = post['text'].to_s[/\A---[ \t]*\n.*?^slug:[ \t]*(\S[^\n]*)$/m, 1].to_s.strip
-  unless kept.empty?
-    result[:text] = result[:text].sub(/\A(---[ \t]*\n.*?)^slug:[ \t]*$/m) { "#{Regexp.last_match(1)}slug: #{kept}" }
+  # Only the header's: a `slug:` further down -- a code block showing a
+  # header -- is the post's text, and a language with no address of its own
+  # was moved to it (second fleet over 1.12, 01/8).
+  header = ->(text) { text.to_s.match(/\A---[ \t]*\r?\n(.*?)^---[ \t]*\r?$/m) }
+  kept = header.(post['text']).then { |m| m ? m[1][/^slug:[ \t]*(\S[^\r\n]*)/, 1].to_s.strip : '' }
+  own = header.(result[:text])
+  if !kept.empty? && own
+    head = own[1].sub(/^slug:[ \t]*\r?$/) { "slug: #{kept}" }
+    result[:text] = result[:text].sub(own[1]) { head }
   end
   [state, result]
 end
@@ -6540,7 +6556,10 @@ def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined:
     end
   end
   discard_editor_buffer if interactive
-  File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
+  if File.expand_path(new_path) != File.expand_path(path)
+    File.delete(path)
+    Publishing.move_announcement(path, new_path)
+  end
   # A bare name the post already has means the file the post has: that is
   # what lets a second save find its pictures. So a NEW file sent under
   # such a name -- the natural way to try to replace a picture -- was not

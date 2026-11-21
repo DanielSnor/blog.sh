@@ -177,6 +177,14 @@ due.each do |path, _snapshot, _date|
   # address that answers 404 for the minutes a build and a deploy take is
   # what followers used to find (Publishing::ANNOUNCE_PENDING).
   # A site that announces nowhere owes nothing (doctor said it owed a toot).
+  # Nor does one that deploys nowhere: its page is on no server, and a toot
+  # would point at nothing -- what a manual publish has said since the
+  # first fleet over 1.12 (03/5), and the cron did not (second fleet, 02/4).
+  if !silent && !SiteConfig.comment_network.nil? && !Publishing.deploys_somewhere?
+    warn I18n.t('cli.announce_goes_nowhere', slug: updated['slug'],
+                                            command: SiteConfig.comment_network == :bluesky ? 'bluesky' : 'toot')
+    silent = true
+  end
   Publishing.owe_announcement(new_path) unless silent || SiteConfig.comment_network.nil?
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))

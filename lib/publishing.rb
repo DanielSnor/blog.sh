@@ -199,9 +199,18 @@ module Publishing
   # past which the whole post is refused -- cut where a `_` is, if one is.
   HASHTAG_GRAPHEMES = 64
 
+  #
+  # A `+` or `#` that ends a word is said, not cut: `C++` is `#Cplusplus`
+  # and `C#` `#Csharp`, the hashtags those languages go by. Cut, both were
+  # `#C`, and the tags `C`, `C#` and `C++` were announced as one (second
+  # fleet over 1.12, 02/5).
+  SAID = { '+' => 'plus', '#' => 'sharp' }.freeze
+
   def hashtag_for(tag)
     text = tag.to_s.dup.force_encoding(Encoding::UTF_8).scrub('')
-    word = text.unicode_normalize(:nfc).gsub(/\p{Cf}/, '').gsub(/[^[:word:]]+/, '_').gsub(/\A_+|_+\z/, '')
+    text = text.unicode_normalize(:nfc).gsub(/\p{Cf}/, '')
+    text = text.gsub(/(?<=[[:alnum:]])[+#]+(?![[:word:]])/) { |run| run.chars.map { |c| SAID[c] }.join }
+    word = text.gsub(/[^[:word:]]+/, '_').gsub(/\A_+|_+\z/, '')
     word = cut_hashtag(word) if grapheme_length(word) > HASHTAG_GRAPHEMES
     word.empty? ? '' : "##{word}"
   end
@@ -553,6 +562,24 @@ module Publishing
     write_owed(rest + [[rel, Time.now]])
   end
 
+  # A post that moves -- a new slug, a date in another year -- takes its
+  # debt along, owed from the same moment. Left behind, the line named a
+  # file that was no longer there, the next run settled it as a post gone,
+  # and the post went out unannounced without a word (second fleet over
+  # 1.12, 02/1).
+  def move_announcement(from, to)
+    old_rel = relative_to_content(from)
+    new_rel = relative_to_content(to)
+    return if old_rel == new_rel
+
+    entries = owed_entries
+    return unless entries.any? { |owed, _| owed == old_rel }
+
+    write_owed(entries.map { |owed, at| owed == old_rel ? [new_rel, at] : [owed, at] }.uniq { |rel, _| rel })
+  rescue SystemCallError
+    nil
+  end
+
   def settle_announcement(path)
     rel = relative_to_content(path)
     write_owed(owed_entries.reject { |owed, _| owed == rel })
@@ -593,9 +620,16 @@ module Publishing
   # comes back (a build and a deploy lie between them on a manual publish),
   # and writing that copy back undid whatever was saved in between -- an
   # `edit` made during the deploy, said to be saved, quietly gone.
+  #
+  # A post no longer there is not written back: it was deleted or renamed
+  # while the deploy ran, and writing the old copy brought it back -- a
+  # deleted post in the archive again, a renamed one twice (second fleet
+  # over 1.12, 02/3). The fields are still handed back, for the caller.
   def record_announcement(path, fields, fallback)
     current = begin
       JSON.parse(File.read(path, encoding: 'utf-8'))
+    rescue Errno::ENOENT
+      return fallback.merge(fields)
     rescue SystemCallError, JSON::ParserError
       fallback
     end
@@ -617,8 +651,13 @@ module Publishing
   def send_owed_announcements(built_since: nil)
     sent = 0
     failed = 0
+    now = Time.now
     owed_entries.each do |rel, owed_at|
-      next if built_since && owed_at && owed_at > built_since
+      # A debt owed after the build began is a post the build did not see.
+      # One owed in the future is a clock that went back: no build will ever
+      # start after it, and every tick rebuilt and redeployed waiting for
+      # one (second fleet over 1.12, 02/2) -- it is paid.
+      next if built_since && owed_at && owed_at > built_since && owed_at <= now
 
       path = File.join(CONTENT_DIR, rel)
       post = begin
