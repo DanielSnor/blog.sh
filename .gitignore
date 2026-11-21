@@ -20,6 +20,8 @@ env.sh
 # (lib/search_index.rb): this machine's archive, always safe to delete.
 .search_index.json
 .deploy-pending
+# The posts whose announcement waits for a deploy to go through.
+.announce-pending
 # The scheduler's heartbeat -- one line, rewritten every fifteen minutes.
 .last-scheduled-run
 .last-sidebar-run

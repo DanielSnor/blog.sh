@@ -1352,6 +1352,10 @@ main .post-list-item:last-child { margin-bottom: 0; }
 .share__ask-input {
   flex: 1 1 14rem;
   min-width: 0;
+  padding: 0.35rem 0.6rem;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--card-bg);
   color: var(--text);
   font: inherit;
   font-size: 0.9rem;
@@ -1372,6 +1376,21 @@ main .post-list-item:last-child { margin-bottom: 0; }
 
 .share__ask-go:hover, .share__ask-go:focus-visible { border-color: var(--accent); color: var(--accent); }
 .share__ask-error { display: block; margin-top: 0.35rem; font-size: 0.8rem; color: var(--accent); }
+/* The field for replying from one's own server (comments.js): one row, in the
+   page's own type, quiet until it is opened. */
+.comments-reply-form { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; margin: 0 0 1rem; }
+.comments-reply-form input {
+  font: inherit; color: inherit; background: transparent;
+  padding: 0.35rem 0.6rem; border: 1px solid var(--border); border-radius: 4px; width: 21em; max-width: 100%;
+}
+.comments-reply-form button {
+  font: inherit; color: var(--accent); background: transparent; cursor: pointer;
+  padding: 0.35rem 0.8rem; border: 1px solid var(--border); border-radius: 4px;
+}
+.comments-reply-form button:hover, .comments-reply-form button:focus-visible { border-color: var(--accent); }
+/* In the text's colour, not the accent: in the links' blue it read as one
+   more link. */
+.comments-reply-error { color: var(--text); font-size: 0.85rem; }
 
 /* Only rendered where comments.approval is on -- it tells a reader that
    what follows is a selection, so an answer that isn't there doesn't read
@@ -1893,13 +1912,19 @@ aside h3, footer h3 {
   font-variant-numeric: tabular-nums;
 }
 
+/* The reply links are spaced by the row's gap, not by a margin each: a
+   margin on an inline-block went along to the start of the next line, so
+   the second and third began 16px in on a phone. */
+.comments-reply-own, .comments-reply-other { margin-left: 0; }
+
 /* A button is a word in square brackets. */
 .pagination a,
 .series-nav a,
 .comments-reply a,
 .tag-index-sort-button,
 .not-found-links .tag-pill,
-.share__ask-go {
+.share__ask-go,
+.comments-reply-form button {
   display: inline-block;
   padding: 4px 0;
   border: 0;
@@ -1915,17 +1940,20 @@ aside h3, footer h3 {
   cursor: pointer;
 }
 .pagination a::before, .series-nav a::before, .comments-reply a::before,
-.tag-index-sort-button::before, .not-found-links .tag-pill::before, .share__ask-go::before {
+.tag-index-sort-button::before, .not-found-links .tag-pill::before, .share__ask-go::before,
+.comments-reply-form button::before {
   /* a no-break space: the bracket never stands on a line by itself */
   content: "[\00a0"; color: var(--muted); font-weight: 400; opacity: 1;
 }
 .pagination a::after, .series-nav a::after, .comments-reply a::after,
-.tag-index-sort-button::after, .not-found-links .tag-pill::after, .share__ask-go::after {
+.tag-index-sort-button::after, .not-found-links .tag-pill::after, .share__ask-go::after,
+.comments-reply-form button::after {
   content: "\00a0]"; color: var(--muted); font-weight: 400;
 }
 .pagination a:hover, .series-nav a:hover, .comments-reply a:hover,
 .tag-index-sort-button:hover, .not-found-links a.tag-pill:hover,
-.share__ask-go:hover, .share__ask-go:focus-visible {
+.share__ask-go:hover, .share__ask-go:focus-visible,
+.comments-reply-form button:hover, .comments-reply-form button:focus-visible {
   background: none; border: 0; color: var(--accent); opacity: 1; text-decoration: none;
 }
 
@@ -2610,9 +2638,12 @@ article .content + .tags { margin-top: 24px; padding-top: 16px; border-top: 1px 
 .share__heading { opacity: 1; }
 .share__heading::before { content: "# "; opacity: 0.6; }
 .share__links { display: flex; flex-wrap: wrap; gap: 2px 12px; min-width: 0; }
-.share__ask-input { padding: 0.3rem 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; font-family: var(--mono); }
+.share__ask-input,
+.comments-reply-form input { padding: 0.3rem 0; border: 0; border-bottom: 1px solid var(--line); border-radius: 0; background: none; font-family: var(--mono); }
 .share__ask-input:focus,
-.share__ask-input:focus-visible { outline: none; border-color: var(--accent); }
+.share__ask-input:focus-visible,
+.comments-reply-form input:focus,
+.comments-reply-form input:focus-visible { outline: none; border-color: var(--accent); }
 .share__change { font-family: var(--mono); }
 
 .comments { margin-top: 22px; padding-top: 16px; border-top: 1px dashed var(--line); }

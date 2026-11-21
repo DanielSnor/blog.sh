@@ -2934,6 +2934,28 @@ article .share { margin-top: 14px; padding-top: 0; border-top: 0; }
   text-decoration: none;
 }
 .comments-reply a:hover { opacity: 0.85; }
+/* The two beside it that go from the reader's own server (comments.js): the
+   same pill as an outline, so the one that is the post's own stays the
+   loudest. */
+.comments-reply .comments-reply-own,
+.comments-reply .comments-reply-other,
+.comments-reply .comments-reply-own:hover,
+.comments-reply .comments-reply-other:hover {
+  background: none;
+  border: 1px solid var(--accent);
+  padding: 8px 17px;
+  color: var(--accent);
+}
+.comments-reply-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
+.comments-reply-form input {
+  font: inherit; font-size: 14px; color: inherit; background: none;
+  padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; width: 21em; max-width: 100%;
+}
+.comments-reply-form button {
+  font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: 0.05em; text-transform: lowercase;
+  padding: 8px 18px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+.comments-reply-error { color: var(--accent); font-size: 13px; }
 
 /* A gallery in a post runs three across on a wide screen -- where it has
    three pictures, or five and more. Two stay a pair and four a square,
@@ -4123,11 +4145,13 @@ main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--h
    out of a text, but in a monospace it can count: "https://" is eight
    characters and "http://" seven, so the line is drawn that far to the
    left and what runs off the edge is not shown. This holds because the
-   engine writes a bare address here only when the link has no title of its
-   own -- a link with one gives it to the post, and this line is not made. */
+   engine marks a bare address (`link-block--address`) and only that: a link
+   WITH a title, in a post that has a title of its own, stands in the same
+   markup, and the left shift took the first eight characters of it
+   ("Another article" read "article"). */
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block:has(> a > strong) > a { display: block; overflow: hidden; letter-spacing: 0; text-overflow: ellipsis; white-space: nowrap; }
-main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block > a[href^="https://"]:has(> strong) { text-indent: -8ch; }
-main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block > a[href^="http://"]:has(> strong) { text-indent: -7ch; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block--address > a[href^="https://"]:has(> strong) { text-indent: -8ch; }
+main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block--address > a[href^="http://"]:has(> strong) { text-indent: -7ch; }
 main > .post-list-item:not(:where(body.page-first main:has(> .listing-heading--home) > :is(.post-list-item--lead, :first-of-type):not(:has(.content > figure:first-child, .content > .photo-grid:first-child)))) .content > p.link-block:has(> a > strong) + p { display: -webkit-box; order: 2; margin: 0 0 8px; overflow: hidden; color: var(--ink); font-size: 16px; line-height: 1.45; overflow-wrap: anywhere; -webkit-box-orient: vertical; -webkit-line-clamp: 4; }
 
 /* -------------------------------------------------------------- the lead

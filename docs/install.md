@@ -15,6 +15,10 @@ site on the internet.
 - **Ruby 2.7+** (3.x is what the real deployments run) -- standard
   library only, no gems, no Bundler. Check with `ruby -v`; `blog.sh`
   checks too and says exactly this if the interpreter is too old.
+  2.7 is what the code runs on, not what is safe to run: a Ruby that
+  still gets security fixes is 3.3.14, 3.4.13, 4.0.10 or newer (the fix
+  of 18 November 2026). `./blog.sh doctor` and `check` warn about any
+  other.
 - **bash** -- for the thin `blog.sh` / `deploy-web.sh` /
   `refresh-sidebar.sh` wrappers. (On Windows that means WSL2 -- see the
   quick start; there is no native cmd/PowerShell path.)
@@ -122,9 +126,11 @@ cd myblog
 ./blog.sh preview    # -> http://localhost:8000/  (Ctrl-C stops it)
 ```
 
-The system nano is as old as the system Ruby -- if the editor step
-complains about options, set your own: `export EDITOR=vim` (or `code -w`,
-or plain `nano`).
+On a current macOS `nano` is really `pico`: the engine notices and opens
+it with `-w`, so a paragraph stays one line, but pico does not wrap it on
+the screen. `brew install nano` gives GNU nano, which does; or set your
+own editor: `export EDITOR=vim` (or `code -w`). `./blog.sh doctor` says
+which one you have.
 
 **An icon instead of `cd myblog && ./blog.sh`.** On a Mac `./setup.sh`
 ends by offering to put a launcher in Applications: an icon, named after
@@ -879,6 +885,16 @@ since a discussion split across two networks serves nobody. Without
 either section, everything else still works; publishing just skips the
 announcement (logged, not an error).
 
+The post's tags go out as hashtags, on both networks. Both end a hashtag
+at anything but a letter, a digit or `_`, so a run of spaces, dots and
+hyphens in a tag is announced as one `_`: `blog.sh` is `#blog_sh`,
+`hudba dana` is `#hudba_dana`, `self-hosting` is `#self_hosting` -- not
+`#blog`, `#hudbadana` and `#self`, which is what the network would make of
+them. A separator at the very start or end is dropped (`.net` is `#net`),
+and tags that come to the same hashtag are said once. The tag's page on
+your site keeps its address. Toots written before 1.12 stay under the
+hashtags they went out with.
+
 **Mastodon:**
 
 1. In `config/site.yml`, uncomment the `mastodon:` block -- the header
@@ -982,6 +998,33 @@ Worth knowing before switching it on:
   where the thread stays public and this site still links to it. Block,
   mute and report remain the tools for that.
 
+**Replying from the reader's own server (Mastodon).** The link under a
+post, "Reply on Mastodon", opens the announcement on YOUR instance, where
+most readers are not signed in. Beside it the page offers "Reply from
+another server...": the reader types the server they are on -- `mastodon.social`,
+`@me@mastodon.social` and an address copied from the bar all do -- and it opens
+`https://<their server>/authorize_interaction?uri=<the announcement>`, which
+a Mastodon server answers by taking a signed-in visitor to its own copy of
+that toot, where reply, boost and favourite are one click. The server is
+remembered in the reader's browser (the same memory the share row uses, so
+a reader who told one is not asked by the other); the next visit shows a link
+straight to it. It is done in the browser alone: nothing about the reader
+reaches your site, and without JavaScript the page has the one link it always
+had.
+
+It is on by default for a post announced on Mastodon, and never on a Bluesky
+one. To turn it off:
+
+```yaml
+comments:
+  reply_from_own_server: false
+```
+
+Mastodon and the servers built like it answer that address; other servers (GoToSocial,
+Pixelfed and the rest) may not, and the engine does not know which. A reader
+sent to one that does not is no worse off than before: the link beside it still
+goes where it always went.
+
 ## 9. Updating the engine
 
 ```bash
@@ -1001,7 +1044,7 @@ no branch, and `git pull` refuses with "You are not currently on a
 branch"; move it to the next release by name instead:
 
 ```bash
-git fetch --tags && git checkout v1.11
+git fetch --tags && git checkout v1.12
 ```
 
 The first build after an upgrade may be a full one -- the engine's own
@@ -1016,10 +1059,23 @@ file (`?v=`), so a returning reader is never handed a new page with
 yesterday's stylesheet -- and every later change to one does the same.
 The same deploy takes `/write/` off the site, so a post that links to it
 now leads to a 404; `./blog.sh check` names each one (`link_dead`).
+From 1.11.1 to 1.12 the first deploy uploads every page once more: the
+stylesheet and the comment script changed, and with them their
+fingerprints. A post with a toot also carries the words of the field for
+the reader's own server, and nothing else in a page changes.
 
 **Going back a version** is `git checkout <tag>` and a rebuild, and what
 the newer version was given to work with is looked at first, because the
-older one does not treat all of it alike. From 1.11 back to 1.10: take
+older one does not treat all of it alike. From 1.12 back to 1.11.1
+nothing stops the build. `comments.reply_from_own_server` it passes over,
+and the field for the reader's own server leaves the pages. A toot that
+waits in `.announce-pending` is never sent: send it with `./blog.sh toot
+<slug>` (or `bluesky`) first. The `TRANSLATOR_*` lines in `env.sh` it
+ignores, and `--auto` is a word `translate` does not know. A translation
+1.12 wrote into `tmp/` and nobody has saved carries a `base:` that 1.11.1
+reads as "the post changed since", so `add` refuses it -- save it before
+going back. Hashtags go back to their old shape, and a site with no
+deploy target is announced again. From 1.11 back to 1.10: take
 `series_index:` out of every `config/site.<lang>.yml`, or the build
 stops on it and nothing is deployed. A menu entry that names a series
 (`series:`) or heads a group (`group: true`) 1.10 leaves out of the

@@ -41,10 +41,12 @@ ships belong to other people, and [NOTICE](NOTICE) says who.
 
 | Light | Dark |
 | --- | --- |
-| ![Homepage, light mode](docs/screenshot-light.png) | ![Homepage, dark mode](docs/screenshot-dark.png) |
+| ![blogsh.app in Minimal Terminal, light mode](docs/screenshot-light.png) | ![blogsh.app in Minimal Terminal, dark mode](docs/screenshot-dark.png) |
 
-*The default blue palette -- both modes come entirely from the 7-key
-`colors:` section in `config/site.yml` (see
+*[blogsh.app](https://blogsh.app) in the Minimal Terminal skin
+(`site.skin: minimal-terminal`). A site that names no skin wears classic;
+both modes of either come from the 7-key `colors:` section in
+`config/site.yml` (see [skinning.md](docs/skinning.md) and
 [install.md → The palette and the header's type](docs/install.md#the-palette-and-the-headers-type)).*
 
 **Contents:** [Why this exists](#why-this-exists) ·
@@ -235,9 +237,10 @@ says what you are running.
                                # --untrusted refuses a picture reference that is not a bare filename
 ./blog.sh edit [<slug>] [--json]
                                # without a slug, offers the last 50 posts; --json hands the text out as data
-./blog.sh translate <slug> --lang <code> [--json]
+./blog.sh translate <slug> --lang <code> [--json] [--auto [--force]]
                                # writes the post's text in another language the site publishes;
-                               # --json hands the text out as data
+                               # --json hands the text out as data; --auto has the translator named in env.sh
+                               # write it into tmp/ for you to read and add
 ./blog.sh props [<slug>] [--json]
                                # a post's state and its actions; [e] changes what the post IS --
                                # its series and part, tags, type, and the unlisted/hero/toc flags;
@@ -329,6 +332,10 @@ export RSYNC_TARGET=...            # rsync backend (+ optional RSYNC_SSH)
 export GIT_PAGES_REMOTE=...        # git backend (+ optional GIT_PAGES_BRANCH/_CNAME)
 export RCLONE_TARGET=...           # rclone backend (+ optional RCLONE_ARGS)
 export SFTP_TARGET=...             # sftp backend (+ optional SFTP_REMOTE_DIR/SFTP_ARGS)
+export TRANSLATOR_COMMAND=...      # machine translation by a program (optional) -- or:
+export TRANSLATOR=...              # openai | anthropic | gemini (TRANSLATOR_MODEL) | deepl | libretranslate, TRANSLATOR_KEY
+                                   # (+ optional TRANSLATOR_URL, TRANSLATOR_TIMEOUT, TRANSLATOR_MAX_TOKENS,
+                                   # TRANSLATOR_REMOTE=deny); ./setup.sh --translator asks for them
 ```
 
 ## Importing existing content

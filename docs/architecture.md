@@ -366,9 +366,11 @@ and a slug -- something to go and fix -- rather than a file under
 `public.nosync`, and it has to work before a build has ever run. Judging a
 link still needs to know which addresses a build would produce, so those
 are derived in the checker from the same rules `build_blog.rb` follows.
-Twenty questions, in one pass: a `config/site.yml` that is missing, empty,
-unparseable or unopenable -- the one question about something outside the
-archive, asked because this is what people run before a build and the build
+Twenty-one questions, in one pass: a Ruby that gets no security fixes any
+more -- one of the two questions about something outside the archive,
+asked so that somebody who runs only `check` hears what `doctor` would
+have said; a `config/site.yml` that is missing, empty, unparseable or
+unopenable -- the other one, asked because this is what people run before a build and the build
 refuses all four; files the checker cannot read at all, posts
 whose date nothing can parse, posts whose text is not a list of blocks or
 whose blocks carry a picture, a poster, list items or formatting that is not

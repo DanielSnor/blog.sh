@@ -310,7 +310,9 @@ module Wizard
     require 'shellwords'
     # Set to nothing is not set: an empty $VISUAL ran the value's own file
     # as the command (fleet over 1.11.1).
-    editor = [ENV['VISUAL'], ENV['EDITOR']].map { |e| e.to_s.strip }.find { |e| !e.empty? } || 'nano'
+    # nano -w: lines are not broken as they are typed, by GNU nano or by the
+    # pico macOS now calls nano (lib/default_editor.rb).
+    editor = [ENV['VISUAL'], ENV['EDITOR']].map { |e| e.to_s.strip }.find { |e| !e.empty? } || 'nano -w'
     Dir.mktmpdir do |dir|
       path = File.join(dir, 'value.txt')
       header = comment ? comment.lines.map { |l| "// #{l.chomp}\n" }.join : ''

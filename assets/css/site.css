@@ -193,6 +193,11 @@ img, video { max-width: 100%; height: auto; }
 .share__ask[hidden] { display: none; }
 .share__change[hidden] { display: none; }
 .share__ask-error[hidden] { display: none; }
+/* The field that asks which server a reply should go from (comments.js, #75):
+   hidden until the link beside the reply link opens it, and its message
+   until the answer is not a server. */
+.comments-reply-form[hidden] { display: none; }
+.comments-reply-error[hidden] { display: none; }
 .tag-index-jump[hidden] { display: none; }
 /* The "On this day" card arrives hidden and the script shows it only when
    the day has rows (#62): a reader whose script has not run yet, or whose

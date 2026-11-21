@@ -68,6 +68,7 @@ require_relative '../lib/site_header'
 require_relative '../lib/publish_slots'
 require_relative '../lib/path_glob'
 require_relative '../lib/launcher'
+require 'shellwords'
 
 # A script that ASKS has to flush before it blocks. stdout is block
 # buffered whenever it is not a terminal, so `cmd | tee log`, `cmd > log`
@@ -918,7 +919,129 @@ def run_doctor
   puts
 end
 
+# --- the machine translator -------------------------------------------
+#
+# `./setup.sh --translator`: this question and nothing else. It is not part
+# of the interview: it is optional, it costs money, and it sends the text of a
+# post away -- so it is asked for by name, and the questions of the main run
+# stay as they were.
+TRANSLATORS = [%w[none translator_none], %w[command translator_command], %w[openai translator_openai],
+               %w[anthropic translator_anthropic], %w[gemini translator_gemini], %w[deepl translator_deepl], %w[libretranslate translator_libretranslate]].freeze
+
+def ask_translator(env)
+  say(t('section_translator'), :bold)
+  say('')
+  say(t('section_translator_intro'))
+  say('')
+
+  now = ENV['TRANSLATOR'].to_s.strip.downcase
+  now = 'command' if now.empty? && !ENV['TRANSLATOR_COMMAND'].to_s.strip.empty?
+  now = 'none' unless TRANSLATORS.any? { |name, _| name == now }
+  options = TRANSLATORS.map { |name, key| [name, t(key)] }
+  chosen = choose(t('q_translator'), options, current_index: options.index { |o| o.first == now } || 0)
+
+  if chosen == 'none'
+    # A choice that sticks: the lines are commented out, not forgotten, so
+    # choosing a translator again later finds what was there.
+    %w[TRANSLATOR TRANSLATOR_COMMAND].each { |name| env.unset(name) }
+    say(t('translator_skipped'))
+    say('')
+    return
+  end
+
+  if chosen == 'command'
+    command = ask_valid(t('q_translator_command'), ENV['TRANSLATOR_COMMAND'].to_s, hint: t('h_translator_command')) do |answer|
+      words = begin
+        Shellwords.split(answer.to_s)
+      rescue ArgumentError
+        []
+      end
+      t('e_translator_command') if words.empty?
+    end
+    # Enter keeps what is there, and with nothing there it keeps nothing: said,
+    # and left as it was -- not written as an empty command.
+    if command.to_s.strip.empty?
+      say(t('e_translator_command'), :yellow)
+      say('')
+      return
+    end
+    env.unset('TRANSLATOR')
+    env.set('TRANSLATOR_COMMAND', command.strip)
+  else
+    # DeepL and LibreTranslate are not language models: there is no model to name.
+    modelless = %w[deepl libretranslate].include?(chosen)
+    # Another provider: the address, the key -- and the model -- of the one
+    # before are not its. The model was offered as "Now:" and Enter gave
+    # Anthropic an OpenAI model (second fleet over 1.12, 03/4).
+    switched = chosen != now
+    model = if modelless
+              ''
+            else
+              ask_valid(t('q_translator_model'), switched ? '' : ENV['TRANSLATOR_MODEL'].to_s, hint: t('h_translator_model')) do |answer|
+                t('e_translator_model') if answer.to_s.strip.empty?
+              end
+            end
+    if model.to_s.strip.empty? && !modelless
+      say(t('e_translator_model'), :yellow)
+      say('')
+      return
+    end
+    # Another provider: the address and the key of the one before are not
+    # its. Kept, they sent the new provider's requests -- and the old key --
+    # to the old address, and Enter at the key kept a key the new provider
+    # does not know.
+    env.set('TRANSLATOR', chosen)
+    modelless ? env.unset('TRANSLATOR_MODEL') : env.set('TRANSLATOR_MODEL', model.strip)
+    env.unset('TRANSLATOR_URL') if switched
+    if %w[openai libretranslate].include?(chosen)
+      which = chosen == 'openai' ? 'q_translator_url' : 'q_translator_url_libre'
+      url = ask(t(which), switched ? '' : ENV['TRANSLATOR_URL'].to_s, hint: t(chosen == 'openai' ? 'h_translator_url' : 'h_translator_url_libre'))
+      env.set('TRANSLATOR_URL', url.strip) unless url.to_s.strip.empty?
+    end
+    puts t('translator_key_where')
+    key = Tui.password(t('q_translator_key'))
+    puts unless Tui.interactive? # see the note by the Mastodon token above
+    acknowledge_secret(key)
+    puts
+    if !key.empty?
+      env.set('TRANSLATOR_KEY', key)
+    elsif switched
+      env.unset('TRANSLATOR_KEY')
+    end
+  end
+
+  # What the default is, and what saying no costs: see lib/auto_translate.rb.
+  # Enter keeps what is set: a server that said deny says it still.
+  remote = ENV['TRANSLATOR_REMOTE'].to_s.strip.downcase
+  allowed_now = remote.empty? || %w[allow on yes true 1].include?(remote)
+  if Wizard.confirm(t('q_translator_remote'), default: allowed_now)
+    env.unset('TRANSLATOR_REMOTE')
+  else
+    env.set('TRANSLATOR_REMOTE', 'deny')
+  end
+  say(t('translator_done'))
+  say('')
+end
+
+def run_translator_only
+  env = ConfigWriter::EnvFile.new(ENV_SH, template: ENV_SH_EXAMPLE)
+  puts SiteHeader.render(tool: './setup.sh')
+  puts
+  ask_translator(env)
+  outcome = Wizard.review_and_write([[relative(ENV_SH), env]])
+  exit 1 if outcome == :failed
+  puts Tui.paint(t('env_permissions', path: relative(ENV_SH)), :dim) if outcome == :written && env.changed?
+  puts t('translator_check')
+  puts
+end
+
 # `./setup.sh --launcher`: the launcher and nothing else.
 exit(make_launcher ? 0 : 1) if ARGV.include?('--launcher')
+
+# `./setup.sh --translator`: the machine translator and nothing else.
+if ARGV.include?('--translator')
+  Wizard.guard { run_translator_only }
+  exit 0
+end
 
 Wizard.guard { run }

@@ -2905,6 +2905,28 @@ article .share { margin-top: 14px; padding-top: 0; border-top: 0; }
   text-decoration: none;
 }
 .comments-reply a:hover { opacity: 0.85; }
+/* The two beside it that go from the reader's own server (comments.js): the
+   same pill as an outline, so the one that is the post's own stays the
+   loudest. */
+.comments-reply .comments-reply-own,
+.comments-reply .comments-reply-other,
+.comments-reply .comments-reply-own:hover,
+.comments-reply .comments-reply-other:hover {
+  background: none;
+  border: 1px solid var(--accent);
+  padding: 8px 17px;
+  color: var(--accent);
+}
+.comments-reply-form { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 16px; }
+.comments-reply-form input {
+  font: inherit; font-size: 14px; color: inherit; background: none;
+  padding: 8px 14px; border: 1px solid var(--line); border-radius: 999px; width: 21em; max-width: 100%;
+}
+.comments-reply-form button {
+  font-family: var(--mono); font-weight: 700; font-size: 13px; letter-spacing: 0.05em; text-transform: lowercase;
+  padding: 8px 18px; border: 0; border-radius: 999px; background: var(--accent); color: var(--on-accent); cursor: pointer;
+}
+.comments-reply-error { color: var(--accent); font-size: 13px; }
 
 /* A gallery in a post runs three across on a wide screen -- where it has
    three pictures, or five and more. Two stay a pair and four a square,

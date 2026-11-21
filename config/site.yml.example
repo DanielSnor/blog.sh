@@ -596,8 +596,17 @@ social:
 #     network, where the thread stays public -- for that you still have
 #     block, mute and report.
 #
+# Replying from the reader's own server (Mastodon only). Most readers are on
+# another server than yours, where the "Reply on Mastodon" link lands them
+# signed out. Beside it the page offers "Reply from another server...": the
+# reader types their server once, this browser remembers it, and the link
+# goes to /authorize_interaction on THEIR server, which takes them to its own
+# copy of the toot to reply, boost or favourite. Nothing is sent to your
+# site. It is on unless you say false:
+#
 # comments:
 #   approval: fav
+#   reply_from_own_server: true
 # --- end of comments ---
 
 # Optional. The times posts usually go out. With this set, [s] in the

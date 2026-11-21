@@ -94,7 +94,7 @@ due.sort_by! { |_path, _post, date| date }
 # anywhere saying why. `doctor` reads this file.
 Publishing.mark_scheduler_alive
 
-if due.empty? && !File.exist?(DEPLOY_PENDING)
+if due.empty? && !File.exist?(DEPLOY_PENDING) && Publishing.owed_announcements.empty?
   # Said to a PERSON, and to nobody else. The documented crontab runs this
   # every fifteen minutes and the overwhelming majority of those ticks
   # have nothing to do; cron mails whatever the job writes, so one
@@ -173,8 +173,19 @@ due.each do |path, _snapshot, _date|
   # bargain -- said out loud, per post, with the command that fixes it.
   backdated = !Publishing.within_recency_window?(date)
   silent = unlisted || announced || backdated
-  fields = silent ? nil : Publishing.announce(updated, year: date.year.to_s)
-  AtomicWrite.write_json(new_path, updated.merge(fields)) if fields
+  # Owed, not sent: the toot goes out once the page is live, below -- an
+  # address that answers 404 for the minutes a build and a deploy take is
+  # what followers used to find (Publishing::ANNOUNCE_PENDING).
+  # A site that announces nowhere owes nothing (doctor said it owed a toot).
+  # Nor does one that deploys nowhere: its page is on no server, and a toot
+  # would point at nothing -- what a manual publish has said since the
+  # first fleet over 1.12 (03/5), and the cron did not (second fleet, 02/4).
+  if !silent && !SiteConfig.comment_network.nil? && !Publishing.deploys_somewhere?
+    warn I18n.t('cli.announce_goes_nowhere', slug: updated['slug'],
+                                            command: SiteConfig.comment_network == :bluesky ? 'bluesky' : 'toot')
+    silent = true
+  end
+  Publishing.owe_announcement(new_path) unless silent || SiteConfig.comment_network.nil?
   puts I18n.t('cron.published_scheduled', slug: updated['slug'],
                                           date: date.strftime(I18n.t('date_time_format')))
   # One line, not three: a post can be all of unlisted, backdated and
@@ -194,15 +205,6 @@ due.each do |path, _snapshot, _date|
   elsif backdated
     puts I18n.t('cron.backdated_not_announced', slug: updated['slug'])
   end
-  # The post is published either way -- that part worked, and undoing it
-  # would be worse. But an announcement that was attempted and failed is a
-  # failure of this run: counted, so the exit code is non-zero and cron
-  # mails somebody, and said out loud, because the post is now public with
-  # nothing announcing it and no second attempt coming.
-  if fields == false
-    failures += 1
-    warn I18n.t('cron.announce_failed', slug: updated['slug'])
-  end
 # SystemExit as well as StandardError: the likeliest per-post failure is
 # Publishing.publish's own `abort` when the target year already has a post
 # with this slug, and an abort in a loop over due posts must not take the
@@ -219,10 +221,26 @@ end
 
 reason = due.empty? ? I18n.t('cron.retrying_deploy') : I18n.t('cron.publishing_scheduled', count: due.size)
 deployed = Publishing.rebuild_and_deploy(reason)
+live = deployed
+
+# The page is live, so the toots can go out: the ones this run owes and any a
+# failed deploy left behind. An announcement that was attempted and failed
+# is a failure of this run -- counted, so the exit code is non-zero and cron
+# mails somebody, and said out loud, because the post is now public with
+# nothing announcing it and no second attempt coming. What the toots bring
+# is their address, which the pages draw their comment threads from: a
+# second build puts it there.
+if live
+  # Only what this build saw: a post published by hand while it ran is owed
+  # from a moment after it started, and its page is not in this deploy.
+  sent, announce_failures = Publishing.send_owed_announcements(built_since: Publishing.last_build_started)
+  failures += announce_failures
+  deployed = Publishing.rebuild_and_deploy(I18n.t('cron.adding_comments')) if sent.positive?
+end
 
 # The .deploy-pending marker is written and cleared by rebuild_and_deploy
 # itself now, so every path that can leave the site owing a deploy -- this
 # cron and the manual publish alike -- leaves the same trace behind.
-warn I18n.t('cron.deploy_will_retry') unless deployed
+warn I18n.t('cron.deploy_will_retry') unless live
 
 exit(deployed && failures.zero? ? 0 : 1)

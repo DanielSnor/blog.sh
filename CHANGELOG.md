@@ -11,6 +11,60 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.12 -- 2026-11-21
+
+The translation release. `translate --auto` hands a post to a translator the author names -- a program of
+one's own, OpenAI, Anthropic, Gemini, DeepL or LibreTranslate -- and leaves a draft to read and save.
+Beside that, a reader can reply to a toot from their own Mastodon server, and a post is announced once
+its page is live.
+Nothing to migrate -- `git pull`, rebuild, deploy. Hashtags of tags with a dot, a hyphen or a space change
+shape, and a site with no deploy target is no longer announced.
+
+### Added
+
+- **`translate <slug> --lang <code> --auto`** (#68, PR #69, Pavel). A translator writes the first draft into `tmp/`; `add` saves it.
+- **The translator is a setting in `env.sh`.** `TRANSLATOR_COMMAND`, or `TRANSLATOR=openai|anthropic|gemini|deepl|libretranslate` with a model and a key.
+- **DeepL and LibreTranslate.** Sent paragraph by paragraph; code, addresses and Markdown come back untouched.
+- **`./setup.sh --translator`.** Asks about the translator only and writes `env.sh`; `doctor` says whether the setting is whole.
+- **A translation is compared with the original.** Addresses, pictures, numbers and the count of headings and paragraphs; a difference is a warning.
+- **What a provider refuses is said as what it is.** A bad key, no credit, a model the plan leaves out -- a code and a sentence.
+- **`[a]` at the terminal** for a language with nothing written: the editor opens on the machine's draft.
+- **`translate --json` carries an `auto` block.** `translate --auto --json` returns the draft and its warnings without saving.
+- **A reader can reply from their own Mastodon server** (#75, Pavel). One field, remembered in the browser; `comments.reply_from_own_server: false` turns it off.
+- **A translation just saved ends on its preview address and QR code** (#80, Pavel), as a draft does.
+- **A list cut at the 50 newest posts says so** (#82, Pavel), and how to reach an older one.
+- **`doctor` says when the site's address has a path, a query or a fragment.** The engine builds a site for the root of a domain.
+- **`doctor` says when `nano` is pico**, and when there is no editor at all.
+
+### Changed
+
+- **A post is announced after its page is live** (#83, Pavel). A deploy that fails leaves the toot in `.announce-pending` for the next one.
+- **`doctor` names a toot that waits for a deploy**, or whose post is gone, with what to do.
+- **A hashtag keeps a tag's words together.** `blog.sh` is `#blog_sh`, not `#blog`; `C++` is `#Cplusplus`. Old toots keep theirs.
+- **A site with no deploy target is not announced.** Its page is on no server; `./blog.sh toot <slug>` once it is.
+- **`nano` that is really pico (macOS from 2026) is opened with `-w`.** It took `--atblanks` for a file and wrote the post there.
+- **The properties screen begins with the tags** (#81, Pavel). The Czech "Typ" read as "tip".
+- **A link block drawn by its address carries `link-block--address`.** One class more, in every skin.
+
+### Fixed
+
+- **`add <file>` with `lang:` or `base:` and no `edits:` made an orphan post** (#79, Pavel). It is refused.
+- **Saving one translation made the other one of the post "changed".** `base:` is the hash of what it is made from.
+- **`[d]` on a scheduled post said "Still scheduled" after the cron had published it.** It reads the post again.
+- **`publish --no-announce` said nothing at `[d]`** that the flag cannot reach the cron. It says so, as `[s]` does.
+- **Minimal Pictorial cut the first eight characters off a link's title.** Only an address is shifted.
+- **A link block with an empty title was an invisible link.** It is drawn by its address.
+- **The share button took what a browser does not take for a host.** A port past 65535, `evil.com#.mastodon.social`.
+- **Many tags or a long title took a toot past 500 characters, and Mastodon refused it.** Tags yield first.
+- **`translate --json` with a mistake in its words answered nothing a program reads.** An object and a code.
+
+### Security
+
+- **A paired device may ask for a translation unless `TRANSLATOR_REMOTE=deny`.** Someone pays for it; a lost device until `pair --revoke`.
+- **The translator program does not get the engine's secrets from `env.sh`.** Its own key it keeps.
+- **`doctor` and `check` say when the Ruby gets no security fixes** (GHSA-34m4-m9fh-gqp5). 3.3.14, 3.4.13, 4.0.10 or newer; a warning.
+
+
 ## 1.11.1 -- 2026-11-15
 
 A bug-fix release. Five of its fixes came from Pavel's week of everyday writing on 1.11 before its

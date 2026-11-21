@@ -39,8 +39,18 @@
     if (at !== -1) { value = value.slice(at + 1); }
     if (!value || value.indexOf(' ') !== -1) { return null; }
     // A dotted name, optionally with a port. Unicode letters allowed;
-    // what is refused is punctuation, schemes and whitespace.
-    return /^[^\s.:\/@]+(\.[^\s.:\/@]+)+(:\d{1,5})?$/.test(value) ? value : null;
+    // what is refused is punctuation, schemes and whitespace -- and a name
+    // the browser itself does not take for a host (a port past 65535,
+    // `a<b.c`, `evil.com#.x`), which made the share open nothing or open
+    // somewhere else than it said (fleet over 1.12, 05/1).
+    if (!/^[^\s.:\/@<>"'`%?#\\]+(\.[^\s.:\/@<>"'`%?#\\]+)+(:\d{1,5})?$/.test(value)) { return null; }
+    try {
+      var url = new URL('https://' + value + '/');
+      if (url.pathname !== '/' || url.search || url.hash || url.username || url.password) { return null; }
+    } catch (e) {
+      return null;
+    }
+    return value;
   }
   function remembered() {
     try {

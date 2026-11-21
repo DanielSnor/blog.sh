@@ -179,8 +179,52 @@ module Publishing
     "#{plain[0, limit - 1].sub(/[[:space:]]+[^[:space:]]*\z/, '')}…"
   end
 
+  # A tag as the hashtag it announces under. Mastodon and Bluesky end a
+  # hashtag at anything but a letter, a digit or `_`, so a tag that keeps a
+  # dot or a hyphen is announced as a shorter one: `blog.sh` became `#blog`,
+  # `sean.cz` `#sean`, `self-hosting` `#self` -- and `hudba dana`, with its
+  # space simply dropped, `#hudbadana`, which no reader of the site would
+  # search for. A run of spaces, dots and hyphens is one `_`, and one at the
+  # ends of the tag is nothing at all (`.net` is `#net`). The tag's own page
+  # keeps its address: Slug.slugify makes `_`, space, dot and hyphen the
+  # same `-`, so this changes what the announcement says and not where a tag
+  # lives.
+  #
+  # Every other character a hashtag cannot hold is the same as a dot (fleet
+  # over 1.12): `R&D` was `#R`, `C++` `#C`, `don't` `#don`, and a space
+  # beside an emoji left `#kytara_`. Invisible marks (a soft hyphen, a
+  # zero-width space) are taken out rather than made a `_`; the text is
+  # composed first (NFC), so `é` typed two ways is one hashtag; and a
+  # hashtag is at most HASHTAG_GRAPHEMES long -- Bluesky's limit for a tag,
+  # past which the whole post is refused -- cut where a `_` is, if one is.
+  HASHTAG_GRAPHEMES = 64
+
+  #
+  # A `+` or `#` that ends a word is said, not cut: `C++` is `#Cplusplus`
+  # and `C#` `#Csharp`, the hashtags those languages go by. Cut, both were
+  # `#C`, and the tags `C`, `C#` and `C++` were announced as one (second
+  # fleet over 1.12, 02/5).
+  SAID = { '+' => 'plus', '#' => 'sharp' }.freeze
+
+  def hashtag_for(tag)
+    text = tag.to_s.dup.force_encoding(Encoding::UTF_8).scrub('')
+    text = text.unicode_normalize(:nfc).gsub(/\p{Cf}/, '')
+    text = text.gsub(/(?<=[[:alnum:]])[+#]+(?![[:word:]])/) { |run| run.chars.map { |c| SAID[c] }.join }
+    word = text.gsub(/[^[:word:]]+/, '_').gsub(/\A_+|_+\z/, '')
+    word = cut_hashtag(word) if grapheme_length(word) > HASHTAG_GRAPHEMES
+    word.empty? ? '' : "##{word}"
+  end
+
+  def cut_hashtag(word)
+    kept = word.scan(/\X/).first(HASHTAG_GRAPHEMES).join
+    at = kept.rindex('_')
+    (at && at.positive? ? kept[0, at] : kept).sub(/_+\z/, '')
+  end
+
+  # Two tags that come to the same hashtag are announced once: `blog.sh` and
+  # `blog-sh` both say `#blog_sh`, and a hashtag is the same whatever its case.
   def hashtags_for(tags)
-    tags.map { |t| "##{t.to_s.gsub(/\s+/, '')}" }.join(' ')
+    tags.map { |t| hashtag_for(t) }.reject(&:empty?).uniq(&:downcase).join(' ')
   end
 
   # title/url/hashtags must never be truncated (a cut-off URL is a dead
@@ -195,6 +239,21 @@ module Publishing
     fixed_length = parts.join("\n\n").length
     fixed_length += LINK_LENGTH - url.length unless url.to_s.strip.empty?
     budget = TOOT_LENGTH - fixed_length - 2 # 2 = the "\n\n" the perex adds once inserted
+
+    # Past the limit even without a perex, Mastodon refuses the whole toot
+    # and the post goes out unannounced -- what Bluesky's composer has been
+    # spared since 1.4. What yields is the same here: tags from the end
+    # until the title has room, then the title on a word. The address never.
+    if budget.negative?
+      linked = ->(list) { [url, hashtags_for(list)].reject { |p| p.to_s.strip.empty? }.join("\n\n").length + LINK_LENGTH - url.length }
+      tag_list = Array(tags).dup
+      tag_list.pop while !tag_list.empty? && TOOT_LENGTH - linked.call(tag_list) - 2 < MIN_TITLE_GRAPHEMES
+      hashtags = hashtags_for(tag_list)
+      room = TOOT_LENGTH - linked.call(tag_list) - 2
+      title = trim_to_graphemes(title.to_s, room)
+      fixed_length = [title, url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n").length + LINK_LENGTH - url.length
+      budget = TOOT_LENGTH - fixed_length - 2
+    end
 
     [title, perex_for(blocks, budget), url, hashtags].reject { |p| p.to_s.strip.empty? }.join("\n\n")
   end
@@ -452,6 +511,190 @@ module Publishing
   # The next cron tick reads this and finishes the job.
   DEPLOY_PENDING = File.join(ROOT, '.deploy-pending')
 
+  # The announcements a post is owed once its page is live. The toot used to
+  # go out BEFORE the build and the deploy, because the page draws its
+  # comment thread from the toot's address and so needed it first -- and for
+  # as long as the build and the deploy took (a minute or two on a quiet
+  # machine, three on a cold disk, more on a large archive) the address in
+  # the toot led to a 404, which followers saw and said. Now the page goes
+  # out first, the toot after it, and the address it brings is put on the
+  # page by a second, quick build.
+  #
+  # This file is the record of the toots still to send: a path under the
+  # content directory to a line. A line is written when a post is published
+  # and read when the deploy has gone through -- by the same run, or, when
+  # the deploy failed, by the next tick of the publishing cron, which is why
+  # it is a file and not a variable. A post whose deploy failed is not
+  # announced: a link to a page that is not there is the failure this exists
+  # to prevent.
+  ANNOUNCE_PENDING = File.join(ROOT, '.announce-pending')
+
+  # A line is `<path under content>\t<when it was owed>`. The time is what
+  # lets a run tell its own debts from somebody else's: a build that started
+  # before a post was published did not put its page on the server, so that
+  # run must not send its toot (the 404 this file exists to prevent, by a
+  # different road: a manual publish while the cron's build was running).
+  # A line with no time (written by 1.12 before this) is payable by anybody.
+  def owed_entries
+    File.readlines(ANNOUNCE_PENDING, chomp: true, encoding: 'utf-8').filter_map do |line|
+      rel, stamp = line.scrub.strip.split("\t", 2)
+      next if rel.to_s.empty?
+
+      [rel, (Time.iso8601(stamp) rescue nil)]
+    end.uniq { |rel, _| rel }
+  rescue SystemCallError
+    []
+  end
+
+  def owed_announcements
+    owed_entries.map(&:first)
+  end
+
+  def relative_to_content(path)
+    path.to_s.sub(%r{\A#{Regexp.escape(CONTENT_DIR)}/?}, '')
+  end
+
+  # Owed from now: a post owed again (published, taken down, published
+  # again) is owed from the later moment.
+  def owe_announcement(path)
+    rel = relative_to_content(path)
+    rest = owed_entries.reject { |owed, _| owed == rel }
+    write_owed(rest + [[rel, Time.now]])
+  end
+
+  # A post that moves -- a new slug, a date in another year -- takes its
+  # debt along, owed from the same moment. Left behind, the line named a
+  # file that was no longer there, the next run settled it as a post gone,
+  # and the post went out unannounced without a word (second fleet over
+  # 1.12, 02/1).
+  def move_announcement(from, to)
+    old_rel = relative_to_content(from)
+    new_rel = relative_to_content(to)
+    return if old_rel == new_rel
+
+    entries = owed_entries
+    return unless entries.any? { |owed, _| owed == old_rel }
+
+    write_owed(entries.map { |owed, at| owed == old_rel ? [new_rel, at] : [owed, at] }.uniq { |rel, _| rel })
+  rescue SystemCallError
+    nil
+  end
+
+  def settle_announcement(path)
+    rel = relative_to_content(path)
+    write_owed(owed_entries.reject { |owed, _| owed == rel })
+  rescue SystemCallError
+    nil
+  end
+
+  # Takes the debt off the list and says whether it was there: the one who
+  # takes it sends the toot. A manual publish and the cron can both reach
+  # the same post (the cron paying what a manual run left owed while that
+  # run is still going); whoever claims it first sends, the other does not.
+  def claim_announcement(path)
+    rel = relative_to_content(path)
+    entries = owed_entries
+    return false unless entries.any? { |owed, _| owed == rel }
+
+    write_owed(entries.reject { |owed, _| owed == rel })
+    true
+  end
+
+  def write_owed(entries)
+    if entries.empty?
+      File.delete(ANNOUNCE_PENDING) if File.exist?(ANNOUNCE_PENDING)
+    else
+      AtomicWrite.write(ANNOUNCE_PENDING, entries.map { |rel, at| at ? "#{rel}\t#{at.iso8601(3)}" : rel }.join("\n") + "\n")
+    end
+  end
+
+  # When the last rebuild_and_deploy of this process started reading the
+  # archive -- what send_owed_announcements is told, so that it pays only
+  # the debts that build could see.
+  def last_build_started
+    @last_build_started
+  end
+
+  # The fields an announcement brought, written onto the post as it is NOW
+  # on disk. The copy the sender read is minutes old by the time the toot
+  # comes back (a build and a deploy lie between them on a manual publish),
+  # and writing that copy back undid whatever was saved in between -- an
+  # `edit` made during the deploy, said to be saved, quietly gone.
+  #
+  # A post no longer there is not written back: it was deleted or renamed
+  # while the deploy ran, and writing the old copy brought it back -- a
+  # deleted post in the archive again, a renamed one twice (second fleet
+  # over 1.12, 02/3). The fields are still handed back, for the caller.
+  def record_announcement(path, fields, fallback)
+    current = begin
+      JSON.parse(File.read(path, encoding: 'utf-8'))
+    rescue Errno::ENOENT
+      return fallback.merge(fields)
+    rescue SystemCallError, JSON::ParserError
+      fallback
+    end
+    AtomicWrite.write_json(path, current.merge(fields))
+    current.merge(fields)
+  end
+
+  # Sends every owed announcement whose post is still published, still
+  # unannounced and still announceable, and writes what came back onto the
+  # post. Returns [sent, failed]. A failure is not retried: the post is out,
+  # a second toot would stand beside the first if the network had only been
+  # slow to say so, and `./blog.sh toot` is there for a person to try again.
+  # The caller rebuilds when `sent` is not zero -- that build is what puts
+  # the toot's address on the page.
+  #
+  # built_since: when the build that just went live started. A debt owed
+  # after that moment is a post that build did not see: it stays owed, for
+  # the run that published it or the next tick.
+  def send_owed_announcements(built_since: nil)
+    sent = 0
+    failed = 0
+    now = Time.now
+    owed_entries.each do |rel, owed_at|
+      # A debt owed after the build began is a post the build did not see.
+      # One owed in the future is a clock that went back: no build will ever
+      # start after it, and every tick rebuilt and redeployed waiting for
+      # one (second fleet over 1.12, 02/2) -- it is paid.
+      next if built_since && owed_at && owed_at > built_since && owed_at <= now
+
+      path = File.join(CONTENT_DIR, rel)
+      post = begin
+        JSON.parse(File.read(path, encoding: 'utf-8'))
+      rescue SystemCallError, JSON::ParserError
+        nil
+      end
+      if post.nil? || post['state'] != 'published' || announced?(post) || unlisted?(post)
+        settle_announcement(path)
+        next
+      end
+      next unless claim_announcement(path)
+
+      fields = announce(post, year: File.basename(File.dirname(path)))
+      case fields
+      when Hash
+        record_announcement(path, fields, post)
+        sent += 1
+      when false
+        failed += 1
+        # Without base_url nothing was sent, and the token is not the reason.
+        warn I18n.t(base_url.empty? ? 'cron.announce_failed_base_url' : 'cron.announce_failed', slug: post['slug'])
+      end
+    end
+    [sent, failed]
+  end
+
+  # An unset DEPLOY_BACKEND is Surfer, as DeployBackend.pick and doctor read
+  # it -- looked up by name it was nothing, and a publish that had just
+  # uploaded said the site went nowhere (fleet, 26. 9. 2026).
+  def deploys_somewhere?
+    require_relative 'deploy_backend'
+    name = ENV['DEPLOY_BACKEND'].to_s
+    backend = name.empty? ? DeployBackend::Surfer : DeployBackend::BACKENDS[name]
+    !backend.nil? && backend.configured?
+  end
+
   # The scheduler's heartbeat. Its MTIME is the whole content -- the file
   # says nothing except "something ran the queue at this moment".
   SCHEDULER_HEARTBEAT = File.join(ROOT, '.last-scheduled-run')
@@ -539,6 +782,7 @@ module Publishing
     # Noted before the build reads a single file, so a marker written after
     # this instant is somebody else's debt and survives our success.
     started = Time.now
+    @last_build_started = started
     puts
     puts "#{reason}…"
     build = [File.join(ROOT, 'build', 'build_blog.rb')]

@@ -404,7 +404,10 @@ module Blocks
       end.join
       %(<dl class="chat">#{rows}</dl>)
     when 'link'
-      title = CGI.escapeHTML((block['title'] || block['url']).to_s)
+      # A title of nothing but spaces is no title: the address is drawn, as
+      # for one with none -- it was an empty, invisible link (fleet over 1.12,
+      # 05/3; a hand-made JSON or a Tumblr import can carry "title": "").
+      title = CGI.escapeHTML((block['title'].to_s.strip.empty? ? block['url'] : block['title']).to_s)
       description = CGI.escapeHTML(block['description'].to_s)
       if title_lifted
         # The title is the post's heading now, and the heading is the link.
@@ -412,7 +415,13 @@ module Blocks
         # none has nothing left to draw at all.
         description.empty? ? '' : %(<p class="link-block">#{description}</p>)
       else
-        %(<p class="link-block"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
+        # `link-block--address` where the link has no title and so is drawn by
+        # its address: the one case a skin may treat the text as an address
+        # (Pictorial cuts `https://` off the left of it) -- and not a title that
+        # happens to sit in the same markup, which lost its first eight
+        # characters to that rule.
+        bare = block['title'].to_s.strip.empty? ? ' link-block--address' : ''
+        %(<p class="link-block#{bare}"><a href="#{CGI.escapeHTML(safe_href(block['url']))}"><strong>#{title}</strong></a><br>#{description}</p>)
       end
     else
       # Escaped. architecture.md promises an unknown type renders "as its

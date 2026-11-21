@@ -32,6 +32,7 @@ require_relative '../lib/embed_lookup'
 require_relative '../lib/file_size'
 require_relative '../lib/slug'
 require_relative '../lib/translations'
+require_relative '../lib/auto_translate'
 require_relative '../lib/content_type'
 require_relative '../lib/post_text'
 require_relative '../lib/search_query'
@@ -159,10 +160,7 @@ end
 # it -- looked up by name it was nothing, and a publish that had just
 # uploaded said the site went nowhere (fleet, 26. 9. 2026).
 def deploys_somewhere?
-  require_relative '../lib/deploy_backend'
-  name = ENV['DEPLOY_BACKEND'].to_s
-  backend = name.empty? ? DeployBackend::Surfer : DeployBackend::BACKENDS[name]
-  !backend.nil? && backend.configured?
+  Publishing.deploys_somewhere?
 end
 
 # --- frontmatter ------------------------------------------------------
@@ -808,12 +806,16 @@ def editor_round_trip(initial_content, hint_comment)
     # no words and the post's own file was run as the command (fleet over
     # 1.11.1).
     own = [ENV['EDITOR'], ENV['VISUAL']].map { |e| e.to_s.strip }.find { |e| !e.empty? }
-    editor = own || 'nano --softwrap --atblanks --trimblanks'
+    # Which nano it is decides the switches (lib/default_editor.rb): pico,
+    # which macOS now calls nano, took the GNU ones for file names.
+    require_relative '../lib/default_editor'
+    editor = own || DefaultEditor.argv.join(' ')
     ok = system(*Shellwords.split(editor), path)
-    # The default nano flags postdate the 2007-vintage nano Apple still
-    # ships -- when the *default* editor rejects them, retry bare nano
-    # before giving up. A user's own $EDITOR gets no second-guessing.
-    ok ||= own.nil? && system('nano', path)
+    # The long switches postdate the old GNU nano Apple shipped for years --
+    # when the *default* editor rejects them, retry with the one switch every
+    # nano knows (-w: do not break lines), and only then bare nano. A user's
+    # own $EDITOR gets no second-guessing.
+    ok ||= own.nil? && (system(*DefaultEditor::PLAIN, path) || system('nano', path))
     unless ok
       abort(t('cli.editor_failed', editor: editor))
     end
@@ -1128,7 +1130,7 @@ end
 # raises: a failed announcement must not block publishing the post
 # itself. Composition and dispatch live in lib/publishing.rb, shared
 # with the scheduled-publish cron.
-def announce_post(post, year:, date:, force: false)
+def announce_post(post, year:, date:, force: false, defer: false)
   # An unlisted post is not announced, and force does not open this door the
   # way it opens the backdating one. The whole point of `unlisted` is a post
   # that exists at its address for the handful of people you send the link
@@ -1168,7 +1170,11 @@ def announce_post(post, year:, date:, force: false)
     return nil
   end
 
-  Tui.spinner(t('cli.announcing')) { Publishing.announce(post, year: year) }
+  # defer: everything above has been asked and checked, and what is handed
+  # back is the sending itself -- for publish, which sends it once the page
+  # is live (see Publishing::ANNOUNCE_PENDING).
+  sending = -> { Tui.spinner(t('cli.announcing')) { Publishing.announce(post, year: year) } }
+  defer ? sending : sending.call
 end
 
 # --- commands ------------------------------------------------------------
@@ -1497,6 +1503,15 @@ def add_from_file(source, json: false, confined: false)
   # A file that names the draft it edits is not a new post: see edit_from_file.
   return edit_from_file(file, raw, meta, json: json, confined: confined, publish: publish) unless meta['edits'].to_s.strip.empty?
 
+  # `lang:` and `base:` belong to a file that is a new text for a post that
+  # already exists, and the post is named by `edits:`. Without it there is
+  # nothing to attach the text to, and what happened was the worst of the
+  # answers: a post of its own, in the language the file named, with a
+  # generated address -- an orphan beside the original, made without a word
+  # (#79). Refused instead, naming the key that is missing.
+  stray = %w[lang base].select { |key| !meta[key].to_s.strip.empty? }
+  refuse('needs_edits', t('cli.add_needs_edits', keys: stray.join(' / '), file: file)) if stray.any?
+
   path, warnings = quietly(json, keep_stdout: true) do
     compose_post(raw, suggested, interactive: false, also_consume: [file], confined: confined,
                  extra_keys: FILE_ONLY_FRONTMATTER_KEYS)
@@ -1669,9 +1684,13 @@ def edit_from_file(file, raw, meta, json:, confined:, publish:)
   # and a change made elsewhere in the meantime would be overwritten in
   # silence. The save rebuilds and deploys, as `edit` does at the desk.
   refuse('base_required', t('cli.edit_from_base_required', slug: slug)) if base.empty? && !draft?(post)
-  if !base.empty? && base != Digest::SHA256.hexdigest(original_raw)
-    refuse('changed', t('cli.edit_from_changed', slug: slug))
-  end
+  # A translation may name what it was made from (translation_base) or, as
+  # programs that asked before 1.12 do, the whole file.
+  # A `lang:` naming no language is refused below as what it is, not here.
+  lang_named = meta['lang'].to_s.strip.delete("'\"")
+  same = base == Digest::SHA256.hexdigest(original_raw) ||
+         (meta.key?('lang') && (lang_named.empty? || base == translation_base(post, lang_named)))
+  refuse('changed', t('cli.edit_from_changed', slug: slug)) if !base.empty? && !same
   # `lang:` makes it a translation: the words of one language, not the post.
   # The LINE makes it one, not what the line holds: `lang:` with nothing
   # after it was read as no line at all, and what a program had written as
@@ -1942,17 +1961,8 @@ def draft_decision_loop(slug, path: nil, announce: true)
     # A post already scheduled is asked about as one (#71): "keep as draft"
     # and "schedule (the next free slot)" read as if it were a plain draft,
     # while Enter leaves its date as it is and [s] moves it.
-    scheduled_for = post['scheduled'] && (Time.parse(post['date'].to_s).getlocal rescue nil)
-    # A date already past is said to be, as the queue says it: "keep it
-    # scheduled for" a day gone by promised what had not happened, while
-    # the queue in the same run said nothing publishes it here (fleet
-    # over 1.11.1).
-    scheduled_label = scheduled_for && begin
-      date = scheduled_for.strftime(t('date_time_format'))
-      overdue = scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler'
-      scheduled_for <= Time.now ? "#{date} #{t(overdue)}" : date
-    end
-    prompt = if scheduled_for
+    scheduled_label = scheduled_label_of(post)
+    prompt = if scheduled_label
                t('cli.what_next_prompt_scheduled', date: scheduled_label, translate: offer)
              elsif slot
                t('cli.what_next_prompt_slot', slot: slot.strftime(t('date_time_format')), translate: offer)
@@ -1979,8 +1989,7 @@ def draft_decision_loop(slug, path: nil, announce: true)
       return if prompt_and_schedule(path, post, raw: raw) == true
     when 'd', ''
       puts
-      puts(scheduled_for ? t('cli.left_scheduled', date: scheduled_label)
-                         : t('cli.left_as_draft', slug: slug))
+      say_where_the_draft_stands(slug, path, post, announce)
       puts
       return
     when 'x'
@@ -2001,6 +2010,50 @@ def draft_decision_loop(slug, path: nil, announce: true)
       end
     else puts langs.empty? ? t('cli.unknown_choice_pde') : t('cli.unknown_choice_pdet')
     end
+  end
+end
+
+# How a scheduled draft is named in the dialog: its date, and when that date
+# is past, said to be -- "keep it scheduled for" a day gone by promised what
+# had not happened, while the queue in the same run said nothing publishes it
+# here (fleet over 1.11.1). nil for a draft that is not scheduled.
+def scheduled_label_of(post)
+  at = post['scheduled'] && (Time.parse(post['date'].to_s).getlocal rescue nil)
+  return nil unless at
+
+  date = at.strftime(t('date_time_format'))
+  overdue = scheduler_ran? ? 'cli.queue_overdue' : 'cli.queue_overdue_no_scheduler'
+  at <= Time.now ? "#{date} #{t(overdue)}" : date
+end
+
+# What [d] says on the way out of the dialog, from the post as it is NOW. The
+# copy this dialog was drawn from was read before the keypress, and the
+# scheduled-publish cron runs every fifteen minutes: "Still scheduled for ..."
+# was said of a post the cron had published while the prompt waited (fleet
+# over 1.11.1). A post that is no longer a draft is said to be published, one
+# whose plan was moved says its new date.
+#
+# And --no-announce, which cannot travel with a plan (the cron decides
+# silence from the post itself), is said not to have, here as [s] says it: a
+# plan that is kept announces when its date comes.
+def say_where_the_draft_stands(slug, path, shown, announce)
+  fresh = begin
+    where = File.exist?(path) ? path : find_post_path(slug, ask: false)
+    where ? JSON.parse(File.read(where, encoding: 'utf-8')) : shown
+  rescue JSON::ParserError, SystemCallError, SystemExit
+    shown
+  end
+  unless draft?(fresh)
+    puts t('cli.already_published', slug: slug, url: published_url(slug, post_time!(fresh).year, page: PostAddress.page?(fresh)))
+    return
+  end
+
+  label = scheduled_label_of(fresh)
+  if label
+    puts t('cli.left_scheduled', date: label)
+    warn t('cli.no_announce_not_scheduled') unless announce
+  else
+    puts t('cli.left_as_draft', slug: slug)
   end
 end
 
@@ -2199,7 +2252,7 @@ def prompt_and_schedule(path, post, raw: nil)
   true
 end
 
-def announce_on_publish(post, year, date, ask: true)
+def announce_on_publish(post, year, date, ask: true, defer: false)
   # Before everything else, the record on the post itself: an announcement
   # that already exists is never repeated from here -- not by publish, not
   # by the standalone toot/bluesky commands, which all arrive through this
@@ -2250,7 +2303,7 @@ def announce_on_publish(post, year, date, ask: true)
     force = true
   end
 
-  announce_post(post, year: year, date: date, force: force)
+  announce_post(post, year: year, date: date, force: force, defer: defer)
 end
 
 # `path:` names the exact post when the caller already has it. The queue
@@ -2328,10 +2381,30 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # "check your section header" advice under every publish said otherwise
   # (second trial, 25. 9. 2026). An explicit toot or bluesky still says it.
   announce &&= !SiteConfig.comment_network.nil?
-  fields = announce ? announce_on_publish(updated, new_year, date, ask: asked) : nil
-  if fields
-    updated.merge!(fields)
-    AtomicWrite.write_json(new_path, updated)
+  # Asked and checked now, while the person is here; SENT once the page is
+  # live, so the address in the toot never leads to a page that is not there
+  # yet (Publishing::ANNOUNCE_PENDING). What this holds is the sending.
+  send_announcement = announce ? announce_on_publish(updated, new_year, date, ask: asked, defer: true) : nil
+  # A site that goes nowhere is not announced: its page is built here and is
+  # on no server, so the toot would point at nothing (fleet over 1.12, 03/5;
+  # so since 1.0). Said, with the command for when it is online.
+  if send_announcement && !deploys_somewhere?
+    send_announcement = nil
+    command = SiteConfig.comment_network == :bluesky ? 'bluesky' : 'toot'
+    warn t('cli.announce_goes_nowhere', slug: slug, command: command)
+  end
+  # Owed BEFORE the build, for the same reason the deploy marker above is:
+  # a run stopped during the build or the deploy (Ctrl-C, a closed SSH
+  # session, a kill) must leave the debt behind for the cron to pay once the
+  # page is out. Written only after a failed deploy, it was lost with the
+  # run, and the post stayed unannounced with nothing saying so.
+  # --no-announce is a decision about this publication: a debt left by an
+  # earlier one (a deploy that failed, then unpublish) is dropped with it.
+  if send_announcement
+    Publishing.owe_announcement(new_path)
+  else
+    Publishing.settle_announcement(path)
+    Publishing.settle_announcement(new_path)
   end
 
   puts t('cli.published_label', path: new_path)
@@ -2340,7 +2413,15 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   # on a terminal it waited for an answer, with the post already
   # published and announced -- and under --json it wrote the question
   # where the answer should have been.
-  return new_path unless rebuild_and_deploy(t('cli.publishing'))
+  unless rebuild_and_deploy(t('cli.publishing'))
+    # Not announced: the page is not there. The debt is written down, and
+    # the next tick of the publishing cron that gets a deploy through sends it.
+    if send_announcement
+      command = SiteConfig.comment_network == :bluesky ? 'bluesky' : 'toot'
+      warn t('cli.announce_waits_for_deploy', slug: slug, command: command)
+    end
+    return new_path
+  end
   # No extra `puts` before "Done:" -- rebuild_and_deploy ended with a blank
   # line after its own "Done: uploaded...", same doubling as
   # draft_decision_loop above.
@@ -2348,7 +2429,36 @@ def publish_draft(slug, path: nil, announce: true, asked: true)
   puts_local_preview_hint(published_path(slug, new_year, page: PostAddress.page?(updated)))
   puts t('cli.backdated_note') unless untouched
   puts
+  announce_after_deploy(send_announcement, new_path, updated)
   new_path
+end
+
+# The announcement, now that the page is live: sent, written onto the post,
+# and put on the page by a second build -- the page draws its comment thread
+# from the toot's address. That build is quick (the cache holds all but this
+# one post); if it fails the site is marked as owing a deploy, as for any
+# other, and the toot is already right: its link works.
+#
+# Claimed first: if the cron already paid this debt while the deploy ran,
+# the toot is out and a second one would stand beside it. Written onto the
+# post as it is now on disk, not the copy read before the build.
+#
+# A post no longer at its path was deleted or renamed while the deploy ran:
+# deleted, it is not announced; renamed, its debt went with it and the next
+# run pays it at the new address (second fleet over 1.12, 02/3).
+def announce_after_deploy(sending, path, post)
+  return unless sending
+  unless File.exist?(path)
+    Publishing.settle_announcement(path)
+    return
+  end
+  return unless Publishing.claim_announcement(path)
+
+  fields = sending.call
+  return unless fields
+
+  post.replace(Publishing.record_announcement(path, fields, post))
+  rebuild_and_deploy(t('cli.adding_comments'))
 end
 
 # The answer sticks for the rest of the run. publish/edit/delete resolve
@@ -2495,6 +2605,8 @@ def cmd_toot(slug)
   end
 
   AtomicWrite.write_json(path, post.merge(fields))
+  # A toot a failed deploy left owed (Publishing::ANNOUNCE_PENDING) is paid.
+  Publishing.settle_announcement(path)
   puts t('cli.tooted', url: fields['mastodon_url'])
   puts
 end
@@ -2569,6 +2681,7 @@ def cmd_bluesky(slug)
   end
 
   AtomicWrite.write_json(path, post.merge(fields))
+  Publishing.settle_announcement(path)
   puts t('cli.bluesky_posted', url: fields['bluesky_url'])
   puts
 end
@@ -2824,6 +2937,7 @@ def write_in_year_of(path, updated, date, slug:)
     Publishing.relocate_media(slug, File.basename(File.dirname(path)), new_year)
     AtomicWrite.write_json(new_path, updated)
     File.delete(path)
+    Publishing.move_announcement(path, new_path)
   else
     AtomicWrite.write_json(new_path, updated)
   end
@@ -3850,6 +3964,9 @@ end
 # Returns the path and the announcement addresses that could NOT be
 # deleted and so stay on the post.
 def unpublish_post(path, post, slug)
+  # A toot still owed for this publication is owed no more: the post is a
+  # draft, and a later publish decides about its own announcement.
+  Publishing.settle_announcement(path)
   toot_gone, skeet_gone = retract_announcements(post)
 
   updated = post.merge('state' => DRAFT, 'draft_token' => SecureRandom.hex(8), 'created_at' => post['date'],
@@ -5125,6 +5242,7 @@ def rename_apply(path, post, new_slug)
                     to_dir: File.join(PostVersions.versions_root(CONTENT_DIR), year, new_slug))
   AtomicWrite.write_json(new_path, updated)
   File.delete(path)
+  Publishing.move_announcement(path, new_path)
   new_path
 end
 
@@ -5342,34 +5460,172 @@ end
 # digest `base:` hands back. The text comes back through `add` of a file
 # saying `edits:`, `base:` and `lang:` (translation_from_file).
 def translate_as_json(slug, lang)
-  answer_json do
-    translate_language!(lang)
-    path, raw, post = post_for_json(slug)
-    year = File.basename(File.dirname(path))
-    entry = post.dig('translations', lang)
-    entry = {} unless entry.is_a?(Hash)
-    media_dir = File.join(MEDIA_DIR, year, slug)
-    # Said before the text is handed out, as `drafts --json` and `edit
-    # --json` say it of the post's own: a translation holding something
-    # its text cannot say is not one to edit from here, and the save
-    # would be refused (content_lost).
-    lost = unwritable_translation(entry, media_dir)
-    problem = if lost.nil?
-                'unreadable'
-              else
-                lost.any? ? 'content_lost' : nil
-              end
-    { 'ok' => true,
-      'post' => { 'slug' => slug, 'lang' => lang, 'title' => post_name_for(post),
-                  'written' => Translations.written?(entry),
-                  'editable' => problem.nil?, 'problem' => problem,
-                  'text' => translation_skeleton(entry, nil),
-                  'original' => translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
-                                                       'content' => LinkCard.split(post['content']).last }, nil),
-                  'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
-                  'preview' => PostAddress.path(post),
-                  'base' => Digest::SHA256.hexdigest(raw) } }
+  answer_json { translate_state(slug, lang) }
+end
+
+# The post's words in `lang` as a program is handed them (`translate
+# --json`), and what `translate --auto --json` starts from.
+def translate_state(slug, lang)
+  translate_language!(lang)
+  path, raw, post = post_for_json(slug)
+  year = File.basename(File.dirname(path))
+  entry = post.dig('translations', lang)
+  entry = {} unless entry.is_a?(Hash)
+  media_dir = File.join(MEDIA_DIR, year, slug)
+  # Said before the text is handed out, as `drafts --json` and `edit
+  # --json` say it of the post's own: a translation holding something
+  # its text cannot say is not one to edit from here, and the save
+  # would be refused (content_lost).
+  lost = unwritable_translation(entry, media_dir)
+  problem = if lost.nil?
+              'unreadable'
+            else
+              lost.any? ? 'content_lost' : nil
+            end
+  { 'ok' => true,
+    'post' => { 'slug' => slug, 'lang' => lang, 'title' => post_name_for(post),
+                'written' => Translations.written?(entry),
+                'editable' => problem.nil?, 'problem' => problem,
+                'text' => translation_skeleton(entry, nil),
+                'original' => translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
+                                                     'content' => LinkCard.split(post['content']).last }, nil),
+                'media' => (Dir.exist?(media_dir) ? Dir.children(media_dir).reject { |f| f.start_with?('.') }.sort : []),
+                'preview' => PostAddress.path(post),
+                'base' => translation_base(post, lang) },
+    'auto' => auto_availability }
+end
+
+# What a translation is made from, as `base:` names it: the post's own title
+# and text, and what this language has now. Not the whole file: the hash of
+# all of it changed when ANOTHER language was saved, or a tag, so the second
+# of two translations made side by side was refused as "changed" -- and with
+# --auto, made again at a cost. What it must catch it still does: the
+# original rewritten, or this language saved from somewhere else meanwhile.
+def translation_base(post, lang)
+  Digest::SHA256.hexdigest(JSON.generate([post['title'].to_s, post['content'], post.dig('translations', lang)]))
+end
+
+# Whether `translate --auto` would run for whoever asks, said before the
+# asking: an app shows its button only where it works, and where it does
+# not says what to set. Nothing is run and nothing is sent to find out.
+def auto_availability
+  AutoTranslate.adapter
+  return { 'available' => true } if AutoTranslate.permitted?
+
+  { 'available' => false, 'problem' => 'translator_not_allowed', 'message' => t('cli.auto_translator_not_allowed').strip }
+rescue AutoTranslate::Error => e
+  { 'available' => false, 'problem' => e.code, 'message' => t("cli.auto_#{e.code}", detail: e.detail).strip }
+end
+
+# What a person is told of the differences `AutoTranslate.check` found.
+def auto_warning_lines(warnings)
+  none = t('cli.auto_nothing')
+  warnings.map do |w|
+    items = w[:items]
+    case w[:code]
+    when 'urls', 'images', 'numbers'
+      t("cli.auto_warn_#{w[:code]}", missing: items[:missing].first(8).join(', ').then { |x| x.empty? ? none : x },
+                                     extra: items[:extra].first(8).join(', ').then { |x| x.empty? ? none : x })
+    else
+      t("cli.auto_warn_#{w[:code]}", was: items[:was], now: items[:now])
+    end
   end
+end
+
+def auto_warnings_json(warnings)
+  lines = auto_warning_lines(warnings)
+  warnings.each_with_index.map do |w, at|
+    { 'code' => w[:code], 'message' => lines[at].strip }.merge(w[:items].transform_keys(&:to_s))
+  end
+end
+
+# The translator asked for the post's words in `lang`: the state as
+# `translate --json` gives it and the machine's text. Raises
+# AutoTranslate::Error and nothing else of its own; refuses a post whose
+# text cannot be written back.
+def auto_translation(slug, lang, force:)
+  raise AutoTranslate::Error, 'translator_not_allowed' unless AutoTranslate.permitted?
+
+  state = translate_state(slug, lang)
+  post = state['post']
+  refuse(post['problem'], t('cli.auto_not_editable', slug: slug).strip) unless post['editable']
+  refuse('already_written', t('cli.auto_already_written', slug: slug, lang: lang).strip) if post['written'] && !force
+  # A post with neither a title nor words has nothing a translator could be
+  # paid to translate.
+  if AutoTranslate.body(post['original']).strip.empty? && post['original'][/^title:[ \t]*(\S.*)$/, 1].nil?
+    refuse('nothing_to_translate', t('cli.auto_nothing_to_translate', slug: slug).strip)
+  end
+  yield state if block_given?
+  result = AutoTranslate.translate(post['original'], lang_name: language_name(lang), lang_code: lang)
+  # A language already written keeps its address: the translator may not
+  # invent one (its `slug:` is emptied), and the text handed back shows the
+  # one the language has, as `translate --json` does -- an empty line there
+  # read as "no address" to whoever looked (the iOS app's trial, 18. 11.).
+  # Only the header's: a `slug:` further down -- a code block showing a
+  # header -- is the post's text, and a language with no address of its own
+  # was moved to it (second fleet over 1.12, 01/8).
+  header = ->(text) { text.to_s.match(/\A---[ \t]*\r?\n(.*?)^---[ \t]*\r?$/m) }
+  kept = header.(post['text']).then { |m| m ? m[1][/^slug:[ \t]*(\S[^\r\n]*)/, 1].to_s.strip : '' }
+  own = header.(result[:text])
+  if !kept.empty? && own
+    head = own[1].sub(/^slug:[ \t]*\r?$/) { "slug: #{kept}" }
+    result[:text] = result[:text].sub(own[1]) { head }
+  end
+  [state, result]
+end
+
+# The same, said as the command line says things: a refusal whose words
+# are the locale's.
+def auto_translation!(slug, lang, force:, &before)
+  auto_translation(slug, lang, force: force, &before)
+rescue AutoTranslate::Error => e
+  refuse(e.code, t("cli.auto_#{e.code}", detail: e.detail).strip)
+end
+
+# `translate <slug> --lang xx --auto --json`: the machine's text for a
+# program to show, and nothing saved. It comes back through `add` of a file
+# saying `edits:`, `base:` and `lang:`, as a hand-written one does.
+def translate_auto_as_json(slug, lang, force: false)
+  answer_json do
+    state, result = auto_translation!(slug, lang, force: force)
+    state['post']['text'] = result[:text]
+    state['auto'] = state['auto'].merge('warnings' => auto_warnings_json(result[:warnings]))
+    state
+  end
+end
+
+# `translate <slug> --lang xx --auto`: the machine's text written to a
+# file in tmp/ for `add` to take -- after the person has read it. Nothing is
+# published and nothing is added: a translation nobody has read is not
+# something to put on a site.
+def cmd_translate_auto(slug, lang, force: false)
+  dir = File.join(ROOT, 'tmp')
+  target = File.join(dir, "#{slug}.#{lang}.md")
+  # Said once everything is known to be in order, and only then: the post,
+  # the language, the translator. It used to be said first, over refusals.
+  state, result = auto_translation!(slug, lang, force: force) do
+    # A file from an earlier run not saved yet is the person's work -- read,
+    # perhaps corrected by hand. Not replaced without being told to.
+    refuse('pending_exists', t('cli.auto_pending_exists', path: "tmp/#{File.basename(target)}").strip) if File.exist?(target) && !force
+    puts t('cli.auto_working', language: language_name(lang), seconds: AutoTranslate.seconds)
+  end
+  FileUtils.mkdir_p(dir)
+  AtomicWrite.write(target, AutoTranslate.as_file(result[:text], slug: slug, base: state['post']['base'], lang: lang))
+  shown = "tmp/#{File.basename(target)}"
+  puts t('cli.auto_saved', path: shown)
+  auto_warning_lines(result[:warnings]).each { |line| warn line }
+  puts t('cli.auto_read_then_add', path: shown)
+end
+
+# The post a bare `translate --auto` means: the newest one that is out.
+def newest_published_slug
+  found = Dir.glob(File.join(CONTENT_DIR, '*', '*.json')).filter_map do |file|
+    post = JSON.parse(File.read(file, encoding: 'utf-8'))
+    [post['date'].to_s, post['slug'].to_s] if post['state'] == PUBLISHED && !post['slug'].to_s.empty?
+  rescue JSON::ParserError, SystemCallError
+    nil
+  end
+  found.max&.last
 end
 
 # A file saying `edits: <slug>`, `base: <digest>` and `lang: <code>`: the
@@ -5396,6 +5652,35 @@ def translation_from_file(file, raw, meta, path, original_raw, post, json:, conf
     puts t('cli.translate_saved', lang: lang, slug: slug)
     print_translation_preview(path, lang)
   end
+end
+
+# In a terminal, with a translator set up and nothing written in the
+# language yet, the editor may start from the machine's text -- a question
+# first, because it is paid for and sent away. nil: by hand, as ever;
+# :cancel: the person backed out; otherwise { text:, warnings: }. A
+# translation that fails says why and leaves the editor to the person.
+def auto_for_editor(post, lang, entry)
+  return nil unless Array(entry['content']).empty? && Tui.interactive?
+  return nil unless AutoTranslate.configured? && AutoTranslate.permitted?
+
+  answer = Tui.key_choice(t('cli.auto_ask'), escape: :cancel)
+  return :cancel if answer == :cancel
+  return nil unless answer == t('cli.auto_key')
+
+  puts t('cli.auto_working', language: language_name(lang), seconds: AutoTranslate.seconds)
+  original = translation_skeleton({ 'title' => post['title'].to_s, 'slug' => post['slug'],
+                                    'content' => LinkCard.split(post['content']).last }, nil)
+  AutoTranslate.translate(original, lang_name: language_name(lang), lang_code: lang)
+rescue AutoTranslate::Error => e
+  puts t('cli.auto_fallback', reason: t("cli.auto_#{e.code}", detail: e.detail).strip)
+  nil
+end
+
+# What looks wrong with the machine's text, as notes in the editor.
+def auto_notes(warnings)
+  return '' if warnings.empty?
+
+  "\n" + auto_warning_lines(warnings).map { |line| "// #{line}" }.join("\n") + "\n"
 end
 
 # `path:` is the draft dialog's (#66): the post it is showing, which a
@@ -5430,7 +5715,20 @@ def cmd_translate(slug, lang, path: nil)
   # title. It used to come the first time only -- and the first time was
   # the title -- so the body was then written with the original in
   # another window, which is what these lines are there to spare.
-  opened_with = restored || (Array(entry['content']).empty? ? skeleton + original_as_notes(post, media_dir) : skeleton)
+  machine = restored ? nil : auto_for_editor(post, lang, entry)
+  if machine == :cancel
+    puts t('cli.cancelled')
+    puts
+    return
+  end
+  opened_with = if restored then restored
+                elsif machine
+                  # The machine's text to read and mend; what it found to doubt, and the original, as `//`
+                  # notes the editor drops on the way back.
+                  machine[:text] + auto_notes(machine[:warnings]) + original_as_notes(post, media_dir)
+                else
+                  Array(entry['content']).empty? ? skeleton + original_as_notes(post, media_dir) : skeleton
+                end
   raw = edit_in_editor(opened_with, t('cli.translate_hint', lang: lang, title: post['title'].to_s),
                        { 'kind' => 'translate', 'slug' => "#{slug}@#{lang}" }, untouched: [skeleton])
   # 🪤 Against the buffer WITHOUT the notes as well: the editor strips
@@ -5438,7 +5736,15 @@ def cmd_translate(slug, lang, path: nil)
   # NEVER returns the bytes it went in with -- and an untouched editor
   # then read as "everything was deleted", which takes the language off
   # the post and rebuilds the site to say so.
-  if raw == opened_with || raw == skeleton
+  if machine && raw.strip == machine[:text].strip
+    # Closed without a change: read, and either left as it is or not wanted.
+    # An editor cannot say which, so it is asked.
+    unless Tui.yes?(Tui.key_choice(t('cli.auto_confirm_as_is')))
+      puts t('cli.no_changes')
+      puts
+      return
+    end
+  elsif raw == opened_with || raw == skeleton
     puts t('cli.no_changes')
     puts
     return
@@ -5469,8 +5775,18 @@ def print_translation_preview(path, lang)
   return unless translation_preview_url(post, lang)
 
   site_path = translation_draft_path(post, lang)
-  puts Tui.paint(t('cli.preview_label', url: "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"), :cyan)
+  shown = "#{SITE_BASE_URL.to_s.chomp('/')}#{site_path}"
+  puts Tui.paint(t('cli.preview_label', url: shown), :cyan)
   puts_local_preview_hint(site_path)
+  # The code the draft dialog shows, here too (#80): the translation's page
+  # is the one a person wants to look at on a phone, and the address is as
+  # long as the draft's own. Only where it can do its job -- a draft, in a
+  # terminal, on a site with a real address.
+  if props_qr_available?(post) && (qr = QrCode.render(shown))
+    puts
+    puts qr
+    puts Tui.paint(t('cli.qr_hint'), :dim)
+  end
   puts
 end
 
@@ -6240,7 +6556,10 @@ def apply_post_edit(slug, path, post, original_raw, raw, interactive:, confined:
     end
   end
   discard_editor_buffer if interactive
-  File.delete(path) if File.expand_path(new_path) != File.expand_path(path)
+  if File.expand_path(new_path) != File.expand_path(path)
+    File.delete(path)
+    Publishing.move_announcement(path, new_path)
+  end
   # A bare name the post already has means the file the post has: that is
   # what lets a second save find its pictures. So a NEW file sent under
   # such a name -- the natural way to try to replace a picture -- was not
@@ -6372,6 +6691,9 @@ def delete_post(slug, path: nil, confirmed: false)
   end
   File.write(File.join(trash_dir, 'post.json'), JSON.pretty_generate(trashed))
   File.delete(path)
+  # A deleted post owes no toot: settled here, its line is not left to be
+  # read by doctor as a post renamed before its announcement went out.
+  Publishing.settle_announcement(path)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
   # ...and back in with them, beside the post's own media rather than
   # instead of it: a name already taken keeps both copies.
@@ -7954,7 +8276,11 @@ def pick_from_list(posts, empty_message)
   # letters falls back to entering a slug). Piped input keeps the
   # numbered list exactly as before.
   if Tui.interactive?
-    choice = Tui.menu(posts.map { |p| summary_row(p) },
+    # Numbered as the piped list is: a typed number picks that row of the
+    # whole list, and with fifty rows and no numbers "35" was a guess
+    # (Pavel, #82).
+    width = posts.size.to_s.length
+    choice = Tui.menu(posts.each_with_index.map { |p, i| "#{(i + 1).to_s.rjust(width)}) #{summary_row(p)}" },
                       hint: t('cli.menu_hint'), allow_text: true,
                       text_prompt: t('cli.enter_number_or_slug'))
     abort t('cli.cancelled_empty') if choice.nil?
@@ -7985,7 +8311,13 @@ end
 # Lets `edit`/`delete` be called with no slug: shows the RECENT_LIST_COUNT
 # most recent posts regardless of state.
 def pick_slug_interactively
-  pick_from_list(recent_posts(RECENT_LIST_COUNT), t('cli.no_posts_to_pick'))
+  recent = recent_posts(RECENT_LIST_COUNT)
+  # A list that ends before the archive does says so, and where the rest
+  # is: older posts are reached by their slug here or by searching in the
+  # Archive.
+  total = recent.length == RECENT_LIST_COUNT ? load_posts_summary.length : recent.length
+  puts t('cli.recent_only', shown: recent.length, total: total) if total > recent.length
+  pick_from_list(recent, t('cli.no_posts_to_pick'))
 end
 
 # Lets `publish` be called with no slug: publishing an already-published post
@@ -8853,21 +9185,33 @@ begin
       # INTO a language, so both are required and neither has a default.
       args = ARGV.dup
       json = !args.delete('--json').nil?
+      auto = !args.delete('--auto').nil?
+      force = !args.delete('--force').nil?
+      # Under --json a mistake in the words is an answer like any other: an
+      # object and a zero, not prose on a stderr a phone's shortcut throws
+      # away (fleet over 1.12, 02/7).
+      stop = lambda do |code, message|
+        abort message unless json
+
+        puts JSON.generate('ok' => false, 'error' => code, 'message' => message.to_s.strip)
+        exit 0
+      end
       lang = args.find { |arg| arg.start_with?('--lang=') }&.delete_prefix('--lang=')
       args.reject! { |arg| arg.start_with?('--lang=') }
       if lang.nil? && (at = args.index('--lang'))
         lang = args[at + 1]
         args.slice!(at, 2)
       end
-      abort t('cli.translate_json_needs_slug') if json && (args.empty? || args.first.to_s.start_with?('--'))
-      slug = args.shift || pick_slug_interactively
+      stop.call('needs_slug', t('cli.translate_json_needs_slug')) if json && (args.empty? || args.first.to_s.start_with?('--'))
+      slug = args.shift || (auto ? newest_published_slug : pick_slug_interactively)
+      stop.call('not_found', t('cli.auto_no_post')) if auto && slug.to_s.empty?
       lang ||= args.shift unless args.first.to_s.start_with?('--')
       # 🪤 Whatever is still here was not asked for: a typo in `--lang`, a
       # second `--lang`, a stray word. Swallowing it silently is how a
       # translation ends up in a language nobody typed -- and the one
       # message that came out named the typo as the language, which sent
       # the reader to site.locales to add it.
-      abort t('cli.translate_unknown_args', args: args.join(' ')) unless args.empty?
+      stop.call('unknown_args', t('cli.translate_unknown_args', args: args.join(' '))) unless args.empty?
       lang = nil if lang.to_s.start_with?('--')
       if lang.to_s.strip.empty?
         # Named from what THIS site publishes: the sentence used to say
@@ -8876,10 +9220,15 @@ begin
         own = SiteConfig.get('site', 'lang', default: 'en').to_s
         others = Array(SiteConfig.get('site', 'locales', default: nil)).map { |code| code.to_s.strip }
         others = others.reject { |code| code.empty? || code == own }.uniq
-        abort t('cli.translate_needs_locales') if others.empty?
-        abort t('cli.translate_needs_language', lang: others.first, langs: others.join(', '))
+        stop.call('no_locales', t('cli.translate_needs_locales')) if others.empty?
+        stop.call('needs_language', t('cli.translate_needs_language', lang: others.first, langs: others.join(', ')))
       end
-      json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
+      if auto
+        json ? translate_auto_as_json(slug, lang.to_s.strip, force: force) : cmd_translate_auto(slug, lang.to_s.strip, force: force)
+      else
+        stop.call('force_needs_auto', t('cli.translate_force_needs_auto')) if force
+        json ? translate_as_json(slug, lang.to_s.strip) : cmd_translate(slug, lang.to_s.strip)
+      end
     when 'edit'
       json = !ARGV.delete('--json').nil?
       unknown = ARGV.find { |arg| arg.start_with?('--') }

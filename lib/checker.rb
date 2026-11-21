@@ -19,6 +19,7 @@ require_relative 'path_glob'
 require_relative 'content_type'
 require_relative 'video_probe'
 require_relative 'yaml_compat'
+require_relative 'ruby_support'
 
 # What `./blog.sh check` finds. Doctor's counterpart, and deliberately a
 # separate thing: doctor answers "is this installation sound", reads a
@@ -134,6 +135,19 @@ module Checker
   # they still report the same four cases. SiteConfig stays at arm's length
   # for the reason request() gives -- it aborts the process on exactly the
   # file this is about.
+  # doctor's finding about the Ruby, in doctor's words (lib/ruby_support.rb).
+  def check_ruby
+    version = RubySupport.current
+    case RubySupport.status(version)
+    when :end_of_life
+      [warn(dt('ruby_end_of_life', version: version), dt('ruby_end_of_life_fix', fixed: RubySupport.fixed_list), kind: :ruby)]
+    when :unpatched
+      [warn(dt('ruby_unpatched', version: version), dt('ruby_unpatched_fix', fixed: RubySupport.fixed_for(version)), kind: :ruby)]
+    else
+      []
+    end
+  end
+
   def check_config(root)
     path = File.join(root, 'config', 'site.yml')
     unless File.exist?(path)
@@ -176,6 +190,9 @@ module Checker
     # no posts in it and a config the build refuses is still a config the
     # build refuses.
     config = check_config(root)
+    # The Ruby this runs on, said as doctor says it: check is the command
+    # people run, and the machine is the archive's as much as the config.
+    ruby = check_ruby
     posts = load_posts(root)
     # Kept for whoever runs next in the same process: the matrix and the
     # repair index both want the archive this run just read, and reading
@@ -199,12 +216,12 @@ module Checker
       # post it ever had and reads as empty.
       parked = guard(:parked_leftovers) { check_parked_leftovers(root, posts) } +
                guard(:misplaced_posts) { check_misplaced_posts(root) }
-      return config + unbuildable + parked if config.any? || unbuildable.any? || parked.any?
+      return ruby + config + unbuildable + parked if config.any? || unbuildable.any? || parked.any?
 
-      return [warn(t('no_posts'), kind: :no_posts)]
+      return ruby + [warn(t('no_posts'), kind: :no_posts)]
     end
 
-    findings = config
+    findings = ruby + config
     # Every question is asked through guard, so one that raises is one
     # finding and not the end of the run. A post whose `media` was an
     # object rather than a list took check down with a raw TypeError
@@ -241,7 +258,9 @@ module Checker
     findings.concat(guard(:language_key_moved) { check_language_key_moved(root) })
     findings.concat(guard(:language_files) { check_language_files(root, posts) })
     findings.concat(guard(:html_entities) { check_html_entities(posts, cap) })
-    local_clean = findings.none? { |f| f.error? || f.warn? }
+    # The Ruby is the machine's, not the archive's: an archive with nothing
+    # wrong in it is still said to be clear.
+    local_clean = findings.none? { |f| (f.error? || f.warn?) && f.kind != :ruby }
     findings << ok(t('all_clear', posts: posts.size), kind: :all_clear, data: { 'posts' => posts.size }) if local_clean
 
     if online

@@ -29,6 +29,10 @@ require_relative 'file_size'
 # two diagnostics disagreeing about what the build makes is worse than
 # one of them staying quiet.
 require_relative 'checker'
+# The translator's settings are read the way the translator reads them, by the
+# same code: two readings of one setting is how a doctor and an engine disagree.
+require_relative 'auto_translate'
+require_relative 'ruby_support'
 # NOT require_relative 'publishing': it pulls in the posters, which read
 # SiteConfig at LOAD time -- and this is the one command that has to run
 # on a config nothing else can load. Requiring it put the raw Psych
@@ -161,6 +165,9 @@ module Doctor
   # network, appearance, deploy.
   def run(online: false, root: ROOT)
     findings = []
+    # First: it holds whatever the config says, and a site.yml that cannot
+    # be read returns before the rest is asked.
+    findings.concat(of(:ruby, check_ruby))
     findings.concat(of(:env_sh, check_env_sh(root)))
 
     data, parse_findings = load_site_yml(root)
@@ -185,6 +192,9 @@ module Doctor
     findings.concat(of(:publishing, check_publishing(data)))
     findings.concat(of(:scheduler, check_scheduler))
     findings.concat(of(:deploy_pending, check_deploy_pending))
+    findings.concat(of(:announce_pending, check_announce_pending(data)))
+    findings.concat(of(:translator, check_translator))
+    findings.concat(of(:editor, check_editor))
     findings.concat(of(:media_location, check_media_location(root)))
     findings.concat(of(:tag_icons, check_tag_icons(data)))
     findings.concat(of(:social_icons, check_social_icons(data)))
@@ -390,8 +400,22 @@ module Doctor
       findings << error(t('base_url_missing'), t('base_url_missing_fix'))
     elsif base == 'https://example.com'
       findings << warn(t('base_url_placeholder'), t('base_url_placeholder_fix'))
-    elsif !base.match?(%r{\Ahttps?://[^/\s]+})
+    elsif !(parts = base.match(%r{\Ahttps?://[^/?#\s]+(?<path>/[^?#\s]*)?(?<rest>[?#]\S*)?\z}))
+      # A space anywhere is a shape error too: `https://x.cz/ ` was said to
+      # have the path "/ " (second fleet over 1.12, 03/3).
       findings << error(t('base_url_shape', value: base), t('base_url_shape_fix'))
+    elsif parts[:rest]
+      # Every address is the base_url with a path appended: after a query or
+      # a fragment, that path is part of the query (`https://x.cz?lang=cs/feed.xml`).
+      findings << warn(t('base_url_query', value: base), t('base_url_path_fix'))
+    elsif !(path = parts[:path].to_s.sub(%r{/+\z}, '')).empty?
+      # `/blog//` is a path too, not only a trailing slash.
+      # A site under a path (https://example.com/blog) is not one this engine
+      # builds: its pages ask for /assets/..., the search and the feeds from
+      # the root of the domain, so they come out unstyled, or styled by
+      # whatever lives at the root -- and nothing said so (the shape check
+      # above only looks at the start).
+      findings << warn(t('base_url_path', value: base, path: path), t('base_url_path_fix'))
     elsif base.end_with?('/')
       findings << warn(t('base_url_slash', value: base), t('base_url_slash_fix'))
     end
@@ -568,6 +592,7 @@ module Doctor
                   end
     end
     findings.concat(check_comments(data, mastodon || bluesky, credentials: credentials))
+    findings.concat(check_reply_from_own_server(data))
     findings
   end
 
@@ -590,8 +615,11 @@ module Doctor
     # the empty check below, which would otherwise swallow it.
     if approval.empty?
       section = dig(data, 'comments')
-      if section.is_a?(Hash) && section.any?
-        return [error(t('approval_key_unknown', keys: section.keys.join(', ')),
+      # `reply_from_own_server` is the other key this engine reads here; a
+      # section holding only that one is not a misspelled `approval`.
+      unknown = section.is_a?(Hash) ? section.keys.map(&:to_s) - %w[reply_from_own_server] : []
+      if unknown.any?
+        return [error(t('approval_key_unknown', keys: unknown.join(', ')),
                       t('approval_key_unknown_fix'))]
       end
     end
@@ -631,6 +659,25 @@ module Doctor
     # question: by looking for evidence the thing has run.
     findings << warn(t('approval_needs_cron'), t('approval_needs_cron_fix')) unless sidebar_ran_recently?
     findings
+  end
+
+  # comments.reply_from_own_server says whether the reply link of a Mastodon
+  # post is joined by one to the READER'S own server. SiteConfig reads it the
+  # way a person writes it -- true or false, on or off, yes or no, which YAML
+  # turns into true and false before it gets here -- and refuses anything
+  # else, naming the key: the build stops. Said here too, before it does,
+  # for the same reason every other key doctor knows is: the sentence that
+  # explains it should not be a build that will not run.
+  def check_reply_from_own_server(data)
+    value = dig(data, 'comments', 'reply_from_own_server')
+    return [] if value.nil? || value == true || value == false
+
+    text = value.to_s.strip.downcase
+    return [] if text.empty? || %w[true on yes false off no].include?(text)
+
+    # .inspect, for the reason approval's message has it: an invisible
+    # character at the end of a value is only visible between quotes.
+    [error(t('reply_own_unknown', value: text.inspect), t('reply_own_unknown_fix'))]
   end
 
   # How long the sidebar refresh may be silent before its absence is worth
@@ -1164,6 +1211,135 @@ module Doctor
       File.mtime(marker)
     end
     [error(t('deploy_pending', ago: humanize_age(Time.now - since)), t('deploy_pending_fix'))]
+  end
+
+  # The machine translator (env.sh), when anybody has set one up. Nothing is said
+  # of an installation that has not: the feature is optional, and a line on
+  # every run about a thing nobody asked for is noise. One that has set
+  # something gets told whether it is whole -- before `translate --auto` finds
+  # out at the first translation, in the middle of writing. Read by
+  # AutoTranslate itself, from the environment this run was given (the wrapper
+  # sources env.sh): the settings mean what the translator takes them to mean.
+  # The editor `add`, `edit` and the wizard open when nobody has named one.
+  # macOS now ships pico under the name nano: it works (the engine starts it
+  # with -w, lib/default_editor.rb), but it does not wrap a long line on the
+  # screen, so a paragraph runs off to the right -- worth knowing, and one
+  # command away from GNU nano. Nothing is said when $EDITOR or $VISUAL is
+  # set: that is somebody's own choice.
+  # A Ruby that no longer gets security fixes, or a maintained one below
+  # its fixed release (see lib/ruby_support.rb). A warning, not an error:
+  # the engine runs on it and is not known to be hit; the machine is.
+  def check_ruby
+    version = RubySupport.current
+    case RubySupport.status(version)
+    when :end_of_life
+      [warn(t('ruby_end_of_life', version: version), t('ruby_end_of_life_fix', fixed: RubySupport.fixed_list))]
+    when :unpatched
+      [warn(t('ruby_unpatched', version: version), t('ruby_unpatched_fix', fixed: RubySupport.fixed_for(version)))]
+    else
+      []
+    end
+  end
+
+  def check_editor
+    return [] unless [ENV['EDITOR'], ENV['VISUAL']].all? { |e| e.to_s.strip.empty? }
+
+    require_relative 'default_editor'
+    if DefaultEditor.nano_path.nil?
+      [warn(t('editor_missing'), t('editor_missing_fix'))]
+    elsif DefaultEditor.pico?
+      [warn(t('editor_pico', path: DefaultEditor.nano_path), t('editor_pico_fix'))]
+    else
+      []
+    end
+  end
+
+  def check_translator
+    kind = ENV['TRANSLATOR'].to_s.strip.downcase
+    command = ENV['TRANSLATOR_COMMAND'].to_s.strip
+    return [] if kind.empty? && command.empty?
+
+    begin
+      AutoTranslate.adapter(ENV)
+    rescue AutoTranslate::Error => e
+      reason = I18n.t("cli.auto_#{e.code}", detail: e.detail).to_s.strip
+      return [warn(t('translator_incomplete', reason: reason), t('translator_incomplete_fix'))]
+    end
+
+    how = if kind.empty? || kind == 'command'
+            Shellwords.split(command).first.to_s
+          else
+            [kind, ENV['TRANSLATOR_MODEL'].to_s.strip].reject(&:empty?).join(', ')
+          end
+    # The program, found the way it will be run: by name on PATH, or by its
+    # path. A missing one -- `claude` or `ollama` not on the PATH of this
+    # shell, or of the one the apps arrive in -- was "set up" until the first
+    # translation said otherwise.
+    if kind.empty? || kind == 'command'
+      program = how
+      found = program.include?('/') ? File.file?(program) && File.executable?(program) : find_program(program)
+      return [warn(t('translator_program_missing', program: program), t('translator_program_missing_fix'))] unless found
+    end
+    findings = [ok(t(AutoTranslate.remote_allowed?(ENV) ? 'translator_ok' : 'translator_ok_denied', how: how))]
+    # A number the engine cannot read is replaced by its default without a
+    # word; said here, where somebody who wanted a longer limit will look.
+    { 'TRANSLATOR_TIMEOUT' => AutoTranslate::DEFAULT_SECONDS, 'TRANSLATOR_MAX_TOKENS' => 16_000 }.each do |name, default|
+      value = ENV[name].to_s.strip
+      next if value.empty? || (value.match?(/\A\d+\z/) && value.to_i.positive?)
+
+      findings << warn(t('translator_number_unread', name: name, value: value.inspect, default: default),
+                       t('translator_number_unread_fix', name: name))
+    end
+    said = ENV['TRANSLATOR_REMOTE'].to_s.strip.downcase
+    unless said.empty? || %w[allow on yes true 1 deny off no false 0 never].include?(said)
+      findings << warn(t('translator_remote_unknown', value: said.inspect), t('translator_remote_unknown_fix'))
+    end
+    findings
+  end
+
+  # Toots a failed deploy left owed (Publishing::ANNOUNCE_PENDING): a post is
+  # announced only once its page is live, so a deploy that did not go
+  # through leaves its toot waiting -- for the next scheduled run, which on an
+  # install without that cron does not exist. Only what is still owed is
+  # said: a line whose post is gone, back in drafts, unlisted or already
+  # announced (by hand, with `toot`) is a debt that no longer is one.
+  # Read here from the files themselves, not through Publishing (see the note
+  # at the top of this file).
+  def check_announce_pending(data = {})
+    marker = File.join(ROOT, '.announce-pending')
+    return [] unless File.exist?(marker)
+
+    # A site that announces nowhere owes no toot, whatever the file says.
+    bluesky = !dig(data, 'bluesky', 'handle').to_s.strip.empty?
+    return [] unless bluesky || !dig(data, 'mastodon', 'instance').to_s.strip.empty?
+
+    # A line is the path, a tab and when it was owed (the time is the cron's).
+    lines = File.readlines(marker, chomp: true, encoding: 'utf-8').map { |line| line.scrub.split("\t", 2).first.to_s.strip }
+    # A line whose file is gone: a post renamed or moved by an engine before
+    # the debt went along with it (second fleet over 1.12, 02/1), or by
+    # hand. The next run settles it without a word, so this is the moment
+    # to say which post it was.
+    gone = lines.reject(&:empty?).uniq.reject { |rel| File.exist?(File.join(content_dir, rel)) }
+    findings = gone.empty? ? [] : [warn(t('announce_pending_gone', count: gone.size, paths: gone.first(5).join(', ')),
+                                        t('announce_pending_gone_fix'))]
+    owed = lines.reject(&:empty?).uniq.filter_map do |rel|
+      post = begin
+        JSON.parse(File.read(File.join(content_dir, rel), encoding: 'utf-8'))
+      rescue StandardError
+        nil
+      end
+      next unless post.is_a?(Hash) && post['state'] == 'published'
+      next if %w[mastodon_url bluesky_url bluesky_uri].any? { |field| !post[field].to_s.strip.empty? }
+      next if %w[true yes 1].include?(post['unlisted'].to_s.strip.downcase)
+
+      post['slug'].to_s
+    end
+    return findings if owed.empty?
+
+    findings + [warn(t('announce_pending', count: owed.size, slugs: owed.first(5).join(', ')),
+                     t('announce_pending_fix', command: bluesky && dig(data, 'mastodon', 'instance').to_s.strip.empty? ? 'bluesky' : 'toot'))]
+  rescue SystemCallError
+    []
   end
 
   def check_scheduler

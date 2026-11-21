@@ -532,6 +532,107 @@ added with `edit` and referred to from a translation. `translate` refuses
 an attachment rather than putting a file in one language's copy of a post
 whose media the other languages share.
 
+### A first draft from a translator
+
+```bash
+./blog.sh translate my-post --lang de --auto
+```
+
+A program of your choosing translates the post and the result is written to
+`tmp/my-post.de.md`. **Nothing is saved or published by it**: you read the file,
+mend it, and `./blog.sh add tmp/my-post.de.md` saves it -- through the same door
+as a text sent from an app, so a post that changed in the meantime is refused
+instead of overwritten. A machine translation nobody has read is not something to
+put on a site. Without a post it takes the newest one that is out; `--force`
+replaces a language that is already written.
+
+In the wizard, a language with nothing written offers `[a]` before it opens the
+editor: the editor then holds the machine's text, with what looked wrong with it
+and the original as `//` notes, which are dropped on save as always.
+
+The engine does not know whose model answers. You name it in `env.sh` (never in
+`config/site.yml`, which travels with the site's content and must not be able to
+name a program the engine runs):
+
+```bash
+# Any program that reads the instructions and the post on standard input and
+# writes the translation to standard output. Started without a shell.
+export TRANSLATOR_COMMAND='claude -p --tools ""'
+export TRANSLATOR_COMMAND='ollama run mistral'
+
+# Or a service over the web: TRANSLATOR=openai (OpenAI and everything that speaks
+# its chat API: Mistral, OpenRouter, Ollama, LM Studio, any server by its address),
+# anthropic, or gemini.
+export TRANSLATOR=openai
+export TRANSLATOR_MODEL=<the model's name>
+export TRANSLATOR_KEY=<the provider's key>                 # not needed for a server on this machine
+export TRANSLATOR_URL=https://openrouter.ai/api/v1         # OpenAI-style: where its /v1 is
+export TRANSLATOR_MAX_TOKENS=16000                         # how long an answer may be
+export TRANSLATOR_TIMEOUT=300                              # seconds
+
+# Or a translation service, which takes no instructions and no model:
+export TRANSLATOR=deepl                                    # TRANSLATOR_KEY; a free key (…:fx) goes to api-free.deepl.com
+export TRANSLATOR_DEEPL_EN=EN-GB                           # English is EN-US unless said; Portuguese PT-PT (TRANSLATOR_DEEPL_PT)
+export TRANSLATOR=libretranslate                           # TRANSLATOR_URL of your server (http on this machine too);
+                                                           # TRANSLATOR_KEY only if it wants one (libretranslate.com does)
+```
+
+**DeepL and LibreTranslate** translate text, not instructions, so the post is
+not handed to them whole: it is sent paragraph by paragraph -- each heading,
+list item and line of a quote on its own -- with everything that must come back
+unchanged kept aside as a tag the service is told to leave alone: code (a code
+block is not sent at all), the address of a link or a picture, a bare address,
+an HTML tag, the marks of emphasis, and the `## `, `- `, `1. ` or `> ` in front
+of a line. The text of a link and a picture's description are translated. A
+tag the service drops is a piece of Markdown missing, and the check below says
+which. Being sent in pieces, a sentence that runs over a line break is
+translated as two.
+
+A key goes over https, or over http to this machine; to any other host over http it
+is refused before anything is sent. A key never appears in what the engine says,
+even when a provider repeats it back.
+
+**Where the text goes.** The post's text is sent to whatever the translator talks
+to -- a web service, or a model on your own machine. Free plans of some providers
+use what they are sent to train their models; read the terms of the one you pick.
+The engine keeps no table of models and has not been run against the providers'
+own servers by its tests, only against a stand-in on this machine. Models differ
+much, most in the smaller languages: one wrote the number 36 out as words, and a
+small one that otherwise translated a short text correctly put a Czech noun in the
+wrong case ("Druhý odstavce"). The checks above compare addresses, numbers and shape,
+not grammar -- read a translation before it is saved, and try a model on a post you
+can judge before you trust it with the rest.
+
+**What it checks.** Before the file is written the engine compares the translation
+with the original in what a translator is known to damage and a reader does not
+notice: web addresses, the names of pictures, the numbers, and the count of
+headings, paragraphs and `//--more--//` lines. A difference is a warning, not a
+refusal -- a number may be written out in words with good reason -- and the
+`slug:` line is always left empty. An answer that does not begin with the header,
+that is empty, that ran out of room (raise `TRANSLATOR_MAX_TOKENS`) or that the
+model declined is not saved.
+
+**From an app.** `translate <slug> --lang <code> --auto --json` returns the
+translated text and the warnings and saves nothing; the app shows them and saves
+through `add` with `edits:`, `base:` and `lang:`, as for a hand-written one.
+`translate --json` carries an `auto` block -- `available`, and when it is not, a
+`problem` code and a `message` -- so an app shows its button only where it works.
+A paired device may ask for a translation **unless the server says
+`TRANSLATOR_REMOTE=deny`** in `env.sh` (`off`, `no`, `false` and `0` say the same;
+a word nobody knows, a typo in `deny`, is read as a no). The default is yes, because
+the translator is set up to be used and the apps are where most of the writing is
+done -- but a translation is paid for by someone and sent to someone, so a paired
+device that is lost can have translations made at your cost, and the text of a post
+sent to the translator, until its key is revoked (`./blog.sh pair --revoke`). A server
+that does not want that says `deny`; the app is then told (`translator_not_allowed`)
+and offers no button. At a terminal it is always allowed.
+
+**Setting it up.** `env.sh.example` shows both kinds. `./setup.sh --translator`
+asks about the translator and nothing else -- a program, or a service by name with
+its model and key, and whether the apps may ask -- and writes `env.sh` only; the key
+is never shown. `./blog.sh doctor` says whether what is set is whole (nothing, for
+an installation that has not set one up).
+
 ## Writing from a phone
 
 The trick is that a bare filename in an image line resolves against the
@@ -958,7 +1059,8 @@ Three rules follow from "nobody is at the keyboard":
 | `queue --up <slug> --json`, `--down <slug>`, `--move <slug> --to <n>` | the queue afterwards, `warnings`; nothing is rebuilt -- the screen rebuilds once on the way out, a program calls `rebuild --json` when it is done | `not_scheduled`, `ambiguous_slug`, `not_moved` (first, last, or its time has passed), `bad_position`, `overdue`, `busy` |
 | `toot <slug> [--force] --json`, `bluesky <slug> [--force] --json` | `url`, `recovered` (Bluesky found the announcement on the account instead of sending one) | `busy`, `wrong_network`, `no_network`, `still_draft`, `already_announced`, `unlisted`, `outside_window` (unless `--force`), `failed`, `not_sent`, `not_found`, `ambiguous_slug` |
 | `drafts --json [<slug>]` | the drafts with their text, as the phone opens them; every entry says `omitted` -- true where its text was left out of a long answer and has to be asked for by name | `not_found` |
-| `translate <slug> --lang <code> --json` | the post's text in that language as the editor opens it (empty when there is none yet), the original beside it, the post's media by name, `preview` (the address of the post's own page -- not of its page in that language), `base:`, and `editable` with `problem` as `edit --json` says them; the words come back through `add` of a file saying `edits:`, `base:` and `lang:` -- a title and a body both empty take the language off the post, and what the text could not carry is refused (`content_lost`) | `no_locales`, `own_language`, `unknown_language`, `not_found`, `ambiguous_slug` |
+| `translate <slug> --lang <code> --json` | the post's text in that language as the editor opens it (empty when there is none yet), the original beside it, the post's media by name, `preview` (the address of the post's own page -- not of its page in that language), `base:`, and `editable` with `problem` as `edit --json` says them; the words come back through `add` of a file saying `edits:`, `base:` and `lang:` -- a title and a body both empty take the language off the post, and what the text could not carry is refused (`content_lost`); and `auto`: `available`, and when not, `problem` (a `translator_*` code) and `message` -- whether the button for a machine translation would work, found out without running anything. `base:` names what the translation is made from (the original and this language's text), so two languages made side by side are both saved | `no_locales`, `own_language`, `unknown_language`, `not_found`, `ambiguous_slug` |
+| `translate <slug> --lang <code> --auto --json` | as above, with `text` the machine's translation (not saved -- it comes back through `add` like a hand-written one) and `auto.warnings`: what differs from the original in addresses, pictures, numbers, headings, paragraphs and `//--more--//` lines, each with `code` and `message` | those above, `already_written` (add `--force`), `nothing_to_translate`, `content_lost`, `unreadable`, and `translator_not_set`, `translator_unknown`, `translator_missing_setting`, `translator_bad_address`, `translator_not_allowed`, `translator_timeout`, `translator_failed`, `translator_network`, `translator_invalid_key`, `translator_forbidden`, `translator_no_credit`, `translator_not_in_plan`, `translator_rate_limited`, `translator_overloaded`, `translator_too_long`, `translator_unknown_model`, `translator_cut_off`, `translator_refused`, `translator_empty`, `translator_bad_output` |
 | `edit <slug> --json` | one post, any state, with its text as the editor opens it, its media, its address and the digest `base:` hands back; the text comes back through `add` of a file saying `edits:` -- for a published post `base:` is required, and the save rebuilds and deploys | `not_found`, `ambiguous_slug` |
 | `schedule <slug> --at <time> [--allow-partial] --json` | the post, `position` in the queue, `compacted` (0). The time is `YYYY-MM-DD HH:MM` -- a `T` for the space, seconds and a zone (`...Z`, `+02:00`) if wanted -- or `HH:MM` alone for today; it is written down, and the post filed, in the site's own zone. Said any other way, or naming a day the calendar does not have, it is `bad_date` | `schedule_needs_at`, `bad_date` (a day without a time too), `not_future`, `already_published`, `partial_translation` (unless `--allow-partial`), `busy`, `not_found`, `ambiguous_slug` |
 | `schedule <slug> --cancel [--compact] --json` | the post back among the drafts, `compacted`: how many moved forward | `not_scheduled`, `already_published`, `busy`, `not_found`, `ambiguous_slug` |
@@ -1804,6 +1906,10 @@ differently.
 
 What it looks for, each with a line saying what to do about it:
 
+- **A Ruby that gets no security fixes.** A maintained branch below the
+  release that fixed its last security hole, or a branch past its end of
+  life, with the version to update to. It is a warning, nothing exits 1
+  for it, and `doctor` says it in the same words.
 - **A `config/site.yml` that is missing, empty, will not parse, or cannot
   be opened.** The build stops on all four and `doctor` explains all four;
   `check` used to read the config only to pick the language it printed in
@@ -2403,11 +2509,17 @@ anything is serving the queue at all, and it is what `./blog.sh doctor`
 reads to tell a queue that is simply waiting from one whose cron was
 never set up.
 
-A post is announced before the site is rebuilt, so the toot and the page
-it links to come from the same build. If the deploy then fails, the job
-leaves a `.deploy-pending` marker and the next run retries the deploy on
-its own, even with nothing due -- so an announcement never keeps pointing
-at a page that was never uploaded. A post that cannot be published (a slug
+A post is announced **after** the site is rebuilt and deployed, so the
+address in the toot never leads to a page that is not there yet -- as long
+as a build and a deploy take, which is minutes on a large archive or a cold
+disk, followers used to find a 404. The toot brings an address the page
+draws its comment thread from, and a second build, quick because the cache
+holds all but that one post, puts it there. If the deploy fails, nothing is
+announced: the job leaves a `.deploy-pending` marker and writes the post
+into `.announce-pending`, and the next run retries the deploy on its own,
+even with nothing due, and sends the toot once it goes through. The same
+order holds when you publish by hand: page first, toot, then the second
+build (`--no-announce` skips the last two). A post that cannot be published (a slug
 the target year already owns, a malformed date) is reported by name and
 skipped; the rest of the batch still publishes.
 
@@ -2473,7 +2585,8 @@ it a device is "not seen yet" until its next request), and
 the working files next to them -- `.last-edit.md` (the text from the last
 editor session, with `.last-edit.meta` recording which command it came
 from), `.deploy-pending` (a marker that says a scheduled publish still
-owes the target a deploy; see [Deploying](#deploying)) and
+owes the target a deploy; see [Deploying](#deploying)), `.announce-pending`
+(the posts whose toot waits for a deploy to go through) and
 `.last-scheduled-run` (the scheduled-publish heartbeat above) with
 `.last-sidebar-run` (the same for the sidebar's cron). The
 wizards' `config/site.yml.bak` and `env.sh.bak` are not needed either --
