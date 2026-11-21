@@ -34,9 +34,17 @@
 #                               this machine too); TRANSLATOR_KEY if it wants one
 module AutoTranslate
   module Segments
-    FENCE = /\A\s*(```|~~~)/
+    # A fence opens with three or more backticks or tildes and closes only
+    # with the same character, at least as many of it, and nothing after:
+    # the parser's rule (markdown_parser.rb), and the writer's -- a code
+    # block that shows ``` inside is fenced with ```` (fleet over 1.12, 01/1).
+    FENCE = /\A\s*(`{3,}|~{3,})(.*)\z/
     MARKER = %r{\A//--.*--//\s*\z}
-    HTML_LINE = /\A\s*<[A-Za-z!\/]/
+    # A block of HTML: kept as it is, to its blank line. Only block-level
+    # elements -- a line that merely begins with <b>, <i> or an address in
+    # angle brackets is a sentence, and its inline HTML is masked like any
+    # other (fleet over 1.12, 01/4).
+    HTML_BLOCK = %r{\A\s*<(?:!--|/?(?:address|article|aside|audio|blockquote|details|dialog|div|dl|embed|fieldset|figcaption|figure|footer|form|h[1-6]|header|hr|iframe|li|main|nav|object|ol|p|picture|pre|script|section|source|style|summary|table|tbody|td|tfoot|th|thead|tr|ul|video)(?=[\s/>]|\z))}i
     # What marks a line: indentation, quote markers, then a heading, a list
     # bullet or a number.
     PREFIX = /\A(\s*(?:>[ \t]?)*\s*(?:\#{1,6}[ \t]+|[-*+][ \t]+|\d+[.)][ \t]+)?)(.*?)([ \t]{2,}|\\)?\z/m
@@ -72,12 +80,22 @@ module AutoTranslate
         texts << mask(title, tag)
       end
 
-      fenced = false
+      fence = nil
+      html = false
       body.split("\n", -1).each do |line|
-        if line.match?(FENCE)
-          fenced = !fenced
+        if fence
+          fence = nil if closes?(line, fence)
           parts << line
-        elsif fenced || line.strip.empty? || line.match?(MARKER) || line.match?(HTML_LINE)
+        elsif (open = line.match(FENCE))
+          fence = open[1]
+          parts << line
+        elsif html
+          html = !line.strip.empty?
+          parts << line
+        elsif line.match?(HTML_BLOCK)
+          html = true
+          parts << line
+        elsif line.strip.empty? || line.match?(MARKER)
           parts << line
         else
           lead, text, tail = line.match(PREFIX).captures
@@ -101,6 +119,11 @@ module AutoTranslate
         "---\ntitle: #{new_title.gsub(/\s*\n\s*/, ' ')}\nslug:\n---\n#{out.join("\n")}"
       end
       [texts.map { |masked| masked[:sent] }, assemble]
+    end
+
+    def closes?(line, opened)
+      m = line.match(/\A\s*(`{3,}|~{3,})\s*\z/)
+      m && m[1][0] == opened[0] && m[1].length >= opened.length
     end
 
     # The text as it is sent (`sent`) and what each tag stands for (`kept`).
@@ -140,19 +163,31 @@ module AutoTranslate
     # The translation with every tag put back. A tag the service lost is a
     # piece of Markdown missing -- what is left is still the text, and the
     # check against the original says what went.
+    #
+    # The service's text is cleaned first (stray tags out, entities back to
+    # characters) and the kept pieces go in last, as they were: done the
+    # other way round, a code span `&lt;div&gt;` came back as `<div>` and a
+    # code span `<x>` vanished (fleet over 1.12, 01/2). A tag is known by its
+    # i however the service wrote it -- attributes in another order, single
+    # quotes, spaces (01/7).
+    OPEN = /<x\b(?=[^>]*?\bi\s*=\s*["']?(\d+))[^>]*?/
+    SLOT = "\u{F8F0}%d\u{F8F1}"
     def unmask(translated, masked)
       kept = masked[:kept]
-      put = ->(m) { kept[m.to_i].to_s }
-      # A language that declines its nouns hangs an ending on the kept words
-      # ("s `code`m"): letters stuck to the tag that the original did not
-      # have there are the service's, and go.
-      text = translated.to_s.gsub(%r{<x\s+i="(\d+)"[^>/]*>.*?</x>([[:alpha:]]*)}m) do
-        at = Regexp.last_match(1)
+      glued = masked[:glued].to_a
+      text = translated.to_s.gsub(%r{#{OPEN}(?<!/)>.*?</x\s*>((?:[\p{Latin}\p{Cyrillic}\p{Greek}]{1,3}(?![[:alpha:]]))?)}m) do
+        at = Regexp.last_match(1).to_i
         ending = Regexp.last_match(2)
-        put.call(at) + (masked[:glued].to_a[at.to_i] ? ending : '')
+        # A language that declines its nouns hangs an ending on the kept
+        # words ("s `code`m"): a short ending the original did not have
+        # there is the service's, and goes. Only a short one, and only in a
+        # script that puts spaces between words -- in Japanese or Chinese
+        # what follows the tag is the rest of the sentence (01/3).
+        format(SLOT, at) + (glued[at] ? ending : '')
       end
-      text = text.gsub(%r{<x\s+i="(\d+)"[^>]*/>}) { put.call(Regexp.last_match(1)) }
-      unescape(text.gsub(%r{</?x\b[^>]*>}, ''))
+      text = text.gsub(%r{#{OPEN}/\s*>}) { format(SLOT, Regexp.last_match(1).to_i) }
+      text = unescape(text.gsub(%r{</?x\b[^>]*>}, ''))
+      text.gsub(/\u{F8F0}(\d+)\u{F8F1}/) { kept[Regexp.last_match(1).to_i].to_s }
     end
 
     def escape(text)
@@ -174,8 +209,16 @@ module AutoTranslate
       raise Error.new('translator_failed', 'no target language') if @lang.to_s.empty?
 
       texts, assemble = Segments.split(document, tag: tag)
-      translated = texts.each_slice(BATCH).flat_map { |batch| request(batch) }
-      raise Error.new('translator_empty') unless translated.length == texts.length
+      # Counted batch by batch, and every text owed something: one batch a
+      # text short and the next one over shifted every paragraph between
+      # them, and an empty answer was taken for a translation (01/6).
+      translated = texts.each_slice(BATCH).flat_map do |batch|
+        answer = request(batch)
+        raise Error.new('translator_empty') unless answer.length == batch.length
+        raise Error.new('translator_empty') if answer.each_with_index.any? { |t, n| t.to_s.strip.empty? && !batch[n].to_s.strip.empty? }
+
+        answer
+      end
 
       assemble.call(translated)
     end
@@ -229,8 +272,16 @@ module AutoTranslate
       { 'authorization' => "DeepL-Auth-Key #{@key}" }
     end
 
+    # The variants DeepL knows by name. A site whose language says which
+    # one (pt-BR, en-GB, zh-Hant) gets that one; only a bare code falls
+    # back to the setting or the default (01/5).
+    NAMED = %w[EN-GB EN-US PT-BR PT-PT ZH-HANS ZH-HANT].freeze
     def target
-      code = @lang.to_s.split(/[-_]/).first.to_s.upcase
+      parts = @lang.to_s.split(/[-_]/)
+      code = parts.first.to_s.upcase
+      named = parts[1] && "#{code}-#{parts[1].upcase}"
+      return named if NAMED.include?(named)
+
       name, fallback = VARIANTS[code]
       name ? (@env[name].to_s.strip.empty? ? fallback : @env[name].to_s.strip.upcase) : code
     end
@@ -282,9 +333,16 @@ module AutoTranslate
     end
 
     def body_for(batch)
-      body = { 'q' => batch, 'source' => 'auto', 'target' => @lang.to_s.split(/[-_]/).first.to_s.downcase, 'format' => 'html' }
+      body = { 'q' => batch, 'source' => 'auto', 'target' => target, 'format' => 'html' }
       body['api_key'] = @key unless @key.empty?
       body
+    end
+
+    # LibreTranslate names traditional Chinese zt; any other variant is its
+    # language (01/5).
+    def target
+      parts = @lang.to_s.downcase.split(/[-_]/)
+      parts.first == 'zh' && %w[hant tw hk mo].include?(parts[1]) ? 'zt' : parts.first.to_s
     end
 
     def texts_of(reply)
