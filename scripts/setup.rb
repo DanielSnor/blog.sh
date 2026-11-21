@@ -970,10 +970,14 @@ def ask_translator(env)
   else
     # DeepL and LibreTranslate are not language models: there is no model to name.
     modelless = %w[deepl libretranslate].include?(chosen)
+    # Another provider: the address, the key -- and the model -- of the one
+    # before are not its. The model was offered as "Now:" and Enter gave
+    # Anthropic an OpenAI model (second fleet over 1.12, 03/4).
+    switched = chosen != now
     model = if modelless
               ''
             else
-              ask_valid(t('q_translator_model'), ENV['TRANSLATOR_MODEL'].to_s, hint: t('h_translator_model')) do |answer|
+              ask_valid(t('q_translator_model'), switched ? '' : ENV['TRANSLATOR_MODEL'].to_s, hint: t('h_translator_model')) do |answer|
                 t('e_translator_model') if answer.to_s.strip.empty?
               end
             end
@@ -986,7 +990,6 @@ def ask_translator(env)
     # its. Kept, they sent the new provider's requests -- and the old key --
     # to the old address, and Enter at the key kept a key the new provider
     # does not know.
-    switched = chosen != now
     env.set('TRANSLATOR', chosen)
     modelless ? env.unset('TRANSLATOR_MODEL') : env.set('TRANSLATOR_MODEL', model.strip)
     env.unset('TRANSLATOR_URL') if switched

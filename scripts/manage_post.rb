@@ -6691,6 +6691,9 @@ def delete_post(slug, path: nil, confirmed: false)
   end
   File.write(File.join(trash_dir, 'post.json'), JSON.pretty_generate(trashed))
   File.delete(path)
+  # A deleted post owes no toot: settled here, its line is not left to be
+  # read by doctor as a post renamed before its announcement went out.
+  Publishing.settle_announcement(path)
   FileUtils.mv(media_dir, File.join(trash_dir, 'media')) if Dir.exist?(media_dir)
   # ...and back in with them, beside the post's own media rather than
   # instead of it: a name already taken keeps both copies.

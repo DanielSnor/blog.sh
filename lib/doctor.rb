@@ -400,9 +400,16 @@ module Doctor
       findings << error(t('base_url_missing'), t('base_url_missing_fix'))
     elsif base == 'https://example.com'
       findings << warn(t('base_url_placeholder'), t('base_url_placeholder_fix'))
-    elsif !base.match?(%r{\Ahttps?://[^/\s]+})
+    elsif !(parts = base.match(%r{\Ahttps?://[^/?#\s]+(?<path>/[^?#\s]*)?(?<rest>[?#]\S*)?\z}))
+      # A space anywhere is a shape error too: `https://x.cz/ ` was said to
+      # have the path "/ " (second fleet over 1.12, 03/3).
       findings << error(t('base_url_shape', value: base), t('base_url_shape_fix'))
-    elsif (path = base[%r{\Ahttps?://[^/\s]+(/.*[^/])/?\z}, 1])
+    elsif parts[:rest]
+      # Every address is the base_url with a path appended: after a query or
+      # a fragment, that path is part of the query (`https://x.cz?lang=cs/feed.xml`).
+      findings << warn(t('base_url_query', value: base), t('base_url_path_fix'))
+    elsif !(path = parts[:path].to_s.sub(%r{/+\z}, '')).empty?
+      # `/blog//` is a path too, not only a trailing slash.
       # A site under a path (https://example.com/blog) is not one this engine
       # builds: its pages ask for /assets/..., the search and the feeds from
       # the root of the domain, so they come out unstyled, or styled by
@@ -1308,6 +1315,13 @@ module Doctor
 
     # A line is the path, a tab and when it was owed (the time is the cron's).
     lines = File.readlines(marker, chomp: true, encoding: 'utf-8').map { |line| line.scrub.split("\t", 2).first.to_s.strip }
+    # A line whose file is gone: a post renamed or moved by an engine before
+    # the debt went along with it (second fleet over 1.12, 02/1), or by
+    # hand. The next run settles it without a word, so this is the moment
+    # to say which post it was.
+    gone = lines.reject(&:empty?).uniq.reject { |rel| File.exist?(File.join(content_dir, rel)) }
+    findings = gone.empty? ? [] : [warn(t('announce_pending_gone', count: gone.size, paths: gone.first(5).join(', ')),
+                                        t('announce_pending_gone_fix'))]
     owed = lines.reject(&:empty?).uniq.filter_map do |rel|
       post = begin
         JSON.parse(File.read(File.join(content_dir, rel), encoding: 'utf-8'))
@@ -1320,10 +1334,10 @@ module Doctor
 
       post['slug'].to_s
     end
-    return [] if owed.empty?
+    return findings if owed.empty?
 
-    [warn(t('announce_pending', count: owed.size, slugs: owed.first(5).join(', ')),
-          t('announce_pending_fix', command: bluesky && dig(data, 'mastodon', 'instance').to_s.strip.empty? ? 'bluesky' : 'toot'))]
+    findings + [warn(t('announce_pending', count: owed.size, slugs: owed.first(5).join(', ')),
+                     t('announce_pending_fix', command: bluesky && dig(data, 'mastodon', 'instance').to_s.strip.empty? ? 'bluesky' : 'toot'))]
   rescue SystemCallError
     []
   end
