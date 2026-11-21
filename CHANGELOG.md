@@ -11,7 +11,7 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.12.pre -- 2026-11-16
+## 1.12 -- 2026-11-21
 
 The translation release. `translate --auto` hands a post to a translator the author names -- a program of
 one's own, OpenAI, Anthropic, Gemini, DeepL or LibreTranslate -- and leaves a draft to read and save.
