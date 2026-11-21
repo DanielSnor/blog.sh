@@ -1044,7 +1044,7 @@ no branch, and `git pull` refuses with "You are not currently on a
 branch"; move it to the next release by name instead:
 
 ```bash
-git fetch --tags && git checkout v1.11
+git fetch --tags && git checkout v1.12
 ```
 
 The first build after an upgrade may be a full one -- the engine's own
@@ -1059,10 +1059,23 @@ file (`?v=`), so a returning reader is never handed a new page with
 yesterday's stylesheet -- and every later change to one does the same.
 The same deploy takes `/write/` off the site, so a post that links to it
 now leads to a 404; `./blog.sh check` names each one (`link_dead`).
+From 1.11.1 to 1.12 the first deploy uploads every page once more: the
+stylesheet and the comment script changed, and with them their
+fingerprints. A post with a toot also carries the words of the field for
+the reader's own server, and nothing else in a page changes.
 
 **Going back a version** is `git checkout <tag>` and a rebuild, and what
 the newer version was given to work with is looked at first, because the
-older one does not treat all of it alike. From 1.11 back to 1.10: take
+older one does not treat all of it alike. From 1.12 back to 1.11.1
+nothing stops the build. `comments.reply_from_own_server` it passes over,
+and the field for the reader's own server leaves the pages. A toot that
+waits in `.announce-pending` is never sent: send it with `./blog.sh toot
+<slug>` (or `bluesky`) first. The `TRANSLATOR_*` lines in `env.sh` it
+ignores, and `--auto` is a word `translate` does not know. A translation
+1.12 wrote into `tmp/` and nobody has saved carries a `base:` that 1.11.1
+reads as "the post changed since", so `add` refuses it -- save it before
+going back. Hashtags go back to their old shape, and a site with no
+deploy target is announced again. From 1.11 back to 1.10: take
 `series_index:` out of every `config/site.<lang>.yml`, or the build
 stops on it and nothing is deployed. A menu entry that names a series
 (`series:`) or heads a group (`group: true`) 1.10 leaves out of the
