@@ -38,8 +38,24 @@ module DefaultEditor
   # Whether `nano` here is really pico. Told by the file the link leads to,
   # never by running it: pico has no --version, and asked for one it opens a
   # file called "--version".
+  #
+  # A link is not the only way to it (second fleet over 1.12, 03/1): a
+  # hard link has no target to read, so it is compared with the pico beside
+  # it; a small script that hands over to pico (`exec .../pico "$@"`) is
+  # read, not run. Either was taken for GNU nano, got its long switches, and
+  # pico wrote the post into a file called --softwrap.
   def pico?(search = ENV['PATH'])
-    File.basename(nano_path(search).to_s).start_with?('pico')
+    path = nano_path(search)
+    return false unless path
+    return true if File.basename(path).start_with?('pico')
+
+    beside = File.join(File.dirname(path), 'pico')
+    return true if File.exist?(beside) && File.identical?(path, beside)
+
+    script = File.open(path, 'rb') { |f| f.read(4096) }.to_s
+    script.start_with?('#!') && script.match?(%r{(?:\A|[\s/"'])pico(?:[\s"']|\z)})
+  rescue SystemCallError
+    false
   end
 
   # The words to start it with, before the file's path.

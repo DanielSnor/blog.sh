@@ -43,7 +43,14 @@ module RubySupport
 
   # :end_of_life for a branch that gets no fixes any more, :unpatched for a
   # maintained branch below its fixed release, nil for a Ruby that is fine.
-  def status(version = current)
+  #
+  # Only for CRuby: JRuby and TruffleRuby give the version of the language
+  # they speak as RUBY_VERSION, have their own regular expressions and
+  # their own releases -- told to update to 3.4.13, there is nothing to
+  # update to, and the warning stayed for good (second fleet over 1.12, 03/2).
+  def status(version = current, engine: RUBY_ENGINE)
+    return nil unless engine == 'ruby'
+
     parts = version.to_s.split('.').map(&:to_i)
     parts << 0 while parts.size < 3
     branch = parts.first(2)
