@@ -197,6 +197,30 @@ Planned for 1.12 and not yet in this file: limako's #78 (a series numbered from 
   as they are typed, which GNU nano reads the same way, and which is now also the fallback for an old GNU nano.
   `doctor` says when `nano` is pico (a paragraph is not wrapped on the screen there) and how to get GNU nano, and
   when there is no editor at all. The setup wizard's own editor step opens `nano -w` too.
+- **What a second, smaller fleet over 1.12 found (20 November), fixed before the release:**
+  - DeepL and LibreTranslate: a code block fenced with ```` that shows ``` inside was sent to be translated, and with
+    an odd number of them the rest of the post was not; a fence now closes as the parser closes it. A code span
+    `&lt;div&gt;` came back as `<div>` and a code span `<x>` not at all, even from an answer that changed nothing:
+    the service's text is cleaned before the kept pieces go back. Cutting the ending off a kept piece ("s `code`m")
+    cut the rest of a Japanese or Chinese sentence; only a short ending in a script with spaces goes now. A line that
+    begins with `<b>` or `<https://...>` is translated; only a block of HTML is kept, to its blank line. A tag the
+    service wrote its own way is still known; every batch is counted and every text owed an answer. A language that
+    names its variant (`pt-BR`, `en-GB`, `zh-Hant`) gets it from DeepL; LibreTranslate's traditional Chinese is `zt`.
+  - The owed toot follows a post renamed, moved to another year by an edit, or moved by a date set through
+    scheduling; before, the next run found no file there and the post went out unannounced. `delete` settles its own
+    line, and `doctor` names a line whose post is gone. A post deleted or renamed while a manual publish deployed is
+    not written back from the copy read before the build. A debt owed in the future (a clock that went back) is paid
+    rather than waited for on every tick. The cron no longer announces a scheduled post on a site with no deploy
+    target, as a manual publish has not since the first fleet.
+  - `C++` and `C#` are `#Cplusplus` and `#Csharp`, not both `#C`. `translate --auto` reads a language's address from
+    the header only, not from a `slug:` line in a code block. `doctor` reads the site's address whole: `/blog//` is a
+    path, a query or a fragment is said as such, a trailing space is the wrong shape. `./setup.sh --translator`
+    switched to another provider asks for the model afresh; the question about the apps no longer says "(Enter:
+    yes)" where Enter keeps a `deny`. A `nano` that reaches pico by a hard link or a script is pico too. JRuby and
+    TruffleRuby are not told to update to a CRuby release.
+- The classic skin lays the ways to reply (#75) out as a row that wraps whole links -- on a phone "Reply from
+  another / server..." broke in two -- and the field's error is in the text's colour, not the links'. Terminal stands
+  on classic and has it too.
 - README names the `TRANSLATOR_*` settings, and the `--json` table in `docs/operations.md` has the `auto` block and
   `translate --auto --json` with its codes.
 
