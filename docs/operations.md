@@ -1906,6 +1906,10 @@ differently.
 
 What it looks for, each with a line saying what to do about it:
 
+- **A Ruby that gets no security fixes.** A maintained branch below the
+  release that fixed its last security hole, or a branch past its end of
+  life, with the version to update to. It is a warning, nothing exits 1
+  for it, and `doctor` says it in the same words.
 - **A `config/site.yml` that is missing, empty, will not parse, or cannot
   be opened.** The build stops on all four and `doctor` explains all four;
   `check` used to read the config only to pick the language it printed in
