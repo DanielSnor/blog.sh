@@ -8126,11 +8126,21 @@ def browse_preview(summary)
            end
     state = { selected: 0, offset: 0 }
     many = langs.size > 1
+    # The language is the left of the status, not the right: a narrow
+    # terminal drops the right-hand side whole, and the original then stood
+    # under a bare "preview" as if it were the translation (fleet over
+    # 1.12.1, W2). For the same reason [l] leads the keys -- they are cut
+    # from the second-to-last one.
+    status = side.empty? ? t('cli.browse_preview_status') : side
     result = Tui.browse(state, keys: t(many ? 'cli.browse_preview_keys_lang' : 'cli.browse_preview_keys'),
                                empty: t('cli.browse_preview_empty'), cursor: false, hot_keys: many ? ['l'] : []) do
-      [lines, [t('cli.browse_preview_status'), side]]
+      [lines, [status, '']]
     end
-    break unless result
+    # Only [l] turns the page to the next language. Enter leaves, as it did
+    # before there were languages here; taking any answer for [l] made Enter
+    # walk the languages, and on a site in one language repaint the same
+    # page for ever (W1).
+    break unless result.is_a?(Array) && result[0] == :key && result[1] == 'l'
 
     shown = (shown + 1) % langs.size
     print "\e[2J\e[H"
@@ -8143,14 +8153,31 @@ end
 
 # One language of the preview: its title and text, with the date, type,
 # slug and tags of the post, which a translation shares.
+#
+# A translation somebody started -- a title, an excerpt -- and no text yet
+# showed an empty page under the language's name, as if the text were
+# blank (W3). And a content the Markdown writer cannot read (a block that
+# is null, a text block with no text) ended the whole wizard in a backtrace
+# from the preview, the one screen whose job is only to look (W4; for the
+# original's own content it did so in 1.12 already). Both say what they are.
 def browse_preview_page(summary, post, source, year)
-  markdown = MarkdownWriter.blocks_to_markdown(Array(source['content']), File.join(MEDIA_DIR, year, summary[:slug]))
   width = [Tui.term_width - 4, 40].max
+  body = begin
+    blocks = Array(source['content'])
+    if blocks.empty? && !source.equal?(post)
+      [t('cli.browse_preview_no_text')]
+    else
+      markdown = MarkdownWriter.blocks_to_markdown(blocks, File.join(MEDIA_DIR, year, summary[:slug]))
+      browse_preview_lines(post, markdown, width)
+    end
+  rescue StandardError => e
+    [t('cli.browse_preview_unreadable', error: e.message.lines.first.to_s.strip[0, 100])]
+  end
   title = source['title'].to_s.empty? ? post['title'].to_s : source['title'].to_s
   header = [Tui.paint(title.empty? ? summary[:slug] : title, :bold),
             "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary, localized: true)}  ·  #{summary[:slug]}"]
   header << t('cli.browse_preview_tags', tags: post['tags'].join(', ')) unless (post['tags'] || []).empty?
-  header + [''] + browse_preview_lines(post, markdown, width)
+  header + [''] + body
 end
 
 # Time.parse with the file's own sentence instead of a backtrace -- a
@@ -8953,14 +8980,26 @@ def post_crossroads(slug)
     # Backing out of here is :nothing -- the screen it came from comes back
     # without "press any key" under one word (#85).
     if langs.empty?
-      :nothing
+      backed_out
     else
       chosen = langs.size == 1 ? langs.first : pick_language_interactively(path, langs)
-      chosen ? cmd_translate(slug, chosen) : :nothing
+      chosen ? cmd_translate(slug, chosen) : backed_out
     end
   else
-    :nothing
+    backed_out
   end
+end
+
+# What backing out of the crossroads says. The screen wizard and the
+# Archive repaint over it, so there it says nothing; a piped run, which
+# repaints nothing, keeps the "Cancelled." it always printed (fleet over
+# 1.12.1, W5).
+def backed_out
+  unless WIZARD_STATE[:running] || Tui.interactive?
+    puts t('cli.cancelled')
+    puts
+  end
+  :nothing
 end
 
 # Which language to write, when the site publishes more than one. The row
