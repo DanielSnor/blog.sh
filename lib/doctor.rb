@@ -207,6 +207,7 @@ module Doctor
     findings.concat(of(:deploy, check_deploy(root)))
     findings.concat(of(:deploy_keep, check_deploy_keep(data)))
     findings.concat(of(:online, check_online(data, root))) if online
+    findings.concat(of(:engine_update, check_engine_update(root))) if online
     findings
   end
 
@@ -1845,7 +1846,29 @@ module Doctor
     findings
   end
 
-  # What a host serves ahead of index.html: shared hosting lists the PHP
+# Whether a newer release of the engine is out (#87) -- lib/engine_update.rb
+# says why by version and not by commit. Never more than a warning, and
+# a copy that is no clone is said in a sentence, not warned about.
+def check_engine_update(root = ROOT)
+  require_relative 'engine_update'
+  state, *rest = EngineUpdate.status(root)
+  case state
+  when :not_a_clone then [ok(t('engine_update_not_a_clone'))]
+  when :unanswered then [warn(t('engine_update_unanswered', message: rest.first.to_s.empty? ? '?' : rest.first))]
+  when :no_tags then [ok(t('engine_update_no_tags'))]
+  when :current then [ok(t('engine_update_current', current: rest.first))]
+  else
+    newest, current, place = rest
+    fix = case place
+          when :main then t('engine_update_fix_main')
+          when :tag then t('engine_update_fix_tag', newest: newest)
+          else t('engine_update_fix_branch', branch: place, newest: newest)
+          end
+    [warn(t('engine_update_newer', newest: newest, current: current), fix)]
+  end
+end
+
+# What a host serves ahead of index.html: shared hosting lists the PHP
   # front page first in its DirectoryIndex.
   INDEX_SHADOWS = %w[index.php].freeze
 

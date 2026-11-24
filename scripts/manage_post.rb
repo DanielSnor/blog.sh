@@ -2533,7 +2533,7 @@ def pick_among_years(slug, paths)
     # the frame would paint straight over it.
     choice = Tui.menu(rows, header: [question, ''],
                             hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
-    abort t('cli.cancelled_empty') if choice.nil?
+    cancel_pick! if choice.nil?
     puts
     return paths[choice]
   end
@@ -3105,6 +3105,7 @@ end
 
 def cmd_queue_screen
   dirty = false
+  said = false
   selected = 0
   offset = 0
   mode = :list
@@ -3119,6 +3120,7 @@ def cmd_queue_screen
       # only from a cleared screen (the first pass, or after screen.leave
       # published the last post), so there is no open frame row to close.
       puts t('cli.queue_empty')
+      said = true
       break
     end
 
@@ -3205,10 +3207,14 @@ def cmd_queue_screen
   # The one blank line this command ends with. The rebuild opens with a
   # blank line of its own and closes with another after "Done:", so it is
   # only the silent way out that has to write one.
+  # Esc out of a queue nobody touched leaves nothing to read, so the wizard
+  # goes straight back to its menu (#85); a rebuild, or "the queue is
+  # empty", keeps its pause.
   if dirty
     rebuild_and_deploy(t('cli.updating_preview'))
   else
     puts
+    said ? nil : :nothing
   end
 end
 
@@ -6750,7 +6756,7 @@ def pick_among_trashed(slug, paths)
     # the frame would paint straight over it.
     choice = Tui.menu(rows, header: [question, ''],
                             hint: t('cli.menu_hint_plain', count: [rows.size, 9].min))
-    abort t('cli.cancelled_empty') if choice.nil?
+    cancel_pick! if choice.nil?
     puts
     return paths[choice]
   end
@@ -8098,23 +8104,53 @@ def wrap_to_width(line, width)
   out
 end
 
+# On a site in more than one language, [l] walks the preview through them:
+# the original, then each other language the site publishes, then back
+# (Pavel, #86) -- checking a translation without opening the post. A
+# language with nothing written shows the original under a status that
+# says so, rather than an empty screen or a silent original that reads as
+# if it were the translation. A site in one language gets no key at all.
 def browse_preview(summary)
   post = JSON.parse(File.read(summary[:path], encoding: 'utf-8'))
   year = File.basename(File.dirname(summary[:path]))
-  markdown = MarkdownWriter.blocks_to_markdown(post['content'], File.join(MEDIA_DIR, year, summary[:slug]))
-  width = [Tui.term_width - 4, 40].max
-  header = [Tui.paint(post['title'].to_s.empty? ? summary[:slug] : post['title'], :bold),
-            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary, localized: true)}  ·  #{summary[:slug]}"]
-  header << t('cli.browse_preview_tags', tags: post['tags'].join(', ')) unless (post['tags'] || []).empty?
-  lines = header + [''] + browse_preview_lines(post, markdown, width)
-  state = { selected: 0, offset: 0 }
-  Tui.browse(state, keys: t('cli.browse_preview_keys'), empty: t('cli.browse_preview_empty'), cursor: false) do
-    [lines, [t('cli.browse_preview_status'), '']]
+  langs = [nil] + other_languages
+  shown = 0
+  loop do
+    lang = langs[shown]
+    translated = lang && language_state(post, lang) != :none
+    source = translated ? post['translations'][lang] : post
+    lines = browse_preview_page(summary, post, source, year)
+    side = if lang.nil? then ''
+           elsif translated then t('cli.browse_preview_language', language: language_name(lang))
+           else t('cli.browse_preview_no_translation', language: language_name(lang))
+           end
+    state = { selected: 0, offset: 0 }
+    many = langs.size > 1
+    result = Tui.browse(state, keys: t(many ? 'cli.browse_preview_keys_lang' : 'cli.browse_preview_keys'),
+                               empty: t('cli.browse_preview_empty'), cursor: false, hot_keys: many ? ['l'] : []) do
+      [lines, [t('cli.browse_preview_status'), side]]
+    end
+    break unless result
+
+    shown = (shown + 1) % langs.size
+    print "\e[2J\e[H"
   end
   puts
 rescue JSON::ParserError, SystemCallError => e
   puts t('cli.unreadable_post', path: summary[:path], error: e.message.lines.first.to_s.strip[0, 100])
   puts
+end
+
+# One language of the preview: its title and text, with the date, type,
+# slug and tags of the post, which a translation shares.
+def browse_preview_page(summary, post, source, year)
+  markdown = MarkdownWriter.blocks_to_markdown(Array(source['content']), File.join(MEDIA_DIR, year, summary[:slug]))
+  width = [Tui.term_width - 4, 40].max
+  title = source['title'].to_s.empty? ? post['title'].to_s : source['title'].to_s
+  header = [Tui.paint(title.empty? ? summary[:slug] : title, :bold),
+            "#{row_date(summary)}  ·  [#{summary[:type]}]#{state_marker(summary, localized: true)}  ·  #{summary[:slug]}"]
+  header << t('cli.browse_preview_tags', tags: post['tags'].join(', ')) unless (post['tags'] || []).empty?
+  header + [''] + browse_preview_lines(post, markdown, width)
 end
 
 # Time.parse with the file's own sentence instead of a backtrace -- a
@@ -8189,8 +8225,7 @@ def cmd_browse(filters = {})
       state.delete(:lines)
       puts
       puts
-      post_crossroads(selected[:slug])
-      Tui.pause_and_clear(t('cli.wizard_continue_prompt'))
+      Tui.pause_and_clear(t('cli.wizard_continue_prompt')) unless post_crossroads(selected[:slug]) == :nothing
       posts = browse_posts
       # The screen comes back with the query still active, so the index
       # must come back with it -- nilling it made every post match
@@ -8243,8 +8278,10 @@ def cmd_browse(filters = {})
   # second is the one blank line this command ends with -- without them
   # the wizard's "press a key" was printed straight under the keys, with
   # nothing between.
+  # Nothing is left to read, so the wizard does not pause on it (#85).
   puts
   puts
+  :nothing
 end
 
 # How many posts the pick_*_interactively menus offer. Was 10 back when
@@ -8269,6 +8306,23 @@ end
 # given posts, lets the user answer with either that number or a literal
 # slug typed directly (unchanged behavior for anything that isn't a plain
 # in-range digit).
+# Esc in a picker is a way back, not an error. On the command line it ends
+# the command as it always did -- "Cancelled." and a non-zero exit, which a
+# script reading the status relies on. Under the wizard it raises
+# PickCancelled instead, which run_wizard_choice turns into :nothing: the
+# menu comes straight back, with no "press any key" under a single word
+# (Pavel, #85). A SystemExit, so every place that already lets an abort
+# through lets this through too.
+class PickCancelled < SystemExit; end
+
+WIZARD_STATE = { running: false }
+
+def cancel_pick!
+  raise PickCancelled, 1 if WIZARD_STATE[:running]
+
+  abort t('cli.cancelled_empty')
+end
+
 def pick_from_list(posts, empty_message)
   abort "#{empty_message}\n\n" if posts.empty?
 
@@ -8283,7 +8337,7 @@ def pick_from_list(posts, empty_message)
     choice = Tui.menu(posts.each_with_index.map { |p, i| "#{(i + 1).to_s.rjust(width)}) #{summary_row(p)}" },
                       hint: t('cli.menu_hint'), allow_text: true,
                       text_prompt: t('cli.enter_number_or_slug'))
-    abort t('cli.cancelled_empty') if choice.nil?
+    cancel_pick! if choice.nil?
     puts
     return choice.is_a?(Integer) ? posts[choice][:slug] : choice
   end
@@ -8896,16 +8950,16 @@ def post_crossroads(slug)
     # Nothing to translate into means the key is not a key: a site that
     # publishes one language never had it on the prompt, and a letter that
     # does something invisible is worse than one that does nothing.
+    # Backing out of here is :nothing -- the screen it came from comes back
+    # without "press any key" under one word (#85).
     if langs.empty?
-      puts t('cli.cancelled')
-      puts
+      :nothing
     else
       chosen = langs.size == 1 ? langs.first : pick_language_interactively(path, langs)
-      chosen ? cmd_translate(slug, chosen) : (puts t('cli.cancelled'); puts)
+      chosen ? cmd_translate(slug, chosen) : :nothing
     end
   else
-    puts t('cli.cancelled')
-    puts
+    :nothing
   end
 end
 
@@ -8941,6 +8995,9 @@ def run_wizard_choice(command)
 # here, uncaught, it would end the whole wizard instead of returning to the
 # menu. `abort`/`exit` raise SystemExit, not StandardError, hence the
 # explicit rescue.
+# A picker left by Esc is the one abort with nothing to read (#85).
+rescue PickCancelled
+  :nothing
 rescue SystemExit
   nil
 end
@@ -8981,6 +9038,7 @@ end
 def run_wizard_screen
   selected = 0
   offset = 0
+  WIZARD_STATE[:running] = true
   Tui.screen do |screen|
     loop do
       # Three rows of identity, two blanks, the question, the blank above
@@ -9023,6 +9081,7 @@ def run_wizard_screen
       screen.leave(t('cli.wizard_continue_prompt')) { run_wizard_choice(WIZARD_MENU[chosen].first) }
     end
   end
+  WIZARD_STATE[:running] = false
   # A blank line to sit on the way out, so the shell prompt does not land
   # flush against the last frame. It takes two: Tui.frame ends its last row
   # without a newline, so the first only closes that row -- one alone left

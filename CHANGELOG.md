@@ -11,6 +11,21 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.12.1.pre
+
+Notes as the cycle goes; rewritten into the final shape before the tag.
+
+### Added
+
+- **`doctor --online` says when a newer release is out** (#87, Pavel). By version, not by commit: the release tags are read with `git ls-remote` (nothing written) and the newest is compared with the engine's own. The advice follows the clone: on `main` it is `git pull`, on a release tag `git fetch --tags && git checkout v…` (pull refuses there), on a branch of one's own only the two numbers. A copy that is not a git clone is not checked; an origin that does not answer is a warning.
+- **`l` in the Archive's preview walks through the site's languages** (#86, Pavel). The original, then each other language the site publishes, then back. A language with nothing written shows the original under "no translation (…)". A site in one language has no such key.
+
+### Fixed
+
+- **Esc went back through "Press any key…"** (#85, Pavel). Leaving a picker (Post, Trash), the Archive, an untouched queue or a post's crossroads by Esc cost a keystroke under nothing worth reading. The menu now comes straight back. The pause stays after publishing, rescheduling or a rebuild, and under "the queue is empty"; on the command line a cancelled pick still ends with "Cancelled." and a non-zero exit.
+- **Debian's nano was taken for pico.** Debian and Ubuntu name GNU nano pico through the alternatives (`/usr/bin/pico -> /etc/alternatives/pico -> /usr/bin/nano`); the hard-link check of 1.12 followed the link, so GNU nano lost its long switches and `doctor` said pico. The pico beside nano now counts only as a file of its own.
+
+
 ## 1.12 -- 2026-11-21
 
 The translation release. `translate --auto` hands a post to a translator the author names -- a program of

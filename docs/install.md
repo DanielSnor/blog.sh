@@ -1047,6 +1047,12 @@ branch"; move it to the next release by name instead:
 git fetch --tags && git checkout v1.12
 ```
 
+`./blog.sh doctor --online` says when a newer release is out, and which of
+the two to run: it reads the release tags from `origin` (nothing is
+fetched or written) and compares the newest with the engine's own version.
+A clone on a branch of its own hears the two numbers and no command, and a
+copy that is not a git clone is not checked.
+
 The first build after an upgrade may be a full one -- the engine's own
 fingerprint changed, so the record of the last build is thrown away --
 and it writes `.build_cache.json` in the installation directory -- on a
