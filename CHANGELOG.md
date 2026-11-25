@@ -11,19 +11,23 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
-## 1.12.1.pre
+## 1.12.1 -- 2026-11-25
 
-Notes as the cycle goes; rewritten into the final shape before the tag.
+A small release from Pavel's first days on 1.12: Esc in the wizard goes straight back, the Archive's
+preview shows a post's translations, and `doctor --online` says when a newer release is out. Beside
+them, Debian's nano is no longer taken for pico. Nothing to migrate -- `git pull`, and on a release
+tag `git fetch --tags && git checkout v1.12.1`.
 
 ### Added
 
-- **`doctor --online` says when a newer release is out** (#87, Pavel). By version, not by commit: the release tags are read with `git ls-remote` (nothing written) and the newest is compared with the engine's own. The advice follows the clone: on `main` it is `git pull`, on a release tag `git fetch --tags && git checkout v…` (pull refuses there), on a branch of one's own -- or on no branch and no tag, a commit checked out or a bisect under way -- only the two numbers. A copy that is not a git clone is not checked; an origin that does not answer within 20 seconds, or a clone git will not read (another user's), is a warning that says which. Over ssh it runs in BatchMode, so ssh refuses rather than asks, unless `GIT_SSH_COMMAND`, `GIT_SSH` or `core.sshCommand` says how ssh is to run.
-- **`l` in the Archive's preview walks through the site's languages** (#86, Pavel). The original, then each other language the site publishes, then back; Enter still leaves. A language with nothing written shows the original under "no translation (…)", one with a title and no text yet says so, and the language stays on the left of the status, where a narrow terminal keeps it. A site in one language has no such key. A text the preview cannot render is said in a line instead of ending the wizard -- for the original as much as for a translation, which in 1.12 ended it in a backtrace.
+- **`doctor --online` says when a newer release is out** (#87). By version, with advice that fits the clone.
+- **`l` in the Archive's preview walks through the post's languages** (#86). A missing translation says so.
 
 ### Fixed
 
-- **Esc went back through "Press any key…"** (#85, Pavel). Leaving a picker (Post, Trash), the Archive, an untouched queue or a post's crossroads by Esc cost a keystroke under nothing worth reading. The menu now comes straight back. The pause stays after publishing, rescheduling or a rebuild, and under "the queue is empty"; on the command line a cancelled pick still ends with "Cancelled." and a non-zero exit, and a wizard run through a pipe still answers "Cancelled." at the crossroads.
-- **Debian's nano was taken for pico.** Debian and Ubuntu name GNU nano pico through the alternatives (`/usr/bin/pico -> /etc/alternatives/pico -> /usr/bin/nano`); the hard-link check of 1.12 followed the link, so GNU nano lost its long switches and `doctor` said pico. The pico beside nano now counts only as a file of its own.
+- **Esc went back through "Press any key…"** (#85). Pickers, the Archive, the queue and the crossroads come straight back.
+- **The Archive's preview ended the wizard on a text it could not render.** It says so in a line.
+- **Debian's nano was taken for pico.** GNU nano keeps its long switches, and `doctor` stops saying pico.
 
 
 ## 1.12 -- 2026-11-21
