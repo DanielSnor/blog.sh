@@ -44,13 +44,19 @@ module DefaultEditor
   # it; a small script that hands over to pico (`exec .../pico "$@"`) is
   # read, not run. Either was taken for GNU nano, got its long switches, and
   # pico wrote the post into a file called --softwrap.
+  #
+  # The pico beside it counts only as a file of its own, not as a link:
+  # Debian and Ubuntu name GNU nano pico through the alternatives
+  # (/usr/bin/pico -> /etc/alternatives/pico -> /usr/bin/nano), and
+  # File.identical? follows links -- so GNU nano there was taken for pico,
+  # lost its long switches, and doctor said pico (after 1.12).
   def pico?(search = ENV['PATH'])
     path = nano_path(search)
     return false unless path
     return true if File.basename(path).start_with?('pico')
 
     beside = File.join(File.dirname(path), 'pico')
-    return true if File.exist?(beside) && File.identical?(path, beside)
+    return true if File.exist?(beside) && File.lstat(beside).file? && File.identical?(path, beside)
 
     script = File.open(path, 'rb') { |f| f.read(4096) }.to_s
     script.start_with?('#!') && script.match?(%r{(?:\A|[\s/"'])pico(?:[\s"']|\z)})

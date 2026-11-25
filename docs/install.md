@@ -1044,8 +1044,14 @@ no branch, and `git pull` refuses with "You are not currently on a
 branch"; move it to the next release by name instead:
 
 ```bash
-git fetch --tags && git checkout v1.12
+git fetch --tags && git checkout v1.12.1
 ```
+
+`./blog.sh doctor --online` says when a newer release is out, and which of
+the two to run: it reads the release tags from `origin` (nothing is
+fetched or written) and compares the newest with the engine's own version.
+A clone on a branch of its own hears the two numbers and no command, and a
+copy that is not a git clone is not checked.
 
 The first build after an upgrade may be a full one -- the engine's own
 fingerprint changed, so the record of the last build is thrown away --
@@ -1063,10 +1069,12 @@ From 1.11.1 to 1.12 the first deploy uploads every page once more: the
 stylesheet and the comment script changed, and with them their
 fingerprints. A post with a toot also carries the words of the field for
 the reader's own server, and nothing else in a page changes.
+From 1.12 to 1.12.1 no page changes at all.
 
 **Going back a version** is `git checkout <tag>` and a rebuild, and what
 the newer version was given to work with is looked at first, because the
-older one does not treat all of it alike. From 1.12 back to 1.11.1
+older one does not treat all of it alike. From 1.12.1 back to 1.12
+there is nothing to look at. From 1.12 back to 1.11.1
 nothing stops the build. `comments.reply_from_own_server` it passes over,
 and the field for the reader's own server leaves the pages. A toot that
 waits in `.announce-pending` is never sent: send it with `./blog.sh toot

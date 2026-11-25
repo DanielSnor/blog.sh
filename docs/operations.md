@@ -270,6 +270,11 @@ deploys, opens the editor or writes a file, and in a question about a
 setting it keeps the current value. A question you type an answer into
 is read a whole line at a time, so there it is Esc and then Enter: the
 current value stays, and "publish when?" is left without a date.
+Backing out by Esc also comes straight back: leaving a picker, the
+archive, a queue you did not touch or a post's crossroads paints the menu
+again without "Press any key". The pause stays where something was done
+or said -- after publishing, rescheduling or a rebuild, and under "the
+queue is empty".
 
 The three question-and-answer wizards -- `./setup.sh`, `./style.sh` and
 `./import.sh` -- keep the section you are in and the answers already given
@@ -429,6 +434,10 @@ states `check --languages` prints. The properties screen carries a
 `languages` row for the same reason. (As data the two say them in
 different words: `props --json` has `written`, `started` and `none`,
 `check --languages --json` has `written`, `title_only` and `missing`.)
+In the archive browser Space shows a post's preview, and on such a site
+`[l]` walks it through the languages -- the original, each other one, and
+back. A language with nothing written shows the original under "no
+translation", and one with a title only says it has no text yet.
 
 The editor that opens holds a title and a body, and nothing else. That is
 the whole of what a translation may carry: the date, the tags, the series,

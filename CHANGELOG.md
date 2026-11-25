@@ -11,6 +11,25 @@ adds features and stays compatible with existing sites. `./blog.sh version`
 prints what an installation is running.
 
 
+## 1.12.1 -- 2026-11-25
+
+A small release from Pavel's first days on 1.12: Esc in the wizard goes straight back, the Archive's
+preview shows a post's translations, and `doctor --online` says when a newer release is out. Beside
+them, Debian's nano is no longer taken for pico. Nothing to migrate -- `git pull`, and on a release
+tag `git fetch --tags && git checkout v1.12.1`.
+
+### Added
+
+- **`doctor --online` says when a newer release is out** (#87). By version, with advice that fits the clone.
+- **`l` in the Archive's preview walks through the post's languages** (#86). A missing translation says so.
+
+### Fixed
+
+- **Esc went back through "Press any key…"** (#85). Pickers, the Archive, the queue and the crossroads come straight back.
+- **The Archive's preview ended the wizard on a text it could not render.** It says so in a line.
+- **Debian's nano was taken for pico.** GNU nano keeps its long switches, and `doctor` stops saying pico.
+
+
 ## 1.12 -- 2026-11-21
 
 The translation release. `translate --auto` hands a post to a translator the author names -- a program of
